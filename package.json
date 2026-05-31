@@ -30,8 +30,23 @@
     "productName": "Semester Planner",
     "mac": {
       "category": "public.app-category.productivity",
+      "icon": "assets/icon.icns",
       "target": ["dmg", "zip"]
     },
+    "dmg": {
+      "title": "Semester Planner",
+      "icon": "assets/icon.icns",
+      "background": "assets/dmg-background.png",
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "contents": [
+        { "x": 150, "y": 185, "type": "file" },
+        { "x": 390, "y": 185, "type": "link", "path": "/Applications" }
+      ]
+    },
+    "afterSign": "build/afterSign.js",
     "files": [
       "main.js",
       "preload.js",
