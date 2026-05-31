@@ -1,0 +1,44 @@
+name: Release
+
+# Build and publish the macOS app only for version tags.
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  # Run the full CI workflow first. If any test fails, this job fails and the
+  # build below never runs — so a release is never built when tests fail.
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    name: Build macOS app
+    needs: ci
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build (.dmg + .zip)
+        env:
+          # Unsigned build in CI; remove to enable code signing with certs.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npm run build:mac
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-app
+          path: |
+            dist/*.dmg
+            dist/*.zip
+          if-no-files-found: error

@@ -1,19 +1,48 @@
 {
   "name": "semester-planner",
   "version": "1.0.0",
-  "description": "A minimal semester planner web app backed by JSON files",
-  "main": "server.js",
+  "description": "A minimal semester planner desktop app backed by JSON files",
+  "main": "main.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "electron .",
+    "dev": "electron . --dev-tools",
+    "build:mac": "electron-builder --mac",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [
     "semester",
     "planner",
     "university",
-    "study"
+    "study",
+    "electron"
   ],
   "license": "MIT",
-  "dependencies": {
-    "express": "^4.19.2"
+  "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.9",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "vitest": "^2.1.9"
+  },
+  "build": {
+    "appId": "com.tu-usuario.semester-planner",
+    "productName": "Semester Planner",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": ["dmg", "zip"]
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "app.js",
+      "style.css",
+      "lib/",
+      "semesters/"
+    ],
+    "extraResources": [
+      { "from": "semesters/", "to": "semesters/" }
+    ]
   }
 }
