@@ -8,9 +8,20 @@ there's no database and no server. The UI is vanilla JS in an
 and writes the JSON files directly via Node.js.
 
 ![CI](https://github.com/masprime77/semester-planner/actions/workflows/ci.yml/badge.svg)
+[![Latest release](https://img.shields.io/github/v/release/masprime77/semester-planner?label=download)](https://github.com/masprime77/semester-planner/releases/latest)
 ![Vanilla JS](https://img.shields.io/badge/frontend-vanilla%20JS-yellow)
 ![Electron](https://img.shields.io/badge/runtime-electron-47848F)
 ![macOS](https://img.shields.io/badge/platform-macOS-lightgrey)
+
+## Download
+
+**[⬇ Download for macOS (Apple Silicon)](https://github.com/masprime77/semester-planner/releases/latest/download/SemesterPlanner-arm64.dmg)**
+
+That is a permanent link — it always serves the `.dmg` from the **latest**
+release. Open it, drag **Semester Planner** onto Applications, and launch it (see
+[First launch on macOS](#first-launch-on-macos-gatekeeper) the first time). You
+can also browse the [releases page](https://github.com/masprime77/semester-planner/releases/latest)
+or install via [Homebrew](#install-via-homebrew-tap).
 
 ## Features
 
