@@ -1,12 +1,13 @@
 {
   "name": "semester-planner",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A minimal semester planner desktop app backed by JSON files",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev-tools",
     "build:mac": "electron-builder --mac",
+    "icon": "bash assets/build-icns.sh",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
