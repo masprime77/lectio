@@ -31,7 +31,10 @@
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "assets/icon.icns",
-      "target": ["dmg", "zip"]
+      "target": [
+        "dmg",
+        "zip"
+      ]
     },
     "dmg": {
       "title": "Semester Planner",
@@ -42,8 +45,17 @@
         "height": 380
       },
       "contents": [
-        { "x": 150, "y": 185, "type": "file" },
-        { "x": 390, "y": 185, "type": "link", "path": "/Applications" }
+        {
+          "x": 150,
+          "y": 185,
+          "type": "file"
+        },
+        {
+          "x": 390,
+          "y": 185,
+          "type": "link",
+          "path": "/Applications"
+        }
       ]
     },
     "afterSign": "build/afterSign.js",
@@ -57,7 +69,18 @@
       "semesters/"
     ],
     "extraResources": [
-      { "from": "semesters/", "to": "semesters/" }
-    ]
+      {
+        "from": "semesters/",
+        "to": "semesters/"
+      }
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "masprime77",
+      "repo": "semester-planner"
+    }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.3"
   }
 }

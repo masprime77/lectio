@@ -8,3 +8,10 @@ contextBridge.exposeInMainWorld('planner', {
   saveSemester: (id, data) => ipcRenderer.invoke('save-semester', id, data),
   deleteSemester: (id) => ipcRenderer.invoke('delete-semester', id),
 });
+
+// Auto-update bridge. Main → renderer notifications plus a restart trigger.
+contextBridge.exposeInMainWorld('updater', {
+  onUpdateAvailable: (callback) => ipcRenderer.on('update-available', () => callback()),
+  onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', () => callback()),
+  restartAndUpdate: () => ipcRenderer.invoke('restart-and-update'),
+});
