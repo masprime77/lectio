@@ -51,6 +51,12 @@ const ICONS = {
     '<path d="M4 5m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" /><path d="M16 3l0 4" /><path d="M8 3l0 4" /><path d="M4 11l16 0" />',
   columns:
     '<path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" /><path d="M12 4l0 16" />',
+  sun:
+    '<path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" /><path d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7" />',
+  moon:
+    '<path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />',
+  'device-desktop':
+    '<path d="M3 5a1 1 0 0 1 1 -1h16a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-16a1 1 0 0 1 -1 -1v-10z" /><path d="M7 20h10" /><path d="M9 16v4" /><path d="M15 16v4" />',
 };
 
 function icon(name) {
@@ -495,7 +501,43 @@ async function init() {
   });
 
   setupViewToggle();
+  setupTheme();
   setupModal();
+}
+
+// ---------------------------------------------------------------------------
+// Theme: Light -> Dark -> Auto, persisted in localStorage
+// ---------------------------------------------------------------------------
+const THEME_MODES = ['light', 'dark', 'auto'];
+const THEME_META = {
+  light: { icon: 'sun', label: 'Light' },
+  dark: { icon: 'moon', label: 'Dark' },
+  auto: { icon: 'device-desktop', label: 'Auto' },
+};
+
+function applyTheme(mode) {
+  // Auto = no attribute, so the prefers-color-scheme media query takes over.
+  if (mode === 'auto') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', mode);
+  localStorage.setItem('theme', mode);
+
+  const meta = THEME_META[mode];
+  const btn = document.getElementById('theme-toggle');
+  btn.querySelector('.theme-icon').innerHTML = icon(meta.icon);
+  btn.querySelector('.theme-label').textContent = meta.label;
+  btn.title = `Theme: ${meta.label} (click to change)`;
+}
+
+function setupTheme() {
+  let mode = localStorage.getItem('theme');
+  if (!THEME_MODES.includes(mode)) mode = 'auto'; // default on first load
+  applyTheme(mode);
+
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    const current = localStorage.getItem('theme') || 'auto';
+    const next = THEME_MODES[(THEME_MODES.indexOf(current) + 1) % THEME_MODES.length];
+    applyTheme(next);
+  });
 }
 
 // View toggle (Week / Course), persisted to localStorage.

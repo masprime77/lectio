@@ -1,17 +1,33 @@
+/* -------------------------------------------------------------------------
+   Theme tokens. Every color in the app is a variable defined here.
+   :root holds the light defaults; [data-theme="dark"] overrides them; the
+   prefers-color-scheme block mirrors dark for "Auto" (no data-theme set).
+   ------------------------------------------------------------------------- */
 :root {
+  color-scheme: light;
+
+  /* Surfaces & text */
   --bg: #f5f6f8;
   --surface: #ffffff;
   --border: #e3e6ea;
+  --border-subtle: #eef1f4;
   --text: #1f2933;
   --muted: #6b7684;
+
+  /* Accent */
   --primary: #4a90d9;
-  --radius: 10px;
+  --primary-hover: #3a7bc0;
+  --on-accent: #ffffff;
+
+  /* Interaction & misc */
+  --hover: #f0f2f5;
+  --track: #eceff2;
+  --danger: #c0392b;
+  --danger-bg: #fdecea;
+  --overlay: rgba(0, 0, 0, 0.45);
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 
-  --font-base: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-heading: "Outfit", var(--font-base);
-
-  /* Status colors */
+  /* Status colors (shared across themes) */
   --st-pending: #9aa5b1;
   --st-seen: #f0ad4e;
   --st-summarized: #5bc0de;
@@ -19,6 +35,59 @@
   --st-notdone: #9aa5b1;
   --st-done: #5cb85c;
   --st-reviewed: #7e57c2;
+
+  /* Non-color tokens */
+  --radius: 10px;
+  --font-base: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-heading: "Outfit", var(--font-base);
+}
+
+/* Dark theme — applied when data-theme="dark" is set on <html>. */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #16191d;
+  --surface: #1f242b;
+  --border: #333a42;
+  --border-subtle: #2a3138;
+  --text: #e6e9ec;
+  --muted: #98a2ad;
+
+  --primary: #5a9fe0;
+  --primary-hover: #74b0e9;
+  --on-accent: #ffffff;
+
+  --hover: #2a3138;
+  --track: #2a3138;
+  --danger: #e57368;
+  --danger-bg: #3a2522;
+  --overlay: rgba(0, 0, 0, 0.6);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* Auto — follow the system preference when no explicit theme is chosen. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+
+    --bg: #16191d;
+    --surface: #1f242b;
+    --border: #333a42;
+    --border-subtle: #2a3138;
+    --text: #e6e9ec;
+    --muted: #98a2ad;
+
+    --primary: #5a9fe0;
+    --primary-hover: #74b0e9;
+    --on-accent: #ffffff;
+
+    --hover: #2a3138;
+    --track: #2a3138;
+    --danger: #e57368;
+    --danger-bg: #3a2522;
+    --overlay: rgba(0, 0, 0, 0.6);
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  }
 }
 
 * { box-sizing: border-box; }
@@ -85,9 +154,9 @@ body {
   font-size: 0.9rem;
   transition: background 0.15s, border-color 0.15s;
 }
-.btn:hover { background: #f0f2f5; }
-.btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
-.btn-primary:hover { background: #3a7bc0; }
+.btn:hover { background: var(--hover); }
+.btn-primary { background: var(--primary); color: var(--on-accent); border-color: var(--primary); }
+.btn-primary:hover { background: var(--primary-hover); }
 .btn-small { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
 .btn-icon-text {
   display: inline-flex;
@@ -118,10 +187,10 @@ body {
   cursor: pointer;
 }
 .view-btn + .view-btn { border-left: 1px solid var(--border); }
-.view-btn:hover { background: #f0f2f5; }
-.view-btn.active { background: var(--primary); color: #fff; }
-.btn-danger { color: #c0392b; border: none; background: none; }
-.btn-danger:hover { background: #fdecea; }
+.view-btn:hover { background: var(--hover); }
+.view-btn.active { background: var(--primary); color: var(--on-accent); }
+.btn-danger { color: var(--danger); border: none; background: none; }
+.btn-danger:hover { background: var(--danger-bg); }
 
 /* Layout */
 .main { max-width: 960px; margin: 0 auto; padding: 1rem; }
@@ -151,7 +220,7 @@ body {
 }
 .progress-bar {
   height: 8px;
-  background: #eceff2;
+  background: var(--track);
   border-radius: 5px;
   overflow: hidden;
 }
@@ -174,7 +243,7 @@ body {
   cursor: pointer;
   user-select: none;
 }
-.week-header:hover { background: #fafbfc; }
+.week-header:hover { background: var(--hover); }
 .week-header .chevron {
   transition: transform 0.2s;
   color: var(--muted);
@@ -189,7 +258,7 @@ body {
   margin-left: auto;
   font-size: 0.72rem;
   background: var(--primary);
-  color: #fff;
+  color: var(--on-accent);
   padding: 0.1rem 0.5rem;
   border-radius: 20px;
 }
@@ -204,7 +273,7 @@ body {
   border-radius: 8px;
   padding: 0.75rem 0.9rem;
   margin-top: 0.75rem;
-  background: #fff;
+  background: var(--surface);
 }
 .course-card h4 { margin: 0 0 0.5rem; font-size: 0.95rem; }
 .card-section-title {
@@ -220,7 +289,7 @@ body {
   align-items: center;
   gap: 0.5rem;
   padding: 0.3rem 0;
-  border-bottom: 1px dashed #eef1f4;
+  border-bottom: 1px dashed var(--border-subtle);
 }
 .item:last-child { border-bottom: none; }
 .item-title { flex: 1; font-size: 0.9rem; }
@@ -231,7 +300,7 @@ body {
   font-size: 0.72rem;
   padding: 0.12rem 0.55rem;
   border-radius: 20px;
-  color: #fff;
+  color: var(--on-accent);
   cursor: pointer;
   white-space: nowrap;
   border: none;
@@ -254,7 +323,7 @@ body {
   padding: 0.1rem 0.3rem;
   border-radius: 4px;
 }
-.icon-btn:hover { background: #f0f2f5; color: var(--text); }
+.icon-btn:hover { background: var(--hover); color: var(--text); }
 .icon-btn .ti { width: 16px; height: 16px; }
 
 .add-row {
@@ -321,7 +390,7 @@ body {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--overlay);
   display: flex;
   align-items: center;
   justify-content: center;

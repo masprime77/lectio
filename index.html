@@ -3,6 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Apply the saved theme before any rendering to avoid a flash of wrong theme. -->
+  <script>
+    (function () {
+      var t = localStorage.getItem('theme');
+      if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+      // 'auto' or unset: leave no attribute so prefers-color-scheme applies.
+    })();
+  </script>
   <title>Semester Planner</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -14,6 +22,10 @@
     <div class="header-inner">
       <h1 class="logo">Semester Planner</h1>
       <div class="header-controls">
+        <button id="theme-toggle" class="btn btn-icon-text" title="Toggle theme" aria-label="Toggle theme">
+          <span class="theme-icon"></span>
+          <span class="theme-label"></span>
+        </button>
         <div class="selector-group">
           <select id="semester-select" class="semester-select" aria-label="Select semester"></select>
           <button id="edit-semester-btn" class="icon-btn" title="Edit semester" aria-label="Edit semester"></button>
