@@ -1,12 +1,16 @@
 # Semester Planner
 
-A minimal, framework-free web app for planning a university semester. Track
-readings and tasks per course, per week, with click-to-cycle status badges and
-per-course progress bars. Each semester is a plain JSON file — there's no
-database. A tiny Express server reads and writes those files.
+A minimal, framework-free **native desktop app** for planning a university
+semester. Track readings and tasks per course, per week, with click-to-cycle
+status badges and per-course progress bars. Each semester is a plain JSON file —
+there's no database and no server. The UI is vanilla JS in an
+[Electron](https://www.electronjs.org/) window; the Electron main process reads
+and writes the JSON files directly via Node.js.
 
+![CI](https://github.com/masprime77/semester-planner/actions/workflows/ci.yml/badge.svg)
 ![Vanilla JS](https://img.shields.io/badge/frontend-vanilla%20JS-yellow)
-![Express](https://img.shields.io/badge/server-express-green)
+![Electron](https://img.shields.io/badge/runtime-electron-47848F)
+![macOS](https://img.shields.io/badge/platform-macOS-lightgrey)
 
 ## Features
 
@@ -34,53 +38,111 @@ database. A tiny Express server reads and writes those files.
   course names, loaded from Google Fonts.
 - **Mobile-friendly**, English-only, clean minimal UI with inline Tabler icons.
 
-## Install
+## Development
 
-Requires [Node.js](https://nodejs.org) (v18+).
+Requires [Node.js](https://nodejs.org) (v18+). Install dependencies and launch
+the app from source:
 
 ```bash
 npm install
-```
-
-## Run
-
-```bash
 npm start
 ```
 
-Then open <http://localhost:3000>. Changes are saved automatically to the
-selected semester's JSON file in `semesters/`.
+`npm start` runs `electron .`, which opens the desktop window directly — no
+terminal interaction, no browser, no `localhost`. Use `npm run dev` to launch
+with DevTools open. You can also double-click **`start.command`** in Finder to
+run the app from source without a terminal.
+
+In development the app reads and writes the project's own `semesters/` folder.
+
+## Testing
+
+The core logic is extracted into `lib/` (pure, DOM-free modules) and tested with
+[Vitest](https://vitest.dev/):
+
+```bash
+npm test            # run the suite once
+npm run test:watch  # watch mode
+npm run test:coverage   # run with a V8 coverage report (written to coverage/)
+```
+
+- **Unit tests** (`tests/unit/`) cover status cycling, progress calculation,
+  course CRUD, and the filesystem store.
+- **Integration tests** (`tests/integration/`) drive the IPC handlers through a
+  mock `ipcMain` against a temp directory.
+- Coverage thresholds are enforced at **70% lines** and **70% functions**
+  (see `vitest.config.mjs`); the run fails if they aren't met.
+
+CI runs the suite on **macOS** and **Ubuntu** (Node 20) on every push and on
+pull requests to `main`, and uploads the coverage report as an artifact. A
+release is only built once CI passes — see
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) and
+[`release.yml`](.github/workflows/release.yml). Feature-to-test traceability
+lives in [`docs/USER_STORIES.md`](docs/USER_STORIES.md).
+
+## Build for distribution
+
+```bash
+npm run build:mac
+```
+
+This runs [electron-builder](https://www.electron.build/) and produces, in the
+**`dist/`** folder:
+
+- a **`.dmg`** installer — drag-and-drop, ready to share or upload to a GitHub
+  Release, and
+- a **`.zip`** of the `.app` (used by the Homebrew formula).
+
+Open the `.dmg`, drag **Semester Planner** to Applications, and launch it like
+any native Mac app.
 
 ## Project structure
 
 ```
-semester_planner/
+semester-planner/
+├── main.js             # Electron main process: window + ipcMain fs handlers
+├── preload.js          # contextBridge bridge exposing window.planner
 ├── index.html          # Markup: header, dashboard, planner, modal
-├── app.js              # All client logic (vanilla JS)
+├── app.js              # Renderer logic (vanilla JS)
 ├── style.css           # Styles
-├── server.js           # Express server (~50 lines)
-├── package.json
+├── start.command       # Double-click launcher for running from source
+├── package.json        # Scripts + electron-builder config
+├── homebrew/
+│   └── semester-planner.rb   # Homebrew formula template
 ├── semesters/
-│   └── example.json    # Example semester with sample data
+│   └── example.json    # Bundled example semester (starter data)
 └── README.md
 ```
 
-## API
+## How it works (IPC, no HTTP)
 
-| Method | Route                  | Description                     |
-| ------ | ---------------------- | ------------------------------- |
-| GET    | `/api/semesters`       | List all semester files         |
-| GET    | `/api/semesters/:id`   | Load a semester JSON            |
-| PUT    | `/api/semesters/:id`   | Save (or create) a semester     |
-| DELETE | `/api/semesters/:id`   | Delete a semester file          |
+The renderer never touches the filesystem directly. `preload.js` uses
+`contextBridge` to expose a small, safe `window.planner` API; each method calls
+`ipcRenderer.invoke`, and the main process handles it with `ipcMain.handle`:
 
-`:id` is the filename without the `.json` extension and must match
-`[A-Za-z0-9_-]+` (this guards against path traversal).
+| Renderer call (`window.planner.*`) | IPC channel       | Main process action            |
+| ---------------------------------- | ----------------- | ------------------------------ |
+| `listSemesters()`                  | `list-semesters`  | List all semester files        |
+| `getSemester(id)`                  | `get-semester`    | Read a semester JSON           |
+| `saveSemester(id, data)`           | `save-semester`   | Write a semester JSON          |
+| `deleteSemester(id)`               | `delete-semester` | Delete a semester file         |
+
+`id` is the filename without `.json` and must match `[A-Za-z0-9_-]+` (this
+guards against path traversal). `ipcRenderer` is never exposed to the renderer.
+
+### Where your data lives
+
+- **Development:** the project's `semesters/` folder.
+- **Packaged app:** `~/Library/Application Support/Semester Planner/semesters/`
+  (`app.getPath('userData')`), so your data persists across app updates. On
+  first launch the app seeds this folder with the bundled `example.json`.
 
 ## Adding a semester manually
 
-Create a new file in `semesters/`, e.g. `semesters/ws2025.json`. The filename
-(without `.json`) is the semester's id used in the API. Follow this schema:
+Create a new file in the active `semesters/` folder (the project folder in
+development, or `~/Library/Application Support/Semester Planner/semesters/` for
+the installed app), e.g. `ws2025.json`. The filename (without `.json`) is the
+semester's id. Follow this schema:
 
 ```json
 {
@@ -125,55 +187,45 @@ Field reference:
 - Task `status` — `not done` | `done` | `reviewed`.
 - All `id` values must be unique within their list.
 
-Restart isn't required — the file list is read on each request, so a new file
-shows up in the selector after a page refresh.
+The directory is read each time the list loads, so a new file shows up in the
+selector the next time the app launches (or when you reselect from the dropdown).
 
-## Deploy read-only to GitHub Pages
+## Releasing
 
-GitHub Pages serves static files only — there's no Node server, so the `PUT`
-save endpoint won't exist. You can still publish a **read-only** view of your
-semesters with a small workaround.
+1. Bump `version` in `package.json`.
+2. `npm run build:mac` to produce the `.dmg` and `.zip` in `dist/`.
+3. Create a GitHub Release (e.g. tag `v1.0.0`) and attach both artifacts.
 
-The frontend talks to the server through the `api` object in `app.js`. For a
-static deployment, point it at the JSON files directly and make saving a no-op:
+## Install via Homebrew (tap)
 
-1. Copy your semester files into a `semesters/` folder at the site root (they're
-   already there) and create a static manifest the page can fetch instead of
-   the live `/api/semesters` listing — e.g. `semesters/index.json`:
+A formula template lives at [`homebrew/semester-planner.rb`](homebrew/semester-planner.rb).
+It has no `depends_on "node"` — the packaged Electron app bundles its own Node
+runtime. To publish it as a tap so others can `brew install` the app:
 
-   ```json
-   [{ "id": "example", "name": "Summer Semester 2025" }]
+1. Create a repo named **`homebrew-tap`** on your GitHub account (the
+   `homebrew-` prefix is what makes it a tap).
+
+2. Fill in the formula's three placeholders from your release:
+
+   ```ruby
+   version "1.0.0"
+   url "https://github.com/masprime77/semester-planner/releases/download/v1.0.0/Semester-Planner-1.0.0-mac.zip"
+   sha256 "<output of: shasum -a 256 Semester-Planner-1.0.0-mac.zip>"
    ```
 
-2. In `app.js`, swap the `api` implementation for a static version:
+3. Commit it to the tap repo under `Formula/semester-planner.rb` and push.
 
-   ```js
-   const api = {
-     list: () => fetch('semesters/index.json').then((r) => r.json()),
-     load: (id) => fetch(`semesters/${id}.json`).then((r) => r.json()),
-     // No backend on GitHub Pages — saving/deleting are disabled (read-only).
-     save: () => Promise.resolve({ ok: false, readonly: true }),
-     remove: () => Promise.resolve({ ok: false, readonly: true }),
-   };
-   ```
-
-   Status cycling and edits still update the in-memory view, but nothing is
-   persisted. To keep your data in sync, edit the JSON files locally (or via the
-   running server), then commit and push them.
-
-3. Push to a `gh-pages` branch (or enable Pages on `main`):
+4. Anyone can then install with:
 
    ```bash
-   git subtree push --prefix . origin gh-pages   # or use the Pages settings UI
+   brew tap masprime77/tap
+   brew install semester-planner
    ```
 
-4. In your repo's **Settings → Pages**, choose the branch to serve from. Your
-   read-only planner will be available at
-   `https://<username>.github.io/semester-planner/`.
-
-**Export/import workflow:** treat the JSON files as your portable export. Run
-the app locally to edit, commit the updated `semesters/*.json`, and push — the
-GitHub Pages site reflects the committed files on its next build.
+   On install, the formula prints where the app was placed and how to symlink it
+   into `/Applications`, plus the location of your semester data
+   (`~/Library/Application Support/Semester Planner/semesters/`), which is kept
+   separate from the app so it survives upgrades and uninstalls.
 
 ## License
 
