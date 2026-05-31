@@ -133,16 +133,10 @@ function renderPlanner() {
     const body = document.createElement('div');
     body.className = 'week-body';
 
-    const coursesWithContent = sem.courses.filter(
-      (c) =>
-        c.readings.some((r) => r.week === week) ||
-        c.tasks.some((t) => t.week === week)
-    );
-
-    if (coursesWithContent.length === 0) {
-      body.innerHTML = '<div class="week-empty">No readings or tasks this week.</div>';
+    if (sem.courses.length === 0) {
+      body.innerHTML = '<div class="week-empty">No courses in this semester.</div>';
     } else {
-      coursesWithContent.forEach((course) => {
+      sem.courses.forEach((course) => {
         body.appendChild(renderCourseCard(course, week));
       });
     }
@@ -171,14 +165,13 @@ function renderCourseCard(course, week) {
   const readings = course.readings.filter((r) => r.week === week);
   const tasks = course.tasks.filter((t) => t.week === week);
 
-  if (readings.length) {
-    card.appendChild(sectionTitle('Readings'));
-    card.appendChild(renderItemList(readings, 'reading'));
-  }
-  if (tasks.length) {
-    card.appendChild(sectionTitle('Tasks'));
-    card.appendChild(renderItemList(tasks, 'task'));
-  }
+  card.appendChild(sectionTitle('Readings'));
+  card.appendChild(renderItemList(readings, 'reading', course, week));
+  card.appendChild(addRow('reading', course, week));
+
+  card.appendChild(sectionTitle('Tasks'));
+  card.appendChild(renderItemList(tasks, 'task', course, week));
+  card.appendChild(addRow('task', course, week));
 
   return card;
 }
@@ -190,9 +183,16 @@ function sectionTitle(text) {
   return el;
 }
 
-function renderItemList(items, type) {
+function renderItemList(items, type, course, week) {
   const ul = document.createElement('ul');
   ul.className = 'item-list';
+  if (items.length === 0) {
+    const empty = document.createElement('li');
+    empty.className = 'week-empty';
+    empty.textContent = type === 'reading' ? 'No readings.' : 'No tasks.';
+    ul.appendChild(empty);
+    return ul;
+  }
   items.forEach((item) => {
     const li = document.createElement('li');
     li.className = 'item';
@@ -200,6 +200,10 @@ function renderItemList(items, type) {
     const titleSpan = document.createElement('span');
     titleSpan.className = 'item-title';
     titleSpan.textContent = item.title;
+    // Inline edit: click the title to rename
+    titleSpan.title = 'Click to rename';
+    titleSpan.style.cursor = 'text';
+    titleSpan.addEventListener('click', () => editItemTitle(titleSpan, item));
     li.appendChild(titleSpan);
 
     if (type === 'task' && item.dueDate) {
@@ -221,9 +225,93 @@ function renderItemList(items, type) {
     });
     li.appendChild(badge);
 
+    const del = document.createElement('button');
+    del.className = 'icon-btn';
+    del.textContent = '✕';
+    del.title = 'Delete';
+    del.addEventListener('click', () => {
+      const arr = type === 'reading' ? course.readings : course.tasks;
+      const idx = arr.indexOf(item);
+      if (idx > -1) arr.splice(idx, 1);
+      persist();
+      render();
+    });
+    li.appendChild(del);
+
     ul.appendChild(li);
   });
   return ul;
+}
+
+// Replace a title span with an input for inline renaming.
+function editItemTitle(span, item) {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = item.title;
+  input.className = 'item-title';
+  const commit = () => {
+    const v = input.value.trim();
+    if (v) item.title = v;
+    persist();
+    render();
+  };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') input.blur();
+    if (e.key === 'Escape') render();
+  });
+  span.replaceWith(input);
+  input.focus();
+  input.select();
+}
+
+// A row of inputs to add a new reading or task to a course/week.
+function addRow(type, course, week) {
+  const row = document.createElement('div');
+  row.className = 'add-row';
+
+  const title = document.createElement('input');
+  title.type = 'text';
+  title.placeholder = type === 'reading' ? 'New reading…' : 'New task…';
+
+  let due;
+  if (type === 'task') {
+    due = document.createElement('input');
+    due.type = 'date';
+    due.title = 'Due date (optional)';
+  }
+
+  const btn = document.createElement('button');
+  btn.className = 'btn btn-small';
+  btn.textContent = 'Add';
+
+  const add = () => {
+    const v = title.value.trim();
+    if (!v) return;
+    if (type === 'reading') {
+      course.readings.push({ id: uid('r'), week, title: v, status: 'pending' });
+    } else {
+      course.tasks.push({
+        id: uid('t'),
+        week,
+        title: v,
+        dueDate: due.value || '',
+        status: 'not done',
+      });
+    }
+    persist();
+    render();
+  };
+
+  btn.addEventListener('click', add);
+  title.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') add();
+  });
+
+  row.appendChild(title);
+  if (due) row.appendChild(due);
+  row.appendChild(btn);
+  return row;
 }
 
 // ---------------------------------------------------------------------------
