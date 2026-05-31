@@ -47,7 +47,10 @@ body {
   flex-wrap: wrap;
 }
 .logo { font-size: 1.2rem; margin: 0; }
-.header-controls { display: flex; gap: 0.5rem; align-items: center; }
+.header-controls { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.selector-group { display: flex; gap: 0.25rem; align-items: center; }
+.icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.icon-btn:disabled:hover { background: none; }
 
 .semester-select {
   padding: 0.45rem 0.6rem;

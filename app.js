@@ -7,6 +7,7 @@ const state = {
   semesterId: null,   // current semester file id (filename without .json)
   semester: null,     // loaded semester object
   openWeeks: new Set(), // weeks currently expanded
+  editingId: null,    // semester id being edited in the modal (null = create mode)
 };
 
 // ---------------------------------------------------------------------------
@@ -21,6 +22,7 @@ const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }).then((r) => r.json()),
+  remove: (id) => fetch(`/api/semesters/${id}`, { method: 'DELETE' }).then((r) => r.json()),
 };
 
 // Persist the current semester, then re-render.
@@ -109,6 +111,7 @@ async function loadSemester(id) {
   const cw = currentWeek(state.semester);
   if (cw) state.openWeeks.add(cw); // auto-expand current week
   document.getElementById('semester-select').value = id;
+  setSemesterActionsEnabled(true);
   render();
 }
 
@@ -388,14 +391,52 @@ function addRow(type, course, week) {
 // Init
 // ---------------------------------------------------------------------------
 async function init() {
+  // Icon buttons in the header
+  document.getElementById('edit-semester-btn').innerHTML = icon('pencil');
+  document.getElementById('delete-semester-btn').innerHTML = icon('trash');
+
   const list = await populateSelector();
   if (list.length) await loadSemester(list[0].id);
+  else renderEmptyState();
 
   document.getElementById('semester-select').addEventListener('change', (e) => {
     loadSemester(e.target.value);
   });
+  document.getElementById('edit-semester-btn').addEventListener('click', () => {
+    if (state.semesterId) openEditModal(state.semesterId);
+  });
+  document.getElementById('delete-semester-btn').addEventListener('click', () => {
+    if (state.semesterId) deleteSemester(state.semesterId);
+  });
 
   setupModal();
+}
+
+// Shown when there are no semester files left.
+function renderEmptyState() {
+  state.semesterId = null;
+  state.semester = null;
+  document.getElementById('dashboard').innerHTML =
+    '<h2>No semesters yet</h2><div class="current-week">Create one with the “New Semester” button.</div>';
+  document.getElementById('planner').innerHTML = '';
+  setSemesterActionsEnabled(false);
+}
+
+function setSemesterActionsEnabled(enabled) {
+  document.getElementById('edit-semester-btn').disabled = !enabled;
+  document.getElementById('delete-semester-btn').disabled = !enabled;
+}
+
+async function deleteSemester(id) {
+  const select = document.getElementById('semester-select');
+  const opt = [...select.options].find((o) => o.value === id);
+  const name = opt ? opt.textContent : id;
+  if (!confirm(`Delete "${name}"? This permanently removes the file from /semesters/.`)) return;
+
+  await api.remove(id);
+  const list = await populateSelector();
+  if (list.length) await loadSemester(list[0].id);
+  else renderEmptyState();
 }
 
 // ---------------------------------------------------------------------------
@@ -405,47 +446,70 @@ const DEFAULT_COLORS = ['#4A90D9', '#E2725B', '#7E57C2', '#5CB85C', '#F0AD4E', '
 
 function setupModal() {
   const overlay = document.getElementById('modal-overlay');
-  const openBtn = document.getElementById('new-semester-btn');
-  const cancelBtn = document.getElementById('modal-cancel');
-  const addCourseBtn = document.getElementById('ns-add-course');
-  const form = document.getElementById('new-semester-form');
-
-  const open = () => {
-    form.reset();
-    const courses = document.getElementById('ns-courses');
-    courses.innerHTML = '';
-    addCourseField(); // start with one course row
-    overlay.classList.remove('hidden');
-  };
-  const close = () => overlay.classList.add('hidden');
-
-  openBtn.addEventListener('click', open);
-  cancelBtn.addEventListener('click', close);
+  document.getElementById('new-semester-btn').addEventListener('click', openCreateModal);
+  document.getElementById('modal-cancel').addEventListener('click', closeModal);
+  document.getElementById('ns-add-course').addEventListener('click', () => addCourseField());
   overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) close();
+    if (e.target === overlay) closeModal();
   });
-  addCourseBtn.addEventListener('click', addCourseField);
-  form.addEventListener('submit', (e) => {
+  document.getElementById('new-semester-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    createSemester();
-    close();
+    submitModal();
   });
 }
 
-function addCourseField() {
+function closeModal() {
+  document.getElementById('modal-overlay').classList.add('hidden');
+}
+
+// Open the modal in "create" mode (blank form, one empty course row).
+function openCreateModal() {
+  state.editingId = null;
+  document.getElementById('modal-title').textContent = 'Create New Semester';
+  document.getElementById('modal-submit').textContent = 'Create';
+  const form = document.getElementById('new-semester-form');
+  form.reset();
+  document.getElementById('ns-weeks').value = 15;
+  document.getElementById('ns-courses').innerHTML = '';
+  addCourseField();
+  document.getElementById('modal-overlay').classList.remove('hidden');
+}
+
+// Open the modal in "edit" mode, pre-filled with the semester's current data.
+async function openEditModal(id) {
+  const sem =
+    id === state.semesterId && state.semester ? state.semester : await api.load(id);
+  state.editingId = id;
+  document.getElementById('modal-title').textContent = 'Edit Semester';
+  document.getElementById('modal-submit').textContent = 'Save';
+  document.getElementById('ns-name').value = sem.name;
+  document.getElementById('ns-start').value = sem.startDate;
+  document.getElementById('ns-weeks').value = sem.weeks;
+  const courses = document.getElementById('ns-courses');
+  courses.innerHTML = '';
+  if (sem.courses.length) sem.courses.forEach((c) => addCourseField(c));
+  else addCourseField();
+  document.getElementById('modal-overlay').classList.remove('hidden');
+}
+
+// `course` is optional; when given, the row is pre-filled and remembers its id
+// so its readings/tasks can be preserved on save.
+function addCourseField(course) {
   const container = document.getElementById('ns-courses');
   const idx = container.children.length;
   const row = document.createElement('div');
   row.className = 'ns-course-row';
+  if (course && course.id) row.dataset.courseId = course.id;
 
   const name = document.createElement('input');
   name.type = 'text';
   name.placeholder = 'Course name';
   name.className = 'ns-course-name';
+  if (course) name.value = course.name;
 
   const color = document.createElement('input');
   color.type = 'color';
-  color.value = DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
+  color.value = course ? course.color : DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
   color.className = 'ns-course-color';
 
   const remove = document.createElement('button');
@@ -465,13 +529,42 @@ function slugify(s) {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'semester';
 }
 
-async function createSemester() {
+// Handle the modal form for both create and edit.
+async function submitModal() {
   const name = document.getElementById('ns-name').value.trim();
   const startDate = document.getElementById('ns-start').value;
   const weeks = parseInt(document.getElementById('ns-weeks').value, 10) || 15;
+  const rows = [...document.querySelectorAll('#ns-courses .ns-course-row')];
 
+  if (state.editingId) {
+    // Editing: preserve each existing course's readings/tasks.
+    const base =
+      state.editingId === state.semesterId && state.semester
+        ? state.semester
+        : await api.load(state.editingId);
+    const byId = new Map(base.courses.map((c) => [c.id, c]));
+
+    const courses = [];
+    rows.forEach((row) => {
+      const cname = row.querySelector('.ns-course-name').value.trim();
+      if (!cname) return;
+      const color = row.querySelector('.ns-course-color').value;
+      const existing = byId.get(row.dataset.courseId);
+      if (existing) courses.push({ ...existing, name: cname, color });
+      else courses.push({ id: uid('course'), name: cname, color, readings: [], tasks: [] });
+    });
+
+    const semester = { id: state.editingId, name, startDate, weeks, courses };
+    await api.save(state.editingId, semester);
+    closeModal();
+    await populateSelector();
+    await loadSemester(state.editingId);
+    return;
+  }
+
+  // Creating: build a fresh semester with a unique id derived from the name.
   const courses = [];
-  document.querySelectorAll('#ns-courses .ns-course-row').forEach((row, i) => {
+  rows.forEach((row) => {
     const cname = row.querySelector('.ns-course-name').value.trim();
     if (!cname) return;
     courses.push({
@@ -483,7 +576,6 @@ async function createSemester() {
     });
   });
 
-  // Build a unique id from the name.
   const existing = await api.list();
   const ids = new Set(existing.map((s) => s.id));
   let id = slugify(name);
@@ -492,6 +584,7 @@ async function createSemester() {
 
   const semester = { id, name, startDate, weeks, courses };
   await api.save(id, semester);
+  closeModal();
   await populateSelector();
   await loadSemester(id);
 }

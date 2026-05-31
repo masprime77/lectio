@@ -38,6 +38,14 @@ app.put('/api/semesters/:id', (req, res) => {
   res.json({ ok: true, id });
 });
 
+// Delete a semester
+app.delete('/api/semesters/:id', (req, res) => {
+  const { id } = req.params;
+  if (!safeId(id) || !fs.existsSync(fileFor(id))) return res.status(404).json({ error: 'Not found' });
+  fs.unlinkSync(fileFor(id));
+  res.json({ ok: true, id });
+});
+
 app.listen(PORT, () => {
   console.log(`Semester planner running at http://localhost:${PORT}`);
 });
