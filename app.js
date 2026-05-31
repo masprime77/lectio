@@ -482,6 +482,37 @@ async function init() {
   setupViewToggle();
   setupTheme();
   setupModal();
+  setupUpdater();
+}
+
+// ---------------------------------------------------------------------------
+// Auto-update banner (driven by the window.updater bridge)
+// ---------------------------------------------------------------------------
+function setupUpdater() {
+  const banner = document.getElementById('update-banner');
+  const text = document.getElementById('update-banner-text');
+  const restartBtn = document.getElementById('update-restart-btn');
+  const dismissBtn = document.getElementById('update-dismiss-btn');
+
+  dismissBtn.innerHTML = icon('x');
+  dismissBtn.addEventListener('click', () => banner.classList.add('hidden'));
+
+  // The bridge is absent outside Electron (e.g. tests) — fail safe.
+  if (!window.updater) return;
+
+  restartBtn.addEventListener('click', () => window.updater.restartAndUpdate());
+
+  window.updater.onUpdateAvailable(() => {
+    text.textContent = 'A new version is available, downloading…';
+    restartBtn.classList.add('hidden');
+    banner.classList.remove('hidden');
+  });
+
+  window.updater.onUpdateDownloaded(() => {
+    text.textContent = 'Update downloaded and ready.';
+    restartBtn.classList.remove('hidden');
+    banner.classList.remove('hidden');
+  });
 }
 
 // ---------------------------------------------------------------------------

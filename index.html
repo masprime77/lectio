@@ -18,6 +18,13 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <!-- Auto-update banner (hidden until electron-updater fires an event) -->
+  <div id="update-banner" class="update-banner hidden" role="status">
+    <span id="update-banner-text" class="update-banner-text"></span>
+    <button id="update-restart-btn" class="btn btn-small hidden">Restart to update</button>
+    <button id="update-dismiss-btn" class="update-dismiss" aria-label="Dismiss"></button>
+  </div>
+
   <header class="header">
     <div class="header-inner">
       <h1 class="logo">Semester Planner</h1>
