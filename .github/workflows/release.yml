@@ -12,9 +12,12 @@ jobs:
     uses: ./.github/workflows/ci.yml
 
   build:
-    name: Build macOS app
+    name: Build & publish macOS app
     needs: ci
     runs-on: macos-latest
+    # Allow electron-builder to create/upload the GitHub Release via GITHUB_TOKEN.
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,11 +31,14 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build (.dmg + .zip)
+      - name: Build & publish (.dmg + .zip + latest-mac.yml)
         env:
+          # GitHub token so electron-builder can publish release assets,
+          # including the latest-mac.yml metadata electron-updater reads.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Unsigned build in CI; remove to enable code signing with certs.
           CSC_IDENTITY_AUTO_DISCOVERY: false
-        run: npm run build:mac
+        run: npm run build:mac -- --publish always
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -41,4 +47,5 @@ jobs:
           path: |
             dist/*.dmg
             dist/*.zip
+            dist/latest-mac.yml
           if-no-files-found: error
