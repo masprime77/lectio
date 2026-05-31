@@ -8,6 +8,7 @@ const state = {
   semester: null,     // loaded semester object
   openWeeks: new Set(), // weeks currently expanded
   editingId: null,    // semester id being edited in the modal (null = create mode)
+  view: localStorage.getItem('plannerView') || 'week', // 'week' | 'course'
 };
 
 // ---------------------------------------------------------------------------
@@ -175,9 +176,19 @@ function escapeHtml(s) {
 }
 
 // ---------------------------------------------------------------------------
-// Planner: collapsible weeks, one course card per week
+// Planner: dispatches to the selected layout
 // ---------------------------------------------------------------------------
 function renderPlanner() {
+  const root = document.getElementById('planner');
+  root.className = 'planner view-' + state.view;
+  if (state.view === 'course') renderCourseView();
+  else renderWeekView();
+}
+
+// ---------------------------------------------------------------------------
+// Week view: collapsible weeks, one course card per week
+// ---------------------------------------------------------------------------
+function renderWeekView() {
   const sem = state.semester;
   const root = document.getElementById('planner');
   root.innerHTML = '';
@@ -223,6 +234,80 @@ function toggleWeek(week) {
   if (state.openWeeks.has(week)) state.openWeeks.delete(week);
   else state.openWeeks.add(week);
   renderPlanner();
+}
+
+// ---------------------------------------------------------------------------
+// Course view: one column per course, entries grouped by week dividers
+// ---------------------------------------------------------------------------
+function renderCourseView() {
+  const sem = state.semester;
+  const root = document.getElementById('planner');
+  root.innerHTML = '';
+
+  if (sem.courses.length === 0) {
+    root.innerHTML = '<div class="week-empty">No courses in this semester.</div>';
+    return;
+  }
+
+  const board = document.createElement('div');
+  board.className = 'course-board';
+
+  sem.courses.forEach((course) => {
+    const col = document.createElement('div');
+    col.className = 'course-column';
+    col.style.borderTopColor = course.color;
+
+    const header = document.createElement('div');
+    header.className = 'course-column-header';
+    header.textContent = course.name;
+    header.style.color = course.color;
+    col.appendChild(header);
+
+    const body = document.createElement('div');
+    body.className = 'course-column-body';
+
+    // Weeks (in order) that have any reading or task for this course.
+    const weeks = [];
+    for (let w = 1; w <= sem.weeks; w++) {
+      const readings = course.readings.filter((r) => r.week === w);
+      const tasks = course.tasks.filter((t) => t.week === w);
+      if (readings.length || tasks.length) weeks.push({ w, readings, tasks });
+    }
+
+    if (weeks.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'week-empty';
+      empty.textContent = 'No readings or tasks yet.';
+      body.appendChild(empty);
+    } else {
+      weeks.forEach(({ w, readings, tasks }) => {
+        body.appendChild(weekDivider(sem, w));
+        body.appendChild(sectionTitle('Readings'));
+        body.appendChild(renderItemList(readings, 'reading', course, w));
+        body.appendChild(addRow('reading', course, w));
+        body.appendChild(sectionTitle('Tasks'));
+        body.appendChild(renderItemList(tasks, 'task', course, w));
+        body.appendChild(addRow('task', course, w));
+      });
+    }
+
+    col.appendChild(body);
+    board.appendChild(col);
+  });
+
+  root.appendChild(board);
+}
+
+// Horizontal divider with the week label and date range.
+function weekDivider(sem, week) {
+  const start = weekStart(sem.startDate, week);
+  const end = weekStart(sem.startDate, week);
+  end.setDate(end.getDate() + 6);
+  const el = document.createElement('div');
+  el.className = 'week-divider' + (week === currentWeek(sem) ? ' current' : '');
+  el.innerHTML = `<span class="week-divider-label">Week ${week}</span>
+    <span class="week-divider-dates">${formatDate(start)} – ${formatDate(end)}</span>`;
+  return el;
 }
 
 function renderCourseCard(course, week) {
@@ -409,7 +494,27 @@ async function init() {
     if (state.semesterId) deleteSemester(state.semesterId);
   });
 
+  setupViewToggle();
   setupModal();
+}
+
+// View toggle (Week / Course), persisted to localStorage.
+function setupViewToggle() {
+  document.querySelectorAll('.view-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.view = btn.dataset.view;
+      localStorage.setItem('plannerView', state.view);
+      updateViewToggle();
+      if (state.semester) renderPlanner();
+    });
+  });
+  updateViewToggle();
+}
+
+function updateViewToggle() {
+  document.querySelectorAll('.view-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.view === state.view);
+  });
 }
 
 // Shown when there are no semester files left.

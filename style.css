@@ -88,6 +88,25 @@ body {
   vertical-align: middle;
   flex-shrink: 0;
 }
+
+/* View toggle */
+.view-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.view-btn {
+  border: none;
+  background: var(--surface);
+  color: var(--muted);
+  padding: 0.45rem 0.75rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.view-btn + .view-btn { border-left: 1px solid var(--border); }
+.view-btn:hover { background: #f0f2f5; }
+.view-btn.active { background: var(--primary); color: #fff; }
 .btn-danger { color: #c0392b; border: none; background: none; }
 .btn-danger:hover { background: #fdecea; }
 
@@ -240,6 +259,51 @@ body {
 .add-row input[type="text"] { flex: 1; min-width: 120px; }
 .add-row input[type="number"] { width: 70px; }
 
+/* Course view: horizontal columns */
+.course-board {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+.course-column {
+  flex: 0 0 320px;
+  max-width: 320px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--primary);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  max-height: 75vh;
+}
+.course-column-header {
+  font-weight: 600;
+  font-size: 1rem;
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.course-column-body {
+  padding: 0 0.9rem 0.9rem;
+  overflow-y: auto;
+}
+.week-divider {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+.week-divider:first-child { border-top: none; }
+.week-divider-label { font-weight: 600; font-size: 0.85rem; }
+.week-divider-dates { font-size: 0.75rem; color: var(--muted); }
+.week-divider.current .week-divider-label { color: var(--primary); }
+
 /* Modal */
 .modal-overlay {
   position: fixed;
@@ -316,5 +380,9 @@ body {
 @media (max-width: 600px) {
   .header-inner { flex-direction: column; align-items: stretch; }
   .header-controls { justify-content: space-between; }
+  .selector-group { flex: 1; }
   .semester-select { flex: 1; }
+  .view-toggle { flex: 1; }
+  .view-btn { flex: 1; }
+  .course-column { flex-basis: 82vw; max-width: 82vw; }
 }
