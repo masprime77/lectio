@@ -36,6 +36,9 @@ and writes the JSON files directly via Node.js.
 - **Typography** — [Inter](https://fonts.google.com/specimen/Inter) for body
   text and [Outfit](https://fonts.google.com/specimen/Outfit) for headings and
   course names, loaded from Google Fonts.
+- **Auto-updates** — the packaged app checks GitHub Releases on launch and
+  downloads new versions in the background, showing a dismissible banner with a
+  one-click **Restart to update**.
 - **Mobile-friendly**, English-only, clean minimal UI with inline Tabler icons.
 
 ## Development
@@ -93,22 +96,46 @@ This runs [electron-builder](https://www.electron.build/) and produces, in the
   Release, and
 - a **`.zip`** of the `.app` (used by the Homebrew formula).
 
-Open the `.dmg`, drag **Semester Planner** to Applications, and launch it like
-any native Mac app.
+The `.dmg` opens to a drag-to-install window — drag **Semester Planner** onto
+the Applications shortcut, then launch it like any native Mac app.
+
+### First launch on macOS (Gatekeeper)
+
+Builds are unsigned unless you provide signing credentials, so macOS Gatekeeper
+may block the app the first time:
+
+> **First launch:** if macOS blocks the app, right-click the app in Applications
+> → **Open** → **Open anyway**. This is only required once.
+
+To produce a signed and notarized build instead, set `APPLE_TEAM_ID` (along with
+`APPLE_ID` and `APPLE_ID_PASSWORD`) in the environment before `npm run build:mac`.
+The `afterSign` hook notarizes automatically when `APPLE_TEAM_ID` is present and
+is skipped silently otherwise.
 
 ## Project structure
 
 ```
 semester-planner/
-├── main.js             # Electron main process: window + ipcMain fs handlers
-├── preload.js          # contextBridge bridge exposing window.planner
-├── index.html          # Markup: header, dashboard, planner, modal
+├── main.js             # Electron main process: window, IPC handlers, auto-update
+├── preload.js          # contextBridge bridges: window.planner + window.updater
+├── index.html          # Markup: update banner, header, dashboard, planner, modal
 ├── app.js              # Renderer logic (vanilla JS)
-├── style.css           # Styles
+├── style.css           # Styles (theme variables, update banner)
 ├── start.command       # Double-click launcher for running from source
-├── package.json        # Scripts + electron-builder config
+├── package.json        # Scripts + electron-builder config (dmg, publish)
+├── lib/                # Pure, testable core logic
+│   ├── planner-core.js      # status cycles, progress, course CRUD
+│   ├── semester-store.js    # filesystem read/write/delete
+│   └── ipc-handlers.js      # registers the semester IPC handlers
+├── assets/             # App icon (.icns) + DMG background, and generators
+├── build/
+│   └── afterSign.js         # Notarization hook (runs only if APPLE_TEAM_ID set)
+├── tests/              # Vitest unit + integration tests
 ├── homebrew/
-│   └── semester-planner.rb   # Homebrew formula template
+│   └── semester-planner.rb  # Homebrew formula template
+├── docs/
+│   └── USER_STORIES.md      # Stories + test traceability
+├── .github/workflows/  # ci.yml (tests) + release.yml (build & publish)
 ├── semesters/
 │   └── example.json    # Bundled example semester (starter data)
 └── README.md
@@ -192,9 +219,34 @@ selector the next time the app launches (or when you reselect from the dropdown)
 
 ## Releasing
 
-1. Bump `version` in `package.json`.
-2. `npm run build:mac` to produce the `.dmg` and `.zip` in `dist/`.
-3. Create a GitHub Release (e.g. tag `v1.0.0`) and attach both artifacts.
+Releases are built and published automatically by CI:
+
+1. Bump `version` in `package.json` and commit.
+2. Push a matching tag, e.g. `git tag v1.0.1 && git push origin v1.0.1`.
+3. [`release.yml`](.github/workflows/release.yml) runs the full CI suite first
+   (`needs: ci`) and, only if it passes, builds on macOS and publishes the
+   `.dmg`, `.zip`, and **`latest-mac.yml`** to the GitHub Release for that tag.
+
+To build locally without publishing, run `npm run build:mac` (artifacts land in
+`dist/`).
+
+## Auto-updates
+
+The app uses [electron-updater](https://www.electron.build/auto-update) against
+GitHub Releases (configured via the `build.publish` field in `package.json`).
+
+- On launch, the packaged app calls `checkForUpdatesAndNotify()` and compares the
+  installed version against the latest published release (using `latest-mac.yml`).
+- When a newer version exists it downloads in the background and shows a banner:
+  *"A new version is available, downloading…"*.
+- Once downloaded, the banner offers **Restart to update**, which calls
+  `autoUpdater.quitAndInstall()`. The banner can also be dismissed.
+- Update errors are logged silently and never crash the app.
+
+Auto-updates only run in the packaged app from a published release — in
+development it's a no-op. The renderer talks to the updater only through the
+`window.updater` bridge in [`preload.js`](preload.js); `ipcRenderer` is never
+exposed.
 
 ## Install via Homebrew (tap)
 
