@@ -26,6 +26,9 @@ database. A tiny Express server reads and writes those files.
   use the add row at the bottom of each section to add new readings/tasks.
 - **New / edit semester modal** — name, start date, week count, and courses with
   colors; editing preserves each course's existing readings and tasks.
+- **Theme** — a header toggle cycles **Light → Dark → Auto**; Auto follows your
+  system's `prefers-color-scheme` (and updates live when it changes). The choice
+  is saved in `localStorage` and applied before first paint to avoid any flash.
 - **Typography** — [Inter](https://fonts.google.com/specimen/Inter) for body
   text and [Outfit](https://fonts.google.com/specimen/Outfit) for headings and
   course names, loaded from Google Fonts.
