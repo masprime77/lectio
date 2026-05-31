@@ -93,8 +93,21 @@ This runs [electron-builder](https://www.electron.build/) and produces, in the
   Release, and
 - a **`.zip`** of the `.app` (used by the Homebrew formula).
 
-Open the `.dmg`, drag **Semester Planner** to Applications, and launch it like
-any native Mac app.
+The `.dmg` opens to a drag-to-install window — drag **Semester Planner** onto
+the Applications shortcut, then launch it like any native Mac app.
+
+### First launch on macOS (Gatekeeper)
+
+Builds are unsigned unless you provide signing credentials, so macOS Gatekeeper
+may block the app the first time:
+
+> **First launch:** if macOS blocks the app, right-click the app in Applications
+> → **Open** → **Open anyway**. This is only required once.
+
+To produce a signed and notarized build instead, set `APPLE_TEAM_ID` (along with
+`APPLE_ID` and `APPLE_ID_PASSWORD`) in the environment before `npm run build:mac`.
+The `afterSign` hook notarizes automatically when `APPLE_TEAM_ID` is present and
+is skipped silently otherwise.
 
 ## Project structure
 
