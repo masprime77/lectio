@@ -112,16 +112,29 @@ the Applications shortcut, then launch it like any native Mac app.
 
 ### First launch on macOS (Gatekeeper)
 
-Builds are unsigned unless you provide signing credentials, so macOS Gatekeeper
-may block the app the first time:
+Builds are **ad-hoc signed** but not notarized (no paid Apple Developer ID), so
+macOS Gatekeeper blocks a freshly downloaded copy the first time. Do this once:
 
-> **First launch:** if macOS blocks the app, right-click the app in Applications
-> → **Open** → **Open anyway**. This is only required once.
+> **First launch:** right-click **Semester Planner** in Applications → **Open** →
+> **Open**. If macOS still refuses (e.g. *"is damaged and can't be opened"*),
+> clear the download quarantine flag once:
+>
+> ```bash
+> xattr -dr com.apple.quarantine "/Applications/Semester Planner.app"
+> ```
 
-To produce a signed and notarized build instead, set `APPLE_TEAM_ID` (along with
-`APPLE_ID` and `APPLE_ID_PASSWORD`) in the environment before `npm run build:mac`.
-The `afterSign` hook notarizes automatically when `APPLE_TEAM_ID` is present and
-is skipped silently otherwise.
+This is only needed on first launch; updates after that open normally.
+
+**Why:** downloaded files get a `com.apple.quarantine` attribute, and without a
+notarized signature Gatekeeper distrusts the app. The `xattr` command removes
+that flag. The build is ad-hoc signed via the `afterPack` hook so its signature
+is valid (which is what avoids the unrecoverable "damaged" state).
+
+To produce a fully **signed + notarized** build instead — so downloads open with
+no prompt at all — set `APPLE_TEAM_ID` (plus `APPLE_ID` / `APPLE_ID_PASSWORD`,
+and a Developer ID cert via `CSC_LINK` / `CSC_KEY_PASSWORD`) before building. The
+`afterPack` hook then defers to electron-builder's signing and the `afterSign`
+hook notarizes automatically.
 
 ## Project structure
 
