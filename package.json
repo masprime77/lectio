@@ -19,5 +19,24 @@
   "devDependencies": {
     "electron": "^31.0.0",
     "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.tu-usuario.semester-planner",
+    "productName": "Semester Planner",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": ["dmg", "zip"]
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "app.js",
+      "style.css",
+      "semesters/"
+    ],
+    "extraResources": [
+      { "from": "semesters/", "to": "semesters/" }
+    ]
   }
 }
