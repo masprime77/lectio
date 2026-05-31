@@ -10,18 +10,26 @@ database. A tiny Express server reads and writes those files.
 
 ## Features
 
-- **Semester selector** — switch between all `.json` files in `semesters/`.
+- **Semester selector** — switch between all `.json` files in `semesters/`,
+  with inline **edit** and **delete** (the delete asks for confirmation).
+- **Two layouts** — toggle between **Week view** and **Course view**; the choice
+  is remembered in `localStorage`:
+  - *Week view* — weeks as collapsible sections (current week auto-expands),
+    with one card per course showing that week's readings and tasks.
+  - *Course view* — one column per course laid out side by side, each grouping
+    its readings and tasks under per-week dividers, with independent scrolling.
 - **Dashboard** — per-course progress bars and a current-week indicator.
-- **Planner** — weeks as collapsible sections (current week auto-expands), with
-  one card per course showing that week's readings and tasks.
 - **Status cycling** — click a badge to advance its status:
   - Readings: `pending → seen → summarized → studied → pending`
   - Tasks: `not done → done → reviewed → not done`
-- **Inline editing** — click a title to rename, `✕` to delete, and use the
-  add row at the bottom of each section to add new readings/tasks.
-- **New semester modal** — name, start date, week count, and courses with
-  colors; generates a new JSON file.
-- **Mobile-friendly**, English-only, clean minimal UI.
+- **Inline editing** — click a title to rename, the `×` button to delete, and
+  use the add row at the bottom of each section to add new readings/tasks.
+- **New / edit semester modal** — name, start date, week count, and courses with
+  colors; editing preserves each course's existing readings and tasks.
+- **Typography** — [Inter](https://fonts.google.com/specimen/Inter) for body
+  text and [Outfit](https://fonts.google.com/specimen/Outfit) for headings and
+  course names, loaded from Google Fonts.
+- **Mobile-friendly**, English-only, clean minimal UI with inline Tabler icons.
 
 ## Install
 
@@ -61,6 +69,7 @@ semester_planner/
 | GET    | `/api/semesters`       | List all semester files         |
 | GET    | `/api/semesters/:id`   | Load a semester JSON            |
 | PUT    | `/api/semesters/:id`   | Save (or create) a semester     |
+| DELETE | `/api/semesters/:id`   | Delete a semester file          |
 
 `:id` is the filename without the `.json` extension and must match
 `[A-Za-z0-9_-]+` (this guards against path traversal).
@@ -139,8 +148,9 @@ static deployment, point it at the JSON files directly and make saving a no-op:
    const api = {
      list: () => fetch('semesters/index.json').then((r) => r.json()),
      load: (id) => fetch(`semesters/${id}.json`).then((r) => r.json()),
-     // No backend on GitHub Pages — saving is disabled (read-only).
+     // No backend on GitHub Pages — saving/deleting are disabled (read-only).
      save: () => Promise.resolve({ ok: false, readonly: true }),
+     remove: () => Promise.resolve({ ok: false, readonly: true }),
    };
    ```
 
