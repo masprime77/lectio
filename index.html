@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Semester Planner</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <h1 class="logo">📚 Semester Planner</h1>
+      <div class="header-controls">
+        <select id="semester-select" class="semester-select" aria-label="Select semester"></select>
+        <button id="new-semester-btn" class="btn btn-primary">+ New Semester</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+    <section id="dashboard" class="dashboard"></section>
+    <section id="planner" class="planner"></section>
+  </main>
+
+  <!-- New semester modal -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h2 id="modal-title">Create New Semester</h2>
+      <form id="new-semester-form">
+        <label>
+          Semester name
+          <input type="text" id="ns-name" placeholder="Winter Semester 2025" required />
+        </label>
+        <label>
+          Start date
+          <input type="date" id="ns-start" required />
+        </label>
+        <label>
+          Number of weeks
+          <input type="number" id="ns-weeks" min="1" max="30" value="15" required />
+        </label>
+
+        <div class="ns-courses-header">
+          <span>Courses</span>
+          <button type="button" id="ns-add-course" class="btn btn-small">+ Add course</button>
+        </div>
+        <div id="ns-courses" class="ns-courses"></div>
+
+        <div class="modal-actions">
+          <button type="button" id="modal-cancel" class="btn">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
