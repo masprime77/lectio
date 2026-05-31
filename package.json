@@ -1,19 +1,23 @@
 {
   "name": "semester-planner",
   "version": "1.0.0",
-  "description": "A minimal semester planner web app backed by JSON files",
-  "main": "server.js",
+  "description": "A minimal semester planner desktop app backed by JSON files",
+  "main": "main.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "electron .",
+    "dev": "electron . --dev-tools",
+    "build:mac": "electron-builder --mac"
   },
   "keywords": [
     "semester",
     "planner",
     "university",
-    "study"
+    "study",
+    "electron"
   ],
   "license": "MIT",
-  "dependencies": {
-    "express": "^4.19.2"
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
   }
 }
