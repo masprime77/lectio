@@ -40,6 +40,7 @@
       "title": "Semester Planner",
       "icon": "assets/icon.icns",
       "background": "assets/dmg-background.png",
+      "artifactName": "SemesterPlanner-${arch}.${ext}",
       "window": {
         "width": 540,
         "height": 380

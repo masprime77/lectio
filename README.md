@@ -8,9 +8,20 @@ there's no database and no server. The UI is vanilla JS in an
 and writes the JSON files directly via Node.js.
 
 ![CI](https://github.com/masprime77/semester-planner/actions/workflows/ci.yml/badge.svg)
+[![Latest release](https://img.shields.io/github/v/release/masprime77/semester-planner?label=download)](https://github.com/masprime77/semester-planner/releases/latest)
 ![Vanilla JS](https://img.shields.io/badge/frontend-vanilla%20JS-yellow)
 ![Electron](https://img.shields.io/badge/runtime-electron-47848F)
 ![macOS](https://img.shields.io/badge/platform-macOS-lightgrey)
+
+## Download
+
+**[⬇ Download for macOS (Apple Silicon)](https://github.com/masprime77/semester-planner/releases/latest/download/SemesterPlanner-arm64.dmg)**
+
+That is a permanent link — it always serves the `.dmg` from the **latest**
+release. Open it, drag **Semester Planner** onto Applications, and launch it (see
+[First launch on macOS](#first-launch-on-macos-gatekeeper) the first time). You
+can also browse the [releases page](https://github.com/masprime77/semester-planner/releases/latest)
+or install via [Homebrew](#install-via-homebrew-tap).
 
 ## Features
 
@@ -250,34 +261,41 @@ exposed.
 
 ## Install via Homebrew (tap)
 
-A formula template lives at [`homebrew/semester-planner.rb`](homebrew/semester-planner.rb).
-It has no `depends_on "node"` — the packaged Electron app bundles its own Node
-runtime. To publish it as a tap so others can `brew install` the app:
+For a GUI app, a **Cask** is the recommended Homebrew install — it copies
+`Semester Planner.app` straight into `/Applications`. The cask template lives at
+[`homebrew/Casks/semester-planner.rb`](homebrew/Casks/semester-planner.rb) and
+downloads the stable `SemesterPlanner-arm64.dmg` from the release.
+
+**Publish it as a tap** so others can install with one command:
 
 1. Create a repo named **`homebrew-tap`** on your GitHub account (the
-   `homebrew-` prefix is what makes it a tap).
+   `homebrew-` prefix is what makes `brew tap masprime77/tap` resolve).
 
-2. Fill in the formula's three placeholders from your release:
+2. Cut a release first (push a `v*` tag), then fill the cask's `version` and
+   `sha256` from that release — the helper script does it for you:
 
-   ```ruby
-   version "1.0.0"
-   url "https://github.com/masprime77/semester-planner/releases/download/v1.0.0/Semester-Planner-1.0.0-mac.zip"
-   sha256 "<output of: shasum -a 256 Semester-Planner-1.0.0-mac.zip>"
+   ```bash
+   homebrew/update-cask.sh 1.0.1   # downloads the .dmg, computes sha256, rewrites the cask
    ```
 
-3. Commit it to the tap repo under `Formula/semester-planner.rb` and push.
+3. Copy the filled `homebrew/Casks/semester-planner.rb` into the tap repo under
+   `Casks/semester-planner.rb`, commit, and push.
 
-4. Anyone can then install with:
+4. Anyone can then install (and upgrade / uninstall) the app with:
 
    ```bash
    brew tap masprime77/tap
-   brew install semester-planner
+   brew install --cask semester-planner
    ```
 
-   On install, the formula prints where the app was placed and how to symlink it
-   into `/Applications`, plus the location of your semester data
-   (`~/Library/Application Support/Semester Planner/semesters/`), which is kept
-   separate from the app so it survives upgrades and uninstalls.
+> The app is currently built for **Apple Silicon (arm64)** only. For Intel
+> support, add an `x64` (or `universal`) build target and a matching
+> `on_intel`/`on_arm` block in the cask.
+>
+> A plain **formula** alternative (installs into the Cellar prefix and symlinks)
+> also exists at
+> [`homebrew/semester-planner.rb`](homebrew/semester-planner.rb); the cask is the
+> better fit for a desktop app.
 
 ## License
 
