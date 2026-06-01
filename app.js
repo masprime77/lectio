@@ -22,12 +22,99 @@ const api = {
   remove: (id) => window.planner.deleteSemester(id),
 };
 
-// Persist the current semester, then re-render.
-let saveTimer = null;
+// ---------------------------------------------------------------------------
+// Save system: debounced autosave with a header "Saving…/Saved" indicator.
+// ---------------------------------------------------------------------------
+const SAVE_DEBOUNCE_MS = 500;
+const save = { timer: null, fadeTimer: null, saving: false, queued: false };
+
+// Tell the main process whether there are unsaved changes (for the close prompt).
+function markDirty(dirty) {
+  if (window.saver && window.saver.setDirty) window.saver.setDirty(dirty);
+}
+
+function saveIndicator(kind) {
+  const el = document.getElementById('save-status');
+  if (!el) return;
+  clearTimeout(save.fadeTimer);
+  if (kind === 'unsaved') {
+    el.className = 'save-status unsaved visible';
+    el.innerHTML = '<span class="unsaved-dot"></span> Unsaved changes';
+  } else if (kind === 'saving') {
+    el.className = 'save-status saving visible';
+    el.innerHTML = '<span class="save-spinner"></span> Saving…';
+  } else if (kind === 'saved') {
+    el.className = 'save-status saved visible';
+    el.innerHTML = `${icon('check')} Saved`;
+    save.fadeTimer = setTimeout(() => el.classList.remove('visible'), 2000);
+  } else {
+    el.className = 'save-status';
+    el.innerHTML = '';
+  }
+}
+
+// Manual save: write immediately (Cmd/Ctrl+S or File → Save). Cancels any
+// pending debounce and flushes now.
+async function saveNow() {
+  clearTimeout(save.timer);
+  save.timer = null;
+  await flushSave();
+}
+
+// Wire the manual-save shortcut (Cmd/Ctrl+S) and the File → Save menu item.
+function setupSave() {
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      saveNow();
+    }
+  });
+  if (window.saver) {
+    window.saver.onMenuSave(() => saveNow());
+    // On "Save and Close" from the quit dialog: flush, then let main quit.
+    if (window.saver.onFlushSaveAndQuit) {
+      window.saver.onFlushSaveAndQuit(async () => {
+        await saveNow();
+        window.saver.saveAndQuitDone();
+      });
+    }
+  }
+}
+
+// Schedule a debounced save after an in-memory change (rapid changes coalesce).
 function persist() {
   if (!state.semester) return;
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => api.save(state.semesterId, state.semester), 250);
+  markDirty(true);
+  saveIndicator('unsaved');
+  clearTimeout(save.timer);
+  save.timer = setTimeout(flushSave, SAVE_DEBOUNCE_MS);
+}
+
+// Write the current semester to disk, updating the indicator. Re-runs once more
+// if another change came in mid-write, so nothing is lost.
+async function flushSave() {
+  clearTimeout(save.timer);
+  save.timer = null;
+  if (!state.semester) return;
+  if (save.saving) {
+    save.queued = true;
+    return;
+  }
+  save.saving = true;
+  saveIndicator('saving');
+  try {
+    await api.save(state.semesterId, state.semester);
+  } catch (err) {
+    console.error('Save failed:', err);
+  } finally {
+    save.saving = false;
+    if (save.queued) {
+      save.queued = false;
+      return flushSave();
+    }
+    markDirty(false);
+    saveIndicator('saved');
+  }
 }
 
 // Shared pure logic, loaded from lib/planner-core.js before this script.
@@ -54,6 +141,7 @@ const ICONS = {
     '<path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />',
   'device-desktop':
     '<path d="M3 5a1 1 0 0 1 1 -1h16a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-16a1 1 0 0 1 -1 -1v-10z" /><path d="M7 20h10" /><path d="M9 16v4" /><path d="M15 16v4" />',
+  check: '<path d="M5 12l5 5l10 -10" />',
 };
 
 function icon(name) {
@@ -134,7 +222,7 @@ function renderDashboard() {
 
   let bars = '';
   if (sem.courses.length === 0) {
-    bars = '<div class="week-empty">No courses yet. Add one via “New Semester”.</div>';
+    bars = '<div class="week-empty">No courses yet.</div>';
   } else {
     sem.courses.forEach((course) => {
       const pct = courseProgress(course);
@@ -152,12 +240,24 @@ function renderDashboard() {
   }
 
   root.innerHTML = heading + weekLine + bars;
+  // Always offer a persistent way to add a course, empty or not.
+  root.appendChild(addCourseButton('dashboard-add-course'));
 }
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
   );
+}
+
+// A "+ Add course" button that opens the existing course creation flow
+// (the semester editor) for the current semester.
+function addCourseButton(extraClass = '') {
+  const btn = document.createElement('button');
+  btn.className = ('btn btn-small btn-icon-text add-course-btn ' + extraClass).trim();
+  btn.innerHTML = `${icon('plus')}<span>Add course</span>`;
+  btn.addEventListener('click', openAddCourse);
+  return btn;
 }
 
 // ---------------------------------------------------------------------------
@@ -203,7 +303,11 @@ function renderWeekView() {
     body.className = 'week-body';
 
     if (sem.courses.length === 0) {
-      body.innerHTML = '<div class="week-empty">No courses in this semester.</div>';
+      const empty = document.createElement('div');
+      empty.className = 'week-empty';
+      empty.textContent = 'No courses yet.';
+      body.appendChild(empty);
+      body.appendChild(addCourseButton());
     } else {
       sem.courses.forEach((course) => {
         body.appendChild(renderCourseCard(course, week));
@@ -228,11 +332,6 @@ function renderCourseView() {
   const sem = state.semester;
   const root = document.getElementById('planner');
   root.innerHTML = '';
-
-  if (sem.courses.length === 0) {
-    root.innerHTML = '<div class="week-empty">No courses in this semester.</div>';
-    return;
-  }
 
   const board = document.createElement('div');
   board.className = 'course-board';
@@ -264,15 +363,15 @@ function renderCourseView() {
       empty.className = 'week-empty';
       empty.textContent = 'No readings or tasks yet.';
       body.appendChild(empty);
+      body.appendChild(addControls(course, currentWeek(sem) || 1));
     } else {
       weeks.forEach(({ w, readings, tasks }) => {
         body.appendChild(weekDivider(sem, w));
         body.appendChild(sectionTitle('Readings'));
         body.appendChild(renderItemList(readings, 'reading', course, w));
-        body.appendChild(addRow('reading', course, w));
         body.appendChild(sectionTitle('Tasks'));
         body.appendChild(renderItemList(tasks, 'task', course, w));
-        body.appendChild(addRow('task', course, w));
+        body.appendChild(addControls(course, w));
       });
     }
 
@@ -280,7 +379,18 @@ function renderCourseView() {
     board.appendChild(col);
   });
 
+  // Persistent "+ Add course" column at the end of the row.
+  board.appendChild(addCourseColumn());
+
   root.appendChild(board);
+}
+
+// A dashed "add course" column placed at the end of the course board.
+function addCourseColumn() {
+  const col = document.createElement('div');
+  col.className = 'course-add-column';
+  col.appendChild(addCourseButton('course-add-btn'));
+  return col;
 }
 
 // Horizontal divider with the week label and date range.
@@ -408,6 +518,30 @@ function editItemTitle(span, item) {
   input.select();
 }
 
+// Low-weight "+ Reading" / "+ Task" buttons (Course view). Clicking one reveals
+// the existing add-input for that type, focused — so the add UI stays out of the
+// way until needed but nothing is redesigned. Used at the bottom of each week
+// section and in a course column's empty state.
+function addControls(course, week) {
+  const row = document.createElement('div');
+  row.className = 'add-controls';
+  const mk = (type, label) => {
+    const btn = document.createElement('button');
+    btn.className = 'add-mini';
+    btn.textContent = label;
+    btn.addEventListener('click', () => {
+      const input = addRow(type, course, week);
+      row.replaceWith(input);
+      const field = input.querySelector('input[type="text"]');
+      if (field) field.focus();
+    });
+    return btn;
+  };
+  row.appendChild(mk('reading', '+ Reading'));
+  row.appendChild(mk('task', '+ Task'));
+  return row;
+}
+
 // A row of inputs to add a new reading or task to a course/week.
 function addRow(type, course, week) {
   const row = document.createElement('div');
@@ -483,6 +617,7 @@ async function init() {
   setupTheme();
   setupModal();
   setupUpdater();
+  setupSave();
 }
 
 // ---------------------------------------------------------------------------
@@ -630,6 +765,20 @@ function openCreateModal() {
   document.getElementById('ns-courses').innerHTML = '';
   addCourseField();
   document.getElementById('modal-overlay').classList.remove('hidden');
+}
+
+// "+ Add course": open the existing semester editor with a fresh, focused
+// course row so the user can add one course to the current semester. Reuses the
+// same flow as the New Semester modal (existing courses keep their data on save).
+async function openAddCourse() {
+  if (!state.semesterId) return;
+  await openEditModal(state.semesterId);
+  // openEditModal leaves at least one (blank) row; only append an extra blank
+  // when courses already exist, so we always end on a single fresh, focused row.
+  if (state.semester && state.semester.courses.length > 0) addCourseField();
+  const rows = document.querySelectorAll('#ns-courses .ns-course-row');
+  const last = rows[rows.length - 1];
+  if (last) last.querySelector('.ns-course-name').focus();
 }
 
 // Open the modal in "edit" mode, pre-filled with the semester's current data.

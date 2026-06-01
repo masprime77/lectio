@@ -15,3 +15,12 @@ contextBridge.exposeInMainWorld('updater', {
   onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', () => callback()),
   restartAndUpdate: () => ipcRenderer.invoke('restart-and-update'),
 });
+
+// Save bridge: File → Save trigger, dirty-state reporting, and the
+// save-before-quit handshake used by the unsaved-changes close prompt.
+contextBridge.exposeInMainWorld('saver', {
+  onMenuSave: (callback) => ipcRenderer.on('menu-save', () => callback()),
+  setDirty: (dirty) => ipcRenderer.send('set-dirty', !!dirty),
+  onFlushSaveAndQuit: (callback) => ipcRenderer.on('flush-save-and-quit', () => callback()),
+  saveAndQuitDone: () => ipcRenderer.invoke('save-and-quit-done'),
+});

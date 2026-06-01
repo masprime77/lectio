@@ -168,6 +168,40 @@ body {
 }
 
 .logo { font-size: 1.2rem; margin: 0; }
+.header-left { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+
+/* Save status indicator */
+.save-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.save-status.visible { opacity: 1; }
+.save-status.saved { color: var(--st-done); }
+.save-status.unsaved { color: var(--muted); }
+.unsaved-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--st-seen);
+  display: inline-block;
+}
+.save-status .ti { width: 14px; height: 14px; }
+.save-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 .header-controls { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
 .selector-group { display: flex; gap: 0.25rem; align-items: center; }
 .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
@@ -202,6 +236,8 @@ body {
   align-items: center;
   gap: 0.35rem;
 }
+.add-course-btn .ti { width: 16px; height: 16px; }
+.dashboard-add-course { margin-top: 0.75rem; }
 
 /* Tabler icons */
 .ti {
@@ -380,6 +416,19 @@ body {
 .add-row input[type="text"] { flex: 1; min-width: 120px; }
 .add-row input[type="number"] { width: 70px; }
 
+/* Low-weight add buttons inside course columns */
+.add-controls { display: flex; gap: 0.5rem; margin-top: 0.4rem; }
+.add-mini {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+}
+.add-mini:hover { background: var(--hover); color: var(--text); }
+
 /* Course view: horizontal columns */
 .course-board {
   display: flex;
@@ -399,6 +448,16 @@ body {
   display: flex;
   flex-direction: column;
   max-height: 75vh;
+}
+.course-add-column {
+  flex: 0 0 200px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  min-height: 100px;
 }
 .course-column-header {
   font-weight: 600;
