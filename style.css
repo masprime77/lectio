@@ -416,6 +416,19 @@ body {
 .add-row input[type="text"] { flex: 1; min-width: 120px; }
 .add-row input[type="number"] { width: 70px; }
 
+/* Low-weight add buttons inside course columns */
+.add-controls { display: flex; gap: 0.5rem; margin-top: 0.4rem; }
+.add-mini {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+}
+.add-mini:hover { background: var(--hover); color: var(--text); }
+
 /* Course view: horizontal columns */
 .course-board {
   display: flex;
