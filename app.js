@@ -222,7 +222,7 @@ function renderDashboard() {
 
   let bars = '';
   if (sem.courses.length === 0) {
-    bars = '<div class="week-empty">No courses yet. Add one via “New Semester”.</div>';
+    bars = '<div class="week-empty">No courses yet.</div>';
   } else {
     sem.courses.forEach((course) => {
       const pct = courseProgress(course);
@@ -240,12 +240,25 @@ function renderDashboard() {
   }
 
   root.innerHTML = heading + weekLine + bars;
+  if (sem.courses.length === 0) {
+    root.appendChild(addCourseButton('dashboard-add-course'));
+  }
 }
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
   );
+}
+
+// A "+ Add course" button that opens the existing course creation flow
+// (the semester editor) for the current semester.
+function addCourseButton(extraClass = '') {
+  const btn = document.createElement('button');
+  btn.className = ('btn btn-small btn-icon-text add-course-btn ' + extraClass).trim();
+  btn.innerHTML = `${icon('plus')}<span>Add course</span>`;
+  btn.addEventListener('click', openAddCourse);
+  return btn;
 }
 
 // ---------------------------------------------------------------------------
@@ -291,7 +304,11 @@ function renderWeekView() {
     body.className = 'week-body';
 
     if (sem.courses.length === 0) {
-      body.innerHTML = '<div class="week-empty">No courses in this semester.</div>';
+      const empty = document.createElement('div');
+      empty.className = 'week-empty';
+      empty.textContent = 'No courses yet.';
+      body.appendChild(empty);
+      body.appendChild(addCourseButton());
     } else {
       sem.courses.forEach((course) => {
         body.appendChild(renderCourseCard(course, week));
@@ -719,6 +736,20 @@ function openCreateModal() {
   document.getElementById('ns-courses').innerHTML = '';
   addCourseField();
   document.getElementById('modal-overlay').classList.remove('hidden');
+}
+
+// "+ Add course": open the existing semester editor with a fresh, focused
+// course row so the user can add one course to the current semester. Reuses the
+// same flow as the New Semester modal (existing courses keep their data on save).
+async function openAddCourse() {
+  if (!state.semesterId) return;
+  await openEditModal(state.semesterId);
+  // openEditModal leaves at least one (blank) row; only append an extra blank
+  // when courses already exist, so we always end on a single fresh, focused row.
+  if (state.semester && state.semester.courses.length > 0) addCourseField();
+  const rows = document.querySelectorAll('#ns-courses .ns-course-row');
+  const last = rows[rows.length - 1];
+  if (last) last.querySelector('.ns-course-name').focus();
 }
 
 // Open the modal in "edit" mode, pre-filled with the semester's current data.

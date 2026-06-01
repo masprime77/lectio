@@ -236,6 +236,8 @@ body {
   align-items: center;
   gap: 0.35rem;
 }
+.add-course-btn .ti { width: 16px; height: 16px; }
+.dashboard-add-course { margin-top: 0.75rem; }
 
 /* Tabler icons */
 .ti {
