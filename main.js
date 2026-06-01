@@ -67,8 +67,33 @@ function sendToRenderer(channel) {
 // renderer, so the menu item just forwards the request over IPC.
 function buildAppMenu() {
   const isMac = process.platform === 'darwin';
+  // Settings/Preferences → handled in the renderer. Cmd+, on macOS, Ctrl+, else.
+  const settingsItem = {
+    label: 'Settings…',
+    accelerator: 'CmdOrCtrl+,',
+    click: () => sendToRenderer('open-settings'),
+  };
   const template = [
-    ...(isMac ? [{ role: 'appMenu' }] : []),
+    ...(isMac
+      ? [
+          {
+            label: app.name,
+            submenu: [
+              { role: 'about' },
+              { type: 'separator' },
+              settingsItem, // Preferences belongs in the app menu on macOS
+              { type: 'separator' },
+              { role: 'services' },
+              { type: 'separator' },
+              { role: 'hide' },
+              { role: 'hideOthers' },
+              { role: 'unhide' },
+              { type: 'separator' },
+              { role: 'quit' },
+            ],
+          },
+        ]
+      : []),
     {
       label: 'File',
       submenu: [
@@ -77,6 +102,7 @@ function buildAppMenu() {
           accelerator: 'CmdOrCtrl+S',
           click: () => sendToRenderer('menu-save'),
         },
+        ...(!isMac ? [{ type: 'separator' }, settingsItem] : []),
         { type: 'separator' },
         isMac ? { role: 'close' } : { role: 'quit' },
       ],

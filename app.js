@@ -968,6 +968,18 @@ function setupSettings() {
     current.autoUpdate = e.target.checked;
     await window.settings.save(current);
   });
+
+  // Open via the menu item / Cmd+, accelerator (forwarded from main)…
+  if (window.settings && window.settings.onOpen) {
+    window.settings.onOpen(() => openSettingsModal());
+  }
+  // …and a direct keydown fallback (same pattern as ⌘S).
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+      e.preventDefault();
+      openSettingsModal();
+    }
+  });
 }
 
 function closeSettingsModal() {
