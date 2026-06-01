@@ -1,6 +1,6 @@
 {
   "name": "semester-planner",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "A minimal semester planner desktop app backed by JSON files",
   "main": "main.js",
   "scripts": {
