@@ -1,5 +1,5 @@
 #!/bin/bash
-# Publishes the Semester Planner cask to your Homebrew tap repo.
+# Publishes the Lectio cask to your Homebrew tap repo.
 #
 # Usage:   homebrew/sync-tap.sh [version]
 #   - version defaults to the "version" field in package.json
@@ -14,7 +14,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TAP_DIR="${TAP_DIR:-$REPO_ROOT/../homebrew-tap}"
 VERSION="${1:-$(node -p "require('$REPO_ROOT/package.json').version")}"
-CASK="$REPO_ROOT/homebrew/Casks/semester-planner.rb"
+CASK="$REPO_ROOT/homebrew/Casks/lectio.rb"
 
 if [ ! -d "$TAP_DIR/.git" ]; then
   echo "error: tap repo not found at '$TAP_DIR'" >&2
@@ -27,15 +27,15 @@ bash "$REPO_ROOT/homebrew/update-cask.sh" "$VERSION"
 
 echo "==> Copying cask into $TAP_DIR/Casks/"
 mkdir -p "$TAP_DIR/Casks"
-cp "$CASK" "$TAP_DIR/Casks/semester-planner.rb"
+cp "$CASK" "$TAP_DIR/Casks/lectio.rb"
 
 echo "==> Committing & pushing in the tap"
 cd "$TAP_DIR"
-git add Casks/semester-planner.rb
+git add Casks/lectio.rb
 if git diff --cached --quiet; then
   echo "Tap already up to date for v$VERSION — nothing to push."
 else
-  git commit -m "semester-planner $VERSION"
+  git commit -m "lectio $VERSION"
   git push
-  echo "Pushed semester-planner $VERSION to the tap."
+  echo "Pushed lectio $VERSION to the tap."
 fi

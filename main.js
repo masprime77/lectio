@@ -9,7 +9,7 @@ let mainWindow = null;
 // Where semester JSON files live:
 //   - development: the project's /semesters folder
 //   - production:  <userData>/semesters, so user data persists across app
-//     updates (~/Library/Application Support/Semester Planner/semesters on macOS)
+//     updates (~/Library/Application Support/Lectio/semesters on macOS)
 const SEMESTERS_DIR = app.isPackaged
   ? path.join(app.getPath('userData'), 'semesters')
   : path.join(__dirname, 'semesters');

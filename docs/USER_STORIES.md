@@ -1,6 +1,6 @@
 # User Stories
 
-Feature-level user stories for Semester Planner, with acceptance criteria and
+Feature-level user stories for Lectio, with acceptance criteria and
 links to the automated tests that cover them. UI-only behaviours (rendering,
 DOM interaction, theming) are validated manually and noted as such; the
 extracted core logic in `lib/` is covered by the Vitest suite under `tests/`.
