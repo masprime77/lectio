@@ -255,6 +255,70 @@ Test references use the form `file › test name`.
 
 ---
 
+## Saving
+
+**US-030 — Changes autosave automatically**
+- As a student, I want my edits saved automatically so that I never lose work.
+- Acceptance criteria:
+  - [ ] Any change (status toggle, add/edit/delete reading or task) triggers a
+        save after a **500ms debounce** (rapid changes coalesce into one write).
+  - [ ] A header indicator shows **Saving…**, then **✓ Saved** (fades after ~2s).
+- Linked tests: underlying write covered by `tests/unit/semester-manager.test.js › save-semester writes the correct data`; debounce + indicator verified via Electron smoke test.
+
+**US-031 — Save immediately with ⌘S / File → Save**
+- As a student, I want a manual save so that I can force a write on demand.
+- Acceptance criteria:
+  - [ ] **Cmd/Ctrl+S** flushes pending changes immediately.
+  - [ ] A **File → Save** menu item (Cmd/Ctrl+S) does the same.
+- Linked tests: _none (Electron menu/shortcut; verified via Electron smoke test)_
+
+**US-032 — Warn about unsaved changes on close**
+- As a student, I want a prompt if I quit with unsaved changes so that I don't
+  lose them.
+- Acceptance criteria:
+  - [ ] An **Unsaved changes** indicator shows while a save is pending.
+  - [ ] Quitting with unsaved changes shows a dialog: **Save and Close /
+        Close without saving / Cancel**.
+- Linked tests: _none (Electron before-quit dialog; dirty-state + save-and-quit handshake verified via Electron smoke test)_
+
+---
+
+## Adding courses & content
+
+**US-033 — Add a course without creating a new semester**
+- As a student, I want to add a course to the current semester directly so that I
+  don't have to recreate the term.
+- Acceptance criteria:
+  - [ ] A persistent **+ Add course** button is available in the dashboard and in
+        both views (and in their empty states).
+  - [ ] It opens the existing semester editor with a focused new course row;
+        saving preserves the other courses' readings and tasks.
+  - [ ] Empty course columns / week sections offer **+ Reading** / **+ Task**.
+- Linked tests: course-add logic covered by `tests/unit/semester.test.js › adding a course generates a unique id`; UI entry points verified via Electron smoke test.
+
+---
+
+## Session restore
+
+**US-034 — Restore the last active semester on launch**
+- As a student, I want the app to reopen the semester I was last working on.
+- Acceptance criteria:
+  - [ ] The active semester id is persisted (`lastActiveSemesterId`).
+  - [ ] On launch it loads that semester if it still exists, else falls back to
+        the first available (and updates the saved id).
+  - [ ] Missing/corrupt values fall back gracefully with no error shown.
+- Linked tests: _none (verified via Electron smoke test across reloads)_
+
+**US-035 — Restore the last active view on launch**
+- As a student, I want the app to reopen in the layout (week/course) I last used.
+- Acceptance criteria:
+  - [ ] The view is persisted (`lastActiveView`).
+  - [ ] On launch the saved view is restored, defaulting to **week** view for a
+        missing/invalid value.
+- Linked tests: _none (verified via Electron smoke test across reloads)_
+
+---
+
 ## Traceability matrix
 
 | Story  | Feature area        | Linked test file(s)                          | Status        |
@@ -288,8 +352,14 @@ Test references use the form `file › test name`.
 | US-027 | Data persistence    | —                                            | not covered   |
 | US-028 | Distribution        | — (gated by CI)                              | not covered   |
 | US-029 | Distribution        | —                                            | not covered   |
+| US-030 | Saving              | semester-manager.test.js (+ smoke)           | partial       |
+| US-031 | Saving              | — (Electron smoke)                           | not covered   |
+| US-032 | Saving              | — (Electron smoke)                           | not covered   |
+| US-033 | Adding courses      | semester.test.js (+ smoke)                   | partial       |
+| US-034 | Session restore     | — (Electron smoke)                           | not covered   |
+| US-035 | Session restore     | — (Electron smoke)                           | not covered   |
 
-**Coverage summary:** 12 covered, 2 partial, 15 not covered (UI/packaging
-behaviours validated manually). Automated coverage focuses on the pure logic and
-filesystem/IPC layers in `lib/`, which the Vitest suite covers at 100% lines and
-functions (threshold: 70%).
+**Coverage summary:** 12 covered, 4 partial, 19 not covered (35 stories). The
+Vitest suite focuses on the pure logic and filesystem/IPC layers in `lib/`
+(100% lines and functions; threshold 70%). UI, Electron-process, and packaging
+behaviours are validated manually or with hidden-window Electron smoke tests.
