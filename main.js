@@ -63,6 +63,31 @@ function sendToRenderer(channel) {
   }
 }
 
+// Application menu with File → Save (Cmd/Ctrl+S). Save is handled in the
+// renderer, so the menu item just forwards the request over IPC.
+function buildAppMenu() {
+  const isMac = process.platform === 'darwin';
+  const template = [
+    ...(isMac ? [{ role: 'appMenu' }] : []),
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'Save',
+          accelerator: 'CmdOrCtrl+S',
+          click: () => sendToRenderer('menu-save'),
+        },
+        { type: 'separator' },
+        isMac ? { role: 'close' } : { role: 'quit' },
+      ],
+    },
+    { role: 'editMenu' },
+    { role: 'viewMenu' },
+    { role: 'windowMenu' },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
 // ---------------------------------------------------------------------------
 // Auto-update (electron-updater + GitHub Releases)
 // ---------------------------------------------------------------------------
@@ -95,9 +120,7 @@ registerIpcHandlers(ipcMain, () => SEMESTERS_DIR);
 // ---------------------------------------------------------------------------
 app.whenReady().then(() => {
   ensureSemestersDir();
-
-  // Hide the default menu bar on macOS.
-  if (process.platform === 'darwin') Menu.setApplicationMenu(null);
+  buildAppMenu();
 
   createWindow();
   setupAutoUpdater();
