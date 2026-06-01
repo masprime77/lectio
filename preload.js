@@ -16,7 +16,11 @@ contextBridge.exposeInMainWorld('updater', {
   restartAndUpdate: () => ipcRenderer.invoke('restart-and-update'),
 });
 
-// Save bridge. The File → Save menu item asks the renderer to save.
+// Save bridge: File → Save trigger, dirty-state reporting, and the
+// save-before-quit handshake used by the unsaved-changes close prompt.
 contextBridge.exposeInMainWorld('saver', {
   onMenuSave: (callback) => ipcRenderer.on('menu-save', () => callback()),
+  setDirty: (dirty) => ipcRenderer.send('set-dirty', !!dirty),
+  onFlushSaveAndQuit: (callback) => ipcRenderer.on('flush-save-and-quit', () => callback()),
+  saveAndQuitDone: () => ipcRenderer.invoke('save-and-quit-done'),
 });

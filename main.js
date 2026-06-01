@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, dialog } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const fs = require('fs');
 const path = require('path');
@@ -116,6 +116,22 @@ function setupAutoUpdater() {
 registerIpcHandlers(ipcMain, () => SEMESTERS_DIR);
 
 // ---------------------------------------------------------------------------
+// Unsaved-changes tracking + close prompt
+// ---------------------------------------------------------------------------
+let isDirty = false;   // reported by the renderer as changes are made/saved
+let allowQuit = false; // set once the user has decided how to close
+
+ipcMain.on('set-dirty', (event, dirty) => {
+  isDirty = !!dirty;
+});
+
+// Renderer signals it finished saving for the "Save and Close" choice.
+ipcMain.handle('save-and-quit-done', () => {
+  allowQuit = true;
+  app.quit();
+});
+
+// ---------------------------------------------------------------------------
 // App lifecycle
 // ---------------------------------------------------------------------------
 app.whenReady().then(() => {
@@ -128,6 +144,31 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+// Warn about unsaved changes before quitting.
+app.on('before-quit', async (event) => {
+  if (allowQuit || !isDirty || !mainWindow || mainWindow.isDestroyed()) return;
+
+  event.preventDefault();
+  const { response } = await dialog.showMessageBox(mainWindow, {
+    type: 'warning',
+    title: 'Unsaved changes',
+    message: 'You have unsaved changes. Save before closing?',
+    buttons: ['Save and Close', 'Close without saving', 'Cancel'],
+    defaultId: 0,
+    cancelId: 2,
+    noLink: true,
+  });
+
+  if (response === 0) {
+    // Ask the renderer to flush; it calls save-and-quit-done when finished.
+    sendToRenderer('flush-save-and-quit');
+  } else if (response === 1) {
+    allowQuit = true;
+    app.quit();
+  }
+  // response === 2 (Cancel): stay open.
 });
 
 app.on('window-all-closed', () => {

@@ -183,6 +183,14 @@ body {
 }
 .save-status.visible { opacity: 1; }
 .save-status.saved { color: var(--st-done); }
+.save-status.unsaved { color: var(--muted); }
+.unsaved-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--st-seen);
+  display: inline-block;
+}
 .save-status .ti { width: 14px; height: 14px; }
 .save-spinner {
   width: 12px;
