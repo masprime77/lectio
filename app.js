@@ -240,9 +240,8 @@ function renderDashboard() {
   }
 
   root.innerHTML = heading + weekLine + bars;
-  if (sem.courses.length === 0) {
-    root.appendChild(addCourseButton('dashboard-add-course'));
-  }
+  // Always offer a persistent way to add a course, empty or not.
+  root.appendChild(addCourseButton('dashboard-add-course'));
 }
 
 function escapeHtml(s) {
@@ -334,11 +333,6 @@ function renderCourseView() {
   const root = document.getElementById('planner');
   root.innerHTML = '';
 
-  if (sem.courses.length === 0) {
-    root.innerHTML = '<div class="week-empty">No courses in this semester.</div>';
-    return;
-  }
-
   const board = document.createElement('div');
   board.className = 'course-board';
 
@@ -385,7 +379,18 @@ function renderCourseView() {
     board.appendChild(col);
   });
 
+  // Persistent "+ Add course" column at the end of the row.
+  board.appendChild(addCourseColumn());
+
   root.appendChild(board);
+}
+
+// A dashed "add course" column placed at the end of the course board.
+function addCourseColumn() {
+  const col = document.createElement('div');
+  col.className = 'course-add-column';
+  col.appendChild(addCourseButton('course-add-btn'));
+  return col;
 }
 
 // Horizontal divider with the week label and date range.

@@ -436,6 +436,16 @@ body {
   flex-direction: column;
   max-height: 75vh;
 }
+.course-add-column {
+  flex: 0 0 200px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  min-height: 100px;
+}
 .course-column-header {
   font-weight: 600;
   font-size: 1rem;
