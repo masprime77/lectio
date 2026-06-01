@@ -41,6 +41,15 @@ or install via [Homebrew](#install-via-homebrew-tap).
   use the add row at the bottom of each section to add new readings/tasks.
 - **New / edit semester modal** — name, start date, week count, and courses with
   colors; editing preserves each course's existing readings and tasks.
+- **Add courses anytime** — a persistent **+ Add course** button in the dashboard
+  and in both views (no need to create a new semester). Empty course columns and
+  week sections offer low-weight **+ Reading** / **+ Task** entry points.
+- **Autosave & manual save** — every change autosaves after a 500ms debounce,
+  with a header indicator (**Saving…** → **✓ Saved**). Save immediately with
+  **⌘S / Ctrl+S** or **File → Save**. An **Unsaved changes** indicator and a
+  save-before-quit prompt protect your work.
+- **Session restore** — on launch the app reopens the **last active semester**
+  and the **last view** (falling back gracefully if that semester was deleted).
 - **Theme** — a header toggle cycles **Light → Dark → Auto**; Auto follows your
   system's `prefers-color-scheme` (and updates live when it changes). The choice
   is saved in `localStorage` and applied before first paint to avoid any flash.
@@ -136,6 +145,18 @@ and a Developer ID cert via `CSC_LINK` / `CSC_KEY_PASSWORD`) before building. Th
 `afterPack` hook then defers to electron-builder's signing and the `afterSign`
 hook notarizes automatically.
 
+## Updating the app icon
+
+Replace `assets/icon.png` (1024×1024) with your artwork, then rebuild the `.icns`:
+
+```bash
+npm run icon   # assets/icon.png → assets/icon.icns (via sips + iconutil)
+```
+
+Commit both files and ship the new icon in the next release. Full details (the
+generated sizes, DMG background, and caching tips) are in
+[`docs/UPDATING_THE_ICON.md`](docs/UPDATING_THE_ICON.md).
+
 ## Project structure
 
 ```
@@ -143,16 +164,23 @@ semester-planner/
 ├── main.js             # Electron main process: window, IPC handlers, auto-update
 ├── preload.js          # contextBridge bridges: window.planner + window.updater
 ├── index.html          # Markup: update banner, header, dashboard, planner, modal
-├── app.js              # Renderer logic (vanilla JS)
-├── style.css           # Styles (theme variables, update banner)
+├── app.js              # Renderer logic: views, save system, session restore
+├── style.css           # Styles (theme variables, banners, indicators)
 ├── start.command       # Double-click launcher for running from source
 ├── package.json        # Scripts + electron-builder config (dmg, publish)
 ├── lib/                # Pure, testable core logic
 │   ├── planner-core.js      # status cycles, progress, course CRUD
 │   ├── semester-store.js    # filesystem read/write/delete
 │   └── ipc-handlers.js      # registers the semester IPC handlers
-├── assets/             # App icon (.icns) + DMG background, and generators
+├── assets/             # Icon + DMG background, and their generators
+│   ├── icon.png             # 1024×1024 source icon
+│   ├── icon.icns            # built app/volume icon (see docs/UPDATING_THE_ICON.md)
+│   ├── build-icns.sh        # icon.png → icon.icns  (npm run icon)
+│   ├── generate-icon.js     # generate a placeholder icon.png
+│   ├── dmg-background.png / @2x   # DMG window background
+│   └── generate-dmg-background.js
 ├── build/
+│   ├── afterPack.js         # ad-hoc sign the .app (free distribution path)
 │   └── afterSign.js         # Notarization hook (runs only if APPLE_TEAM_ID set)
 ├── tests/              # Vitest unit + integration tests
 ├── homebrew/
@@ -160,7 +188,8 @@ semester-planner/
 │   ├── update-cask.sh             # refresh cask version + sha256 from a release
 │   └── sync-tap.sh                # publish the cask to ../homebrew-tap
 ├── docs/
-│   └── USER_STORIES.md      # Stories + test traceability
+│   ├── USER_STORIES.md       # Stories + test traceability
+│   └── UPDATING_THE_ICON.md  # How to rebuild icon files from icon.png
 ├── .github/workflows/  # ci.yml (tests) + release.yml (build & publish)
 ├── semesters/
 │   └── example.json    # Bundled example semester (starter data)
@@ -182,6 +211,10 @@ The renderer never touches the filesystem directly. `preload.js` uses
 
 `id` is the filename without `.json` and must match `[A-Za-z0-9_-]+` (this
 guards against path traversal). `ipcRenderer` is never exposed to the renderer.
+
+Two more `contextBridge` bridges follow the same pattern: **`window.updater`**
+(auto-update events + restart) and **`window.saver`** (the File → Save trigger,
+unsaved-changes reporting, and the save-before-quit handshake).
 
 ### Where your data lives
 
@@ -293,7 +326,7 @@ so the (ad-hoc signed) app opens on first launch without manual steps.
    the tap's `Casks/`, and commits + pushes it:
 
    ```bash
-   homebrew/sync-tap.sh 1.0.3            # version defaults to package.json
+   homebrew/sync-tap.sh                  # version defaults to package.json
    # tap path defaults to ../homebrew-tap; override with TAP_DIR=/path/to/tap
    ```
 
