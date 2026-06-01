@@ -105,7 +105,7 @@ This runs [electron-builder](https://www.electron.build/) and produces, in the
 
 - a **`.dmg`** installer — drag-and-drop, ready to share or upload to a GitHub
   Release, and
-- a **`.zip`** of the `.app` (used by the Homebrew formula).
+- a **`.zip`** of the `.app` (used by the Homebrew cask and auto-update).
 
 The `.dmg` opens to a drag-to-install window — drag **Semester Planner** onto
 the Applications shortcut, then launch it like any native Mac app.
@@ -156,7 +156,9 @@ semester-planner/
 │   └── afterSign.js         # Notarization hook (runs only if APPLE_TEAM_ID set)
 ├── tests/              # Vitest unit + integration tests
 ├── homebrew/
-│   └── semester-planner.rb  # Homebrew formula template
+│   ├── Casks/semester-planner.rb  # Homebrew cask
+│   ├── update-cask.sh             # refresh cask version + sha256 from a release
+│   └── sync-tap.sh                # publish the cask to ../homebrew-tap
 ├── docs/
 │   └── USER_STORIES.md      # Stories + test traceability
 ├── .github/workflows/  # ci.yml (tests) + release.yml (build & publish)
@@ -274,41 +276,40 @@ exposed.
 
 ## Install via Homebrew (tap)
 
-For a GUI app, a **Cask** is the recommended Homebrew install — it copies
-`Semester Planner.app` straight into `/Applications`. The cask template lives at
-[`homebrew/Casks/semester-planner.rb`](homebrew/Casks/semester-planner.rb) and
-downloads the stable `SemesterPlanner-arm64.dmg` from the release.
+Install the GUI app with a **Cask** — it copies `Semester Planner.app` straight
+into `/Applications`. The cask lives at
+[`homebrew/Casks/semester-planner.rb`](homebrew/Casks/semester-planner.rb); it
+downloads the release `.zip` and its `postflight` clears the download quarantine
+so the (ad-hoc signed) app opens on first launch without manual steps.
 
-**Publish it as a tap** so others can install with one command:
+**Publish it to your tap** so others can install with one command:
 
 1. Create a repo named **`homebrew-tap`** on your GitHub account (the
-   `homebrew-` prefix is what makes `brew tap masprime77/tap` resolve).
+   `homebrew-` prefix is what makes `brew tap masprime77/tap` resolve). Clone it
+   next to this project (so it sits at `../homebrew-tap`).
 
-2. Cut a release first (push a `v*` tag), then fill the cask's `version` and
-   `sha256` from that release — the helper script does it for you:
+2. Cut a release first (push a `v*` tag), then publish the cask to the tap — one
+   command refreshes `version`/`sha256` from the release, copies the cask into
+   the tap's `Casks/`, and commits + pushes it:
 
    ```bash
-   homebrew/update-cask.sh 1.0.1   # downloads the .dmg, computes sha256, rewrites the cask
+   homebrew/sync-tap.sh 1.0.3            # version defaults to package.json
+   # tap path defaults to ../homebrew-tap; override with TAP_DIR=/path/to/tap
    ```
 
-3. Copy the filled `homebrew/Casks/semester-planner.rb` into the tap repo under
-   `Casks/semester-planner.rb`, commit, and push.
+   (`homebrew/update-cask.sh <version>` just does the version/sha256 refresh if
+   you want that step on its own.)
 
-4. Anyone can then install (and upgrade / uninstall) the app with:
+3. Anyone can then install (and upgrade / uninstall) the app with:
 
    ```bash
    brew tap masprime77/tap
    brew install --cask semester-planner
    ```
 
-> The app is currently built for **Apple Silicon (arm64)** only. For Intel
-> support, add an `x64` (or `universal`) build target and a matching
-> `on_intel`/`on_arm` block in the cask.
->
-> A plain **formula** alternative (installs into the Cellar prefix and symlinks)
-> also exists at
-> [`homebrew/semester-planner.rb`](homebrew/semester-planner.rb); the cask is the
-> better fit for a desktop app.
+> The app is currently built for **Apple Silicon (arm64)** only (the cask has
+> `depends_on arch: :arm64`). For Intel support, add an `x64` (or `universal`)
+> build target and a matching `on_intel`/`on_arm` block in the cask.
 
 ## License
 

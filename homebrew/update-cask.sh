@@ -1,15 +1,16 @@
 #!/bin/bash
 # Fills the Homebrew cask's version + sha256 from a published GitHub release.
 #
-# Usage:  homebrew/update-cask.sh <version>     e.g.  homebrew/update-cask.sh 1.0.1
+# Usage:  homebrew/update-cask.sh <version>     e.g.  homebrew/update-cask.sh 1.0.3
 #
-# Requires the release to exist with the SemesterPlanner-arm64.dmg asset
-# attached (the Release workflow uploads it automatically on a v* tag).
+# The cask installs from the .zip asset (the .app inside it), so we hash the zip.
+# The Release workflow uploads "Semester-Planner-<version>-arm64-mac.zip" on a
+# v* tag.
 set -euo pipefail
 
-VERSION="${1:?usage: $0 <version>  e.g. $0 1.0.1}"
+VERSION="${1:?usage: $0 <version>  e.g. $0 1.0.3}"
 REPO="masprime77/semester-planner"
-ASSET="SemesterPlanner-arm64.dmg"
+ASSET="Semester-Planner-${VERSION}-arm64-mac.zip"
 URL="https://github.com/${REPO}/releases/download/v${VERSION}/${ASSET}"
 CASK="$(cd "$(dirname "$0")" && pwd)/Casks/semester-planner.rb"
 
