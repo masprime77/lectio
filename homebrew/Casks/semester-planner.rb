@@ -1,28 +1,28 @@
-# Homebrew Cask for Semester Planner (recommended way to install the GUI app).
-#
-# This is a TEMPLATE. After cutting a release, fill `version` and `sha256` —
-# the easiest way is to run:  homebrew/update-cask.sh <version>
-# (it downloads the release .dmg, computes the sha256, and rewrites both lines).
 cask "semester-planner" do
-  version "1.0.0"
-  sha256 "REPLACE_WITH_SHA256_OF_DMG"
+  version "1.0.3"
+  sha256 "5dbc71cd5f7bedd92a465aa4b406c11884b29bdac5f07b9dfd06f817648e91f0"
 
-  url "https://github.com/masprime77/semester-planner/releases/download/v#{version}/SemesterPlanner-arm64.dmg",
+  url "https://github.com/masprime77/semester-planner/releases/download/v#{version}/Semester-Planner-#{version}-arm64-mac.zip",
       verified: "github.com/masprime77/semester-planner/"
   name "Semester Planner"
-  desc "Minimal semester planner desktop app"
+  desc "Minimal semester planner desktop app (Electron)"
   homepage "https://github.com/masprime77/semester-planner"
 
-  # The packaged Electron app bundles its own Node runtime, so no extra deps.
+  # Only an arm64 (Apple Silicon) build is published.
   depends_on arch: :arm64
 
   app "Semester Planner.app"
 
-  caveats <<~EOS
-    Semester Planner is currently built for Apple Silicon (arm64) only.
+  # The build is ad-hoc signed (not notarized), so strip the download quarantine
+  # on install — otherwise Gatekeeper blocks the first launch.
+  postflight do
+    system_command "/usr/bin/xattr",
+                   args: ["-dr", "com.apple.quarantine", "/Applications/Semester Planner.app"],
+                   sudo: false
+  end
 
-    Your semester data is stored separately from the app and persists across
-    updates and uninstalls, at:
-      ~/Library/Application Support/Semester Planner/semesters/
-  EOS
+  zap trash: [
+    "~/Library/Application Support/Semester Planner",
+    "~/Library/Preferences/com.tu-usuario.semester-planner.plist",
+  ]
 end
