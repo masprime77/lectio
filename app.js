@@ -363,15 +363,15 @@ function renderCourseView() {
       empty.className = 'week-empty';
       empty.textContent = 'No readings or tasks yet.';
       body.appendChild(empty);
+      body.appendChild(addControls(course, currentWeek(sem) || 1));
     } else {
       weeks.forEach(({ w, readings, tasks }) => {
         body.appendChild(weekDivider(sem, w));
         body.appendChild(sectionTitle('Readings'));
         body.appendChild(renderItemList(readings, 'reading', course, w));
-        body.appendChild(addRow('reading', course, w));
         body.appendChild(sectionTitle('Tasks'));
         body.appendChild(renderItemList(tasks, 'task', course, w));
-        body.appendChild(addRow('task', course, w));
+        body.appendChild(addControls(course, w));
       });
     }
 
@@ -516,6 +516,30 @@ function editItemTitle(span, item) {
   span.replaceWith(input);
   input.focus();
   input.select();
+}
+
+// Low-weight "+ Reading" / "+ Task" buttons (Course view). Clicking one reveals
+// the existing add-input for that type, focused — so the add UI stays out of the
+// way until needed but nothing is redesigned. Used at the bottom of each week
+// section and in a course column's empty state.
+function addControls(course, week) {
+  const row = document.createElement('div');
+  row.className = 'add-controls';
+  const mk = (type, label) => {
+    const btn = document.createElement('button');
+    btn.className = 'add-mini';
+    btn.textContent = label;
+    btn.addEventListener('click', () => {
+      const input = addRow(type, course, week);
+      row.replaceWith(input);
+      const field = input.querySelector('input[type="text"]');
+      if (field) field.focus();
+    });
+    return btn;
+  };
+  row.appendChild(mk('reading', '+ Reading'));
+  row.appendChild(mk('task', '+ Task'));
+  return row;
 }
 
 // A row of inputs to add a new reading or task to a course/week.
