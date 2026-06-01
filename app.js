@@ -8,8 +8,34 @@ const state = {
   semester: null,     // loaded semester object
   openWeeks: new Set(), // weeks currently expanded
   editingId: null,    // semester id being edited in the modal (null = create mode)
-  view: localStorage.getItem('plannerView') || 'week', // 'week' | 'course'
+  view: restoreView(), // 'week' | 'course' — restored from last session
 };
+
+// ---------------------------------------------------------------------------
+// Persisted "last active" state (semester + view), restored on launch.
+// Reads/writes are guarded so a corrupted/unavailable store never throws.
+// ---------------------------------------------------------------------------
+function readPref(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch (e) {
+    return null;
+  }
+}
+
+function writePref(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    /* storage unavailable — ignore, not user-facing */
+  }
+}
+
+// Restore the saved view, defaulting to "week" for missing/invalid values.
+function restoreView() {
+  const v = readPref('lastActiveView');
+  return v === 'week' || v === 'course' ? v : 'week';
+}
 
 // ---------------------------------------------------------------------------
 // API helpers — backed by the Electron preload bridge (window.planner),
@@ -194,6 +220,7 @@ async function loadSemester(id) {
   const cw = currentWeek(state.semester);
   if (cw) state.openWeeks.add(cw); // auto-expand current week
   document.getElementById('semester-select').value = id;
+  writePref('lastActiveSemesterId', id); // remember for next launch
   setSemesterActionsEnabled(true);
   render();
 }
@@ -600,8 +627,15 @@ async function init() {
   document.getElementById('delete-semester-btn').innerHTML = icon('trash');
 
   const list = await populateSelector();
-  if (list.length) await loadSemester(list[0].id);
-  else renderEmptyState();
+  if (list.length) {
+    // Restore the last active semester if it still exists, else fall back to
+    // the first one (which loadSemester then records as the new last active).
+    const savedId = readPref('lastActiveSemesterId');
+    const idToLoad = list.some((s) => s.id === savedId) ? savedId : list[0].id;
+    await loadSemester(idToLoad);
+  } else {
+    renderEmptyState();
+  }
 
   document.getElementById('semester-select').addEventListener('change', (e) => {
     loadSemester(e.target.value);
@@ -690,7 +724,7 @@ function setupViewToggle() {
   document.querySelectorAll('.view-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       state.view = btn.dataset.view;
-      localStorage.setItem('plannerView', state.view);
+      writePref('lastActiveView', state.view);
       updateViewToggle();
       if (state.semester) renderPlanner();
     });
