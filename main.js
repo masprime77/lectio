@@ -67,8 +67,33 @@ function sendToRenderer(channel) {
 // renderer, so the menu item just forwards the request over IPC.
 function buildAppMenu() {
   const isMac = process.platform === 'darwin';
+  // Settings/Preferences → handled in the renderer. Cmd+, on macOS, Ctrl+, else.
+  const settingsItem = {
+    label: 'Settings…',
+    accelerator: 'CmdOrCtrl+,',
+    click: () => sendToRenderer('open-settings'),
+  };
   const template = [
-    ...(isMac ? [{ role: 'appMenu' }] : []),
+    ...(isMac
+      ? [
+          {
+            label: app.name,
+            submenu: [
+              { role: 'about' },
+              { type: 'separator' },
+              settingsItem, // Preferences belongs in the app menu on macOS
+              { type: 'separator' },
+              { role: 'services' },
+              { type: 'separator' },
+              { role: 'hide' },
+              { role: 'hideOthers' },
+              { role: 'unhide' },
+              { type: 'separator' },
+              { role: 'quit' },
+            ],
+          },
+        ]
+      : []),
     {
       label: 'File',
       submenu: [
@@ -77,6 +102,7 @@ function buildAppMenu() {
           accelerator: 'CmdOrCtrl+S',
           click: () => sendToRenderer('menu-save'),
         },
+        ...(!isMac ? [{ type: 'separator' }, settingsItem] : []),
         { type: 'separator' },
         isMac ? { role: 'close' } : { role: 'quit' },
       ],
@@ -91,7 +117,7 @@ function buildAppMenu() {
 // ---------------------------------------------------------------------------
 // Auto-update (electron-updater + GitHub Releases)
 // ---------------------------------------------------------------------------
-function setupAutoUpdater() {
+function setupAutoUpdater(enabled) {
   autoUpdater.on('update-available', () => sendToRenderer('update-available'));
   autoUpdater.on('update-downloaded', () => sendToRenderer('update-downloaded'));
   // Never crash the app over an update error — just log it.
@@ -101,6 +127,9 @@ function setupAutoUpdater() {
 
   // Restart into the freshly downloaded update.
   ipcMain.handle('restart-and-update', () => autoUpdater.quitAndInstall());
+
+  // Auto-update disabled in settings → register handlers but skip the check.
+  if (!enabled) return;
 
   // Check in the background, then notify. Wrapped so a dev/offline failure is
   // swallowed (the 'error' handler also covers async rejections).
@@ -132,6 +161,34 @@ ipcMain.handle('save-and-quit-done', () => {
 });
 
 // ---------------------------------------------------------------------------
+// App settings (file-based, in userData) — read in the main process so the
+// auto-update preference is available before the renderer loads.
+// ---------------------------------------------------------------------------
+const SETTINGS_FILE = path.join(app.getPath('userData'), 'settings.json');
+
+function readSettings() {
+  try {
+    return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+  } catch (e) {
+    return {}; // missing or corrupt → defaults applied by callers
+  }
+}
+
+function writeSettings(data) {
+  try {
+    fs.mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true });
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(data || {}, null, 2));
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+ipcMain.handle('get-settings', () => readSettings());
+ipcMain.handle('save-settings', (event, data) => writeSettings(data));
+ipcMain.handle('get-version', () => app.getVersion());
+
+// ---------------------------------------------------------------------------
 // App lifecycle
 // ---------------------------------------------------------------------------
 app.whenReady().then(() => {
@@ -139,7 +196,9 @@ app.whenReady().then(() => {
   buildAppMenu();
 
   createWindow();
-  setupAutoUpdater();
+  // Read the auto-update preference before launching the check (default: on).
+  const autoUpdateEnabled = readSettings().autoUpdate !== false;
+  setupAutoUpdater(autoUpdateEnabled);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

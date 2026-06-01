@@ -24,3 +24,16 @@ contextBridge.exposeInMainWorld('saver', {
   onFlushSaveAndQuit: (callback) => ipcRenderer.on('flush-save-and-quit', () => callback()),
   saveAndQuitDone: () => ipcRenderer.invoke('save-and-quit-done'),
 });
+
+// App info (read-only).
+contextBridge.exposeInMainWorld('appInfo', {
+  getVersion: () => ipcRenderer.invoke('get-version'),
+});
+
+// Settings bridge: file-based settings (settings.json) read/write, plus the
+// "open settings" signal from the menu / Cmd+, accelerator.
+contextBridge.exposeInMainWorld('settings', {
+  get: () => ipcRenderer.invoke('get-settings'),
+  save: (data) => ipcRenderer.invoke('save-settings', data),
+  onOpen: (callback) => ipcRenderer.on('open-settings', () => callback()),
+});

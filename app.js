@@ -108,10 +108,18 @@ function setupSave() {
 }
 
 // Schedule a debounced save after an in-memory change (rapid changes coalesce).
+// Autosave is on unless explicitly disabled in Settings (localStorage).
+function isAutosaveEnabled() {
+  return readPref('autosave') !== 'false';
+}
+
 function persist() {
   if (!state.semester) return;
+  // Still track the unsaved state (indicator + quit prompt) even with autosave
+  // off — only the debounced write is skipped. Manual save (⌘S) still works.
   markDirty(true);
   saveIndicator('unsaved');
+  if (!isAutosaveEnabled()) return;
   clearTimeout(save.timer);
   save.timer = setTimeout(flushSave, SAVE_DEBOUNCE_MS);
 }
@@ -168,6 +176,8 @@ const ICONS = {
   'device-desktop':
     '<path d="M3 5a1 1 0 0 1 1 -1h16a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-16a1 1 0 0 1 -1 -1v-10z" /><path d="M7 20h10" /><path d="M9 16v4" /><path d="M15 16v4" />',
   check: '<path d="M5 12l5 5l10 -10" />',
+  settings:
+    '<path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" /><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" />',
 };
 
 function icon(name) {
@@ -652,6 +662,7 @@ async function init() {
   setupModal();
   setupUpdater();
   setupSave();
+  setupSettings();
 }
 
 // ---------------------------------------------------------------------------
@@ -927,6 +938,75 @@ async function submitModal() {
   closeModal();
   await populateSelector();
   await loadSemester(id);
+}
+
+// ---------------------------------------------------------------------------
+// Settings modal: autosave (localStorage), auto-update (settings.json), version
+// ---------------------------------------------------------------------------
+function setupSettings() {
+  const btn = document.getElementById('settings-btn');
+  btn.innerHTML = icon('settings');
+  btn.addEventListener('click', openSettingsModal);
+
+  const overlay = document.getElementById('settings-overlay');
+  const close = document.getElementById('settings-close');
+  close.innerHTML = icon('x');
+  close.addEventListener('click', closeSettingsModal);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeSettingsModal();
+  });
+
+  // Autosave preference lives in localStorage.
+  document.getElementById('set-autosave').addEventListener('change', (e) => {
+    writePref('autosave', e.target.checked ? 'true' : 'false');
+  });
+
+  // Auto-update preference lives in settings.json (read by main on launch).
+  document.getElementById('set-autoupdate').addEventListener('change', async (e) => {
+    if (!window.settings) return;
+    const current = (await window.settings.get()) || {};
+    current.autoUpdate = e.target.checked;
+    await window.settings.save(current);
+  });
+
+  // Open via the menu item / Cmd+, accelerator (forwarded from main)…
+  if (window.settings && window.settings.onOpen) {
+    window.settings.onOpen(() => openSettingsModal());
+  }
+  // …and a direct keydown fallback (same pattern as ⌘S).
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+      e.preventDefault();
+      openSettingsModal();
+    }
+  });
+}
+
+function closeSettingsModal() {
+  document.getElementById('settings-overlay').classList.add('hidden');
+}
+
+async function openSettingsModal() {
+  document.getElementById('set-autosave').checked = isAutosaveEnabled();
+
+  let autoUpdate = true;
+  if (window.settings) {
+    const s = (await window.settings.get()) || {};
+    autoUpdate = s.autoUpdate !== false;
+  }
+  document.getElementById('set-autoupdate').checked = autoUpdate;
+
+  let version = '';
+  if (window.appInfo) {
+    try {
+      version = await window.appInfo.getVersion();
+    } catch (e) {
+      /* leave blank on failure */
+    }
+  }
+  document.getElementById('set-version').textContent = version || '—';
+
+  document.getElementById('settings-overlay').classList.remove('hidden');
 }
 
 init();
