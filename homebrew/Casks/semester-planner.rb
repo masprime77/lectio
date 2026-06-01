@@ -4,8 +4,8 @@
 # the easiest way is to run:  homebrew/update-cask.sh <version>
 # (it downloads the release .dmg, computes the sha256, and rewrites both lines).
 cask "semester-planner" do
-  version "1.0.0"
-  sha256 "REPLACE_WITH_SHA256_OF_DMG"
+  version "1.0.3"
+  sha256 "0e118a08ffd5bff38c13e8c11088e5294b4f2ff305a1df2f3f5fb4b3b1681f5e"
 
   url "https://github.com/masprime77/semester-planner/releases/download/v#{version}/SemesterPlanner-arm64.dmg",
       verified: "github.com/masprime77/semester-planner/"
