@@ -1,6 +1,6 @@
 'use strict';
 // Generates assets/icon.png (1024x1024): a flat rounded-rect app icon in the
-// app's primary color with "SP" in white (San Francisco system font).
+// app's primary color with "LE" in white (San Francisco system font).
 //
 // Run:   node_modules/.bin/electron assets/generate-icon.js
 // Then build the .icns from it with sips + iconutil (see the build steps in the
@@ -31,12 +31,12 @@ const draw = `(() => {
   ctx.fillStyle = '${PRIMARY}';
   ctx.fill();
 
-  // "SP" wordmark in white, bold San Francisco.
+  // "LE" wordmark in white, bold San Francisco.
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.font = '700 ' + Math.round(S * 0.5) + 'px -apple-system, "SF Pro Display", "Helvetica Neue", system-ui, sans-serif';
-  ctx.fillText('SP', S / 2, S * 0.54);
+  ctx.fillText('LE', S / 2, S * 0.54);
 
   return c.toDataURL('image/png');
 })()`;

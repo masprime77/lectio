@@ -4,7 +4,7 @@ Guidance for AI assistants (and humans) working in this repo.
 
 ## What this is
 
-**Semester Planner** — a native **macOS desktop app** (Electron) for planning a
+**Lectio** — a native **macOS desktop app** (Electron) for planning a
 university semester: courses, weekly readings and tasks, status badges, and
 per-course progress. Framework-free **vanilla JS** renderer. **No server and no
 database** — each semester is a plain JSON file; the Electron main process reads
@@ -70,7 +70,7 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
 - Reading status: `pending → seen → summarized → studied` (cycles).
 - Task status: `not done → done → reviewed` (cycles).
 - **Where files live:** dev → project `semesters/`; packaged →
-  `~/Library/Application Support/Semester Planner/semesters/` (seeded from the
+  `~/Library/Application Support/Lectio/semesters/` (seeded from the
   bundled `example.json` on first launch).
 
 ## Key behaviours (renderer)
@@ -111,7 +111,7 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
   builds and publishes the `.dmg`, `.zip`, and `latest-mac.yml` to the GitHub
   Release (draft by default — publish it to make the download link live).
 - **Versioning:** semver. New features → minor bump; fixes → patch.
-- **Homebrew:** cask at `homebrew/Casks/semester-planner.rb` (installs the
+- **Homebrew:** cask at `homebrew/Casks/lectio.rb` (installs the
   release `.zip`). After a release, `homebrew/sync-tap.sh` refreshes
   version/sha256 and publishes to `../homebrew-tap`.
 - **Icon:** see [`docs/UPDATING_THE_ICON.md`](docs/UPDATING_THE_ICON.md).
@@ -127,7 +127,7 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
   re-add xattrs that break local `codesign`; `afterPack` handles this gracefully
   (local copies aren't quarantined, so it's harmless). CI runs in a clean checkout.
 - **arm64 only** — no Intel/universal build yet (cask has `depends_on arch: :arm64`).
-- **appId** is still the placeholder `com.tu-usuario.semester-planner` in
-  `package.json` → renaming it changes the bundle id (affects signing/updates).
+- **appId** is `com.masprime77.lectio` in `package.json`; changing it alters the
+  bundle id (affects signing/updates and the userData folder location).
 - Don't touch the user's `../homebrew-tap` repo unless asked; `sync-tap.sh`
   commits + pushes there.

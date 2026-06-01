@@ -4,15 +4,15 @@
 # Usage:  homebrew/update-cask.sh <version>     e.g.  homebrew/update-cask.sh 1.0.3
 #
 # The cask installs from the .zip asset (the .app inside it), so we hash the zip.
-# The Release workflow uploads "Semester-Planner-<version>-arm64-mac.zip" on a
+# The Release workflow uploads "Lectio-<version>-arm64-mac.zip" on a
 # v* tag.
 set -euo pipefail
 
 VERSION="${1:?usage: $0 <version>  e.g. $0 1.0.3}"
-REPO="masprime77/semester-planner"
-ASSET="Semester-Planner-${VERSION}-arm64-mac.zip"
+REPO="masprime77/lectio"
+ASSET="Lectio-${VERSION}-arm64-mac.zip"
 URL="https://github.com/${REPO}/releases/download/v${VERSION}/${ASSET}"
-CASK="$(cd "$(dirname "$0")" && pwd)/Casks/semester-planner.rb"
+CASK="$(cd "$(dirname "$0")" && pwd)/Casks/lectio.rb"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT

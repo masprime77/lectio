@@ -1,4 +1,4 @@
-# Semester Planner
+# Lectio
 
 A minimal, framework-free **native desktop app** for planning a university
 semester. Track readings and tasks per course, per week, with click-to-cycle
@@ -7,20 +7,20 @@ there's no database and no server. The UI is vanilla JS in an
 [Electron](https://www.electronjs.org/) window; the Electron main process reads
 and writes the JSON files directly via Node.js.
 
-![CI](https://github.com/masprime77/semester-planner/actions/workflows/ci.yml/badge.svg)
-[![Latest release](https://img.shields.io/github/v/release/masprime77/semester-planner?label=download)](https://github.com/masprime77/semester-planner/releases/latest)
+![CI](https://github.com/masprime77/lectio/actions/workflows/ci.yml/badge.svg)
+[![Latest release](https://img.shields.io/github/v/release/masprime77/lectio?label=download)](https://github.com/masprime77/lectio/releases/latest)
 ![Vanilla JS](https://img.shields.io/badge/frontend-vanilla%20JS-yellow)
 ![Electron](https://img.shields.io/badge/runtime-electron-47848F)
 ![macOS](https://img.shields.io/badge/platform-macOS-lightgrey)
 
 ## Download
 
-**[⬇ Download for macOS (Apple Silicon)](https://github.com/masprime77/semester-planner/releases/latest/download/SemesterPlanner-arm64.dmg)**
+**[⬇ Download for macOS (Apple Silicon)](https://github.com/masprime77/lectio/releases/latest/download/Lectio-arm64.dmg)**
 
 That is a permanent link — it always serves the `.dmg` from the **latest**
-release. Open it, drag **Semester Planner** onto Applications, and launch it (see
+release. Open it, drag **Lectio** onto Applications, and launch it (see
 [First launch on macOS](#first-launch-on-macos-gatekeeper) the first time). You
-can also browse the [releases page](https://github.com/masprime77/semester-planner/releases/latest)
+can also browse the [releases page](https://github.com/masprime77/lectio/releases/latest)
 or install via [Homebrew](#install-via-homebrew-tap).
 
 ## Features
@@ -116,7 +116,7 @@ This runs [electron-builder](https://www.electron.build/) and produces, in the
   Release, and
 - a **`.zip`** of the `.app` (used by the Homebrew cask and auto-update).
 
-The `.dmg` opens to a drag-to-install window — drag **Semester Planner** onto
+The `.dmg` opens to a drag-to-install window — drag **Lectio** onto
 the Applications shortcut, then launch it like any native Mac app.
 
 ### First launch on macOS (Gatekeeper)
@@ -124,12 +124,12 @@ the Applications shortcut, then launch it like any native Mac app.
 Builds are **ad-hoc signed** but not notarized (no paid Apple Developer ID), so
 macOS Gatekeeper blocks a freshly downloaded copy the first time. Do this once:
 
-> **First launch:** right-click **Semester Planner** in Applications → **Open** →
+> **First launch:** right-click **Lectio** in Applications → **Open** →
 > **Open**. If macOS still refuses (e.g. *"is damaged and can't be opened"*),
 > clear the download quarantine flag once:
 >
 > ```bash
-> xattr -dr com.apple.quarantine "/Applications/Semester Planner.app"
+> xattr -dr com.apple.quarantine "/Applications/Lectio.app"
 > ```
 
 This is only needed on first launch; updates after that open normally.
@@ -160,7 +160,7 @@ generated sizes, DMG background, and caching tips) are in
 ## Project structure
 
 ```
-semester-planner/
+lectio/
 ├── main.js             # Electron main process: window, IPC handlers, auto-update
 ├── preload.js          # contextBridge bridges: window.planner + window.updater
 ├── index.html          # Markup: update banner, header, dashboard, planner, modal
@@ -184,7 +184,7 @@ semester-planner/
 │   └── afterSign.js         # Notarization hook (runs only if APPLE_TEAM_ID set)
 ├── tests/              # Vitest unit + integration tests
 ├── homebrew/
-│   ├── Casks/semester-planner.rb  # Homebrew cask
+│   ├── Casks/lectio.rb  # Homebrew cask
 │   ├── update-cask.sh             # refresh cask version + sha256 from a release
 │   └── sync-tap.sh                # publish the cask to ../homebrew-tap
 ├── docs/
@@ -219,14 +219,14 @@ unsaved-changes reporting, and the save-before-quit handshake).
 ### Where your data lives
 
 - **Development:** the project's `semesters/` folder.
-- **Packaged app:** `~/Library/Application Support/Semester Planner/semesters/`
+- **Packaged app:** `~/Library/Application Support/Lectio/semesters/`
   (`app.getPath('userData')`), so your data persists across app updates. On
   first launch the app seeds this folder with the bundled `example.json`.
 
 ## Adding a semester manually
 
 Create a new file in the active `semesters/` folder (the project folder in
-development, or `~/Library/Application Support/Semester Planner/semesters/` for
+development, or `~/Library/Application Support/Lectio/semesters/` for
 the installed app), e.g. `ws2025.json`. The filename (without `.json`) is the
 semester's id. Follow this schema:
 
@@ -309,9 +309,9 @@ exposed.
 
 ## Install via Homebrew (tap)
 
-Install the GUI app with a **Cask** — it copies `Semester Planner.app` straight
+Install the GUI app with a **Cask** — it copies `Lectio.app` straight
 into `/Applications`. The cask lives at
-[`homebrew/Casks/semester-planner.rb`](homebrew/Casks/semester-planner.rb); it
+[`homebrew/Casks/lectio.rb`](homebrew/Casks/lectio.rb); it
 downloads the release `.zip` and its `postflight` clears the download quarantine
 so the (ad-hoc signed) app opens on first launch without manual steps.
 
@@ -337,7 +337,7 @@ so the (ad-hoc signed) app opens on first launch without manual steps.
 
    ```bash
    brew tap masprime77/tap
-   brew install --cask semester-planner
+   brew install --cask lectio
    ```
 
 > The app is currently built for **Apple Silicon (arm64)** only (the cask has
