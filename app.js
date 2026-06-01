@@ -28,11 +28,19 @@ const api = {
 const SAVE_DEBOUNCE_MS = 500;
 const save = { timer: null, fadeTimer: null, saving: false, queued: false };
 
+// Tell the main process whether there are unsaved changes (for the close prompt).
+function markDirty(dirty) {
+  if (window.saver && window.saver.setDirty) window.saver.setDirty(dirty);
+}
+
 function saveIndicator(kind) {
   const el = document.getElementById('save-status');
   if (!el) return;
   clearTimeout(save.fadeTimer);
-  if (kind === 'saving') {
+  if (kind === 'unsaved') {
+    el.className = 'save-status unsaved visible';
+    el.innerHTML = '<span class="unsaved-dot"></span> Unsaved changes';
+  } else if (kind === 'saving') {
     el.className = 'save-status saving visible';
     el.innerHTML = '<span class="save-spinner"></span> Saving…';
   } else if (kind === 'saved') {
@@ -61,12 +69,23 @@ function setupSave() {
       saveNow();
     }
   });
-  if (window.saver) window.saver.onMenuSave(() => saveNow());
+  if (window.saver) {
+    window.saver.onMenuSave(() => saveNow());
+    // On "Save and Close" from the quit dialog: flush, then let main quit.
+    if (window.saver.onFlushSaveAndQuit) {
+      window.saver.onFlushSaveAndQuit(async () => {
+        await saveNow();
+        window.saver.saveAndQuitDone();
+      });
+    }
+  }
 }
 
 // Schedule a debounced save after an in-memory change (rapid changes coalesce).
 function persist() {
   if (!state.semester) return;
+  markDirty(true);
+  saveIndicator('unsaved');
   clearTimeout(save.timer);
   save.timer = setTimeout(flushSave, SAVE_DEBOUNCE_MS);
 }
@@ -93,6 +112,7 @@ async function flushSave() {
       save.queued = false;
       return flushSave();
     }
+    markDirty(false);
     saveIndicator('saved');
   }
 }
