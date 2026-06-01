@@ -22,12 +22,60 @@ const api = {
   remove: (id) => window.planner.deleteSemester(id),
 };
 
-// Persist the current semester, then re-render.
-let saveTimer = null;
+// ---------------------------------------------------------------------------
+// Save system: debounced autosave with a header "Saving…/Saved" indicator.
+// ---------------------------------------------------------------------------
+const SAVE_DEBOUNCE_MS = 500;
+const save = { timer: null, fadeTimer: null, saving: false, queued: false };
+
+function saveIndicator(kind) {
+  const el = document.getElementById('save-status');
+  if (!el) return;
+  clearTimeout(save.fadeTimer);
+  if (kind === 'saving') {
+    el.className = 'save-status saving visible';
+    el.innerHTML = '<span class="save-spinner"></span> Saving…';
+  } else if (kind === 'saved') {
+    el.className = 'save-status saved visible';
+    el.innerHTML = `${icon('check')} Saved`;
+    save.fadeTimer = setTimeout(() => el.classList.remove('visible'), 2000);
+  } else {
+    el.className = 'save-status';
+    el.innerHTML = '';
+  }
+}
+
+// Schedule a debounced save after an in-memory change (rapid changes coalesce).
 function persist() {
   if (!state.semester) return;
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => api.save(state.semesterId, state.semester), 250);
+  clearTimeout(save.timer);
+  save.timer = setTimeout(flushSave, SAVE_DEBOUNCE_MS);
+}
+
+// Write the current semester to disk, updating the indicator. Re-runs once more
+// if another change came in mid-write, so nothing is lost.
+async function flushSave() {
+  clearTimeout(save.timer);
+  save.timer = null;
+  if (!state.semester) return;
+  if (save.saving) {
+    save.queued = true;
+    return;
+  }
+  save.saving = true;
+  saveIndicator('saving');
+  try {
+    await api.save(state.semesterId, state.semester);
+  } catch (err) {
+    console.error('Save failed:', err);
+  } finally {
+    save.saving = false;
+    if (save.queued) {
+      save.queued = false;
+      return flushSave();
+    }
+    saveIndicator('saved');
+  }
 }
 
 // Shared pure logic, loaded from lib/planner-core.js before this script.
@@ -54,6 +102,7 @@ const ICONS = {
     '<path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />',
   'device-desktop':
     '<path d="M3 5a1 1 0 0 1 1 -1h16a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-16a1 1 0 0 1 -1 -1v-10z" /><path d="M7 20h10" /><path d="M9 16v4" /><path d="M15 16v4" />',
+  check: '<path d="M5 12l5 5l10 -10" />',
 };
 
 function icon(name) {
