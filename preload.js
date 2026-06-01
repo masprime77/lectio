@@ -15,3 +15,8 @@ contextBridge.exposeInMainWorld('updater', {
   onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', () => callback()),
   restartAndUpdate: () => ipcRenderer.invoke('restart-and-update'),
 });
+
+// Save bridge. The File → Save menu item asks the renderer to save.
+contextBridge.exposeInMainWorld('saver', {
+  onMenuSave: (callback) => ipcRenderer.on('menu-save', () => callback()),
+});

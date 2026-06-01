@@ -45,6 +45,25 @@ function saveIndicator(kind) {
   }
 }
 
+// Manual save: write immediately (Cmd/Ctrl+S or File → Save). Cancels any
+// pending debounce and flushes now.
+async function saveNow() {
+  clearTimeout(save.timer);
+  save.timer = null;
+  await flushSave();
+}
+
+// Wire the manual-save shortcut (Cmd/Ctrl+S) and the File → Save menu item.
+function setupSave() {
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      saveNow();
+    }
+  });
+  if (window.saver) window.saver.onMenuSave(() => saveNow());
+}
+
 // Schedule a debounced save after an in-memory change (rapid changes coalesce).
 function persist() {
   if (!state.semester) return;
@@ -532,6 +551,7 @@ async function init() {
   setupTheme();
   setupModal();
   setupUpdater();
+  setupSave();
 }
 
 // ---------------------------------------------------------------------------
