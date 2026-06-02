@@ -32,7 +32,9 @@ contextBridge.exposeInMainWorld('appInfo', {
 
 // External links: open a URL in the default browser. Main restricts this to
 // https github.com URLs (used for the pre-filled feedback issue links).
-contextBridge.exposeInMainWorld('external', {
+// NB: named `externalLinks`, not `external` — `window.external` is a built-in
+// browser property and exposeInMainWorld can't bind on top of it.
+contextBridge.exposeInMainWorld('externalLinks', {
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
 });
 
