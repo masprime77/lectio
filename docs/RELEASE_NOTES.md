@@ -7,3 +7,4 @@
 - Renamed the header view toggle labels: "Week view" → "Weekly view" and "Course view" → "All Courses" (internal view values unchanged).
 - Added a focused single-course mode: clicking a course name in the progress bar isolates that course's column (centred, wider) and dims the other progress rows; clicking it again restores the normal layout.
 - Focused mode can also be exited by clicking the empty space around the column or pressing the Esc key.
+- Added a global "+ Add" button in the header (shown once a semester is loaded) that opens a modal for adding a reading or task to any course and week of the current semester, with a Reading/Task toggle (Task reveals an optional due-date field) and the current week pre-selected.

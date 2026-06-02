@@ -247,6 +247,7 @@ async function loadSemester(id) {
   document.getElementById('semester-select').value = id;
   writePref('lastActiveSemesterId', id); // remember for next launch
   setSemesterActionsEnabled(true);
+  document.getElementById('add-item-btn').classList.remove('hidden');
   render();
 }
 
@@ -793,6 +794,7 @@ async function init() {
   setupSave();
   setupSettings();
   setupFeedback();
+  setupAddItem();
 }
 
 // ---------------------------------------------------------------------------
@@ -887,6 +889,7 @@ function renderEmptyState() {
     '<h2>No semesters yet</h2><div class="current-week">Create one with the “New Semester” button.</div>';
   document.getElementById('planner').innerHTML = '';
   setSemesterActionsEnabled(false);
+  document.getElementById('add-item-btn').classList.add('hidden');
 }
 
 function setSemesterActionsEnabled(enabled) {
@@ -1228,6 +1231,109 @@ async function openFeedbackModal() {
     : '—';
 
   document.getElementById('feedback-overlay').classList.remove('hidden');
+}
+
+// ---------------------------------------------------------------------------
+// Global "Add reading / task" modal: add an item to any course/week of the
+// current semester without going through a specific course column or week card.
+// ---------------------------------------------------------------------------
+// Selected type in the global add modal; module-scoped so openAddItemModal can
+// reset it in lockstep with the toggle buttons' visual state.
+let addItemType = 'reading';
+
+function setAddItemType(t) {
+  addItemType = t;
+  document.getElementById('add-item-type-reading').classList.toggle('active', t === 'reading');
+  document.getElementById('add-item-type-task').classList.toggle('active', t === 'task');
+  document.getElementById('add-item-due-row').style.display = t === 'task' ? 'block' : 'none';
+}
+
+function setupAddItem() {
+  // Inject the plus icon into the header button (it ships with only a label).
+  const btn = document.getElementById('add-item-btn');
+  btn.insertAdjacentHTML('afterbegin', icon('plus'));
+
+  btn.addEventListener('click', openAddItemModal);
+
+  document.getElementById('add-item-close').addEventListener('click', closeAddItemModal);
+  document.getElementById('add-item-cancel').addEventListener('click', closeAddItemModal);
+  document.getElementById('add-item-overlay').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('add-item-overlay')) closeAddItemModal();
+  });
+
+  // Type toggle (Reading / Task) — Task reveals the due-date field.
+  document.getElementById('add-item-type-reading').addEventListener('click', () => setAddItemType('reading'));
+  document.getElementById('add-item-type-task').addEventListener('click', () => setAddItemType('task'));
+
+  document.getElementById('add-item-submit').addEventListener('click', () => {
+    const titleVal = document.getElementById('add-item-title-input').value.trim();
+    const courseId = document.getElementById('add-item-course').value;
+    const week = parseInt(document.getElementById('add-item-week').value, 10);
+    const errorEl = document.getElementById('add-item-error');
+
+    if (!titleVal || !courseId) {
+      errorEl.textContent = 'Title and course are required.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+    errorEl.classList.add('hidden');
+
+    const course = state.semester.courses.find((c) => c.id === courseId);
+    if (!course) return;
+
+    if (addItemType === 'reading') {
+      course.readings.push({ id: uid('r'), week, title: titleVal, status: 'pending' });
+    } else {
+      course.tasks.push({
+        id: uid('t'),
+        week,
+        title: titleVal,
+        dueDate: document.getElementById('add-item-due').value || '',
+        status: 'not done',
+      });
+    }
+
+    persist();
+    closeAddItemModal();
+    renderDashboard();
+    renderPlanner();
+  });
+}
+
+function openAddItemModal() {
+  const sem = state.semester;
+  if (!sem) return;
+
+  // Populate course select.
+  const courseSelect = document.getElementById('add-item-course');
+  courseSelect.innerHTML = sem.courses
+    .map((c) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`)
+    .join('');
+
+  // Populate week select, defaulting to the current week.
+  const weekSelect = document.getElementById('add-item-week');
+  weekSelect.innerHTML = '';
+  for (let w = 1; w <= sem.weeks; w++) {
+    const opt = document.createElement('option');
+    opt.value = w;
+    opt.textContent = 'Week ' + w;
+    weekSelect.appendChild(opt);
+  }
+  const cw = currentWeek(sem);
+  weekSelect.value = cw || 1;
+
+  // Reset the form back to its default (Reading) state.
+  document.getElementById('add-item-title-input').value = '';
+  document.getElementById('add-item-due').value = '';
+  document.getElementById('add-item-error').classList.add('hidden');
+  setAddItemType('reading');
+
+  document.getElementById('add-item-overlay').classList.remove('hidden');
+  document.getElementById('add-item-title-input').focus();
+}
+
+function closeAddItemModal() {
+  document.getElementById('add-item-overlay').classList.add('hidden');
 }
 
 init();

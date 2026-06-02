@@ -736,6 +736,17 @@ body {
 .switch input:checked + .slider::before { transform: translateX(18px); }
 .switch input:focus-visible + .slider { outline: 2px solid var(--primary); outline-offset: 2px; }
 
+.add-item-type-toggle {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.add-item-type-btn.active {
+  background: var(--primary);
+  color: var(--on-accent);
+  border-color: var(--primary);
+}
+
 @media (max-width: 600px) {
   .header-inner { flex-direction: column; align-items: stretch; }
   .header-controls { justify-content: space-between; }
