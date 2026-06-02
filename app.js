@@ -1017,20 +1017,35 @@ async function openSettingsModal() {
 }
 
 // ---------------------------------------------------------------------------
-// Feedback: opens a pre-filled GitHub issue (bug report / feature request) in
-// the default browser via the window.externalLinks bridge (main restricts to
-// github.com). The repo's issue templates live in .github/ISSUE_TEMPLATE.
+// Feedback: the user fills in a title + description inside the app, then we
+// open a pre-filled GitHub new-issue page in the default browser via the
+// window.externalLinks bridge (main restricts to github.com) — they only need
+// to click "Submit new issue" there. The repo's issue templates live in
+// .github/ISSUE_TEMPLATE. The current app version is appended to the body.
 // ---------------------------------------------------------------------------
-const FEEDBACK_URLS = {
-  bug: 'https://github.com/masprime77/lectio/issues/new?template=bug_report.md&title=[Bug]%20&labels=bug',
-  feature:
-    'https://github.com/masprime77/lectio/issues/new?template=feature_request.md&title=[Feature]%20&labels=enhancement',
+const FEEDBACK_TEMPLATES = {
+  bug: { template: 'bug_report.md', labels: 'bug' },
+  feature: { template: 'feature_request.md', labels: 'enhancement' },
 };
 
-function openFeedbackLink(kind) {
-  const url = FEEDBACK_URLS[kind];
-  if (url && window.externalLinks) window.externalLinks.openExternal(url);
+let feedbackKind = 'bug';
+let feedbackVersion = '';
+
+function openFeedbackLink(kind, title, body) {
+  const cfg = FEEDBACK_TEMPLATES[kind];
+  if (!cfg || !window.externalLinks) return;
+  const fullBody = `${body}\n\n---\n_Lectio v${feedbackVersion}_`;
+  const url =
+    `https://github.com/masprime77/lectio/issues/new?template=${cfg.template}` +
+    `&labels=${cfg.labels}&title=${encodeURIComponent(title)}&body=${encodeURIComponent(fullBody)}`;
+  window.externalLinks.openExternal(url);
   closeFeedbackModal();
+}
+
+function setFeedbackKind(kind) {
+  feedbackKind = kind;
+  document.getElementById('feedback-type-bug').classList.toggle('active', kind === 'bug');
+  document.getElementById('feedback-type-feature').classList.toggle('active', kind === 'feature');
 }
 
 function setupFeedback() {
@@ -1046,29 +1061,48 @@ function setupFeedback() {
     if (e.target === overlay) closeFeedbackModal();
   });
 
-  const bug = document.getElementById('feedback-bug');
-  bug.querySelector('.feedback-option-icon').innerHTML = icon('bug');
-  bug.addEventListener('click', () => openFeedbackLink('bug'));
+  document
+    .getElementById('feedback-type-bug')
+    .addEventListener('click', () => setFeedbackKind('bug'));
+  document
+    .getElementById('feedback-type-feature')
+    .addEventListener('click', () => setFeedbackKind('feature'));
 
-  const feature = document.getElementById('feedback-feature');
-  feature.querySelector('.feedback-option-icon').innerHTML = icon('bulb');
-  feature.addEventListener('click', () => openFeedbackLink('feature'));
+  document.getElementById('feedback-cancel').addEventListener('click', closeFeedbackModal);
+
+  document.getElementById('feedback-submit').addEventListener('click', () => {
+    const title = document.getElementById('feedback-input-title').value.trim();
+    const body = document.getElementById('feedback-input-body').value.trim();
+    const error = document.getElementById('feedback-error');
+    if (!title || !body) {
+      error.classList.remove('hidden');
+      return;
+    }
+    error.classList.add('hidden');
+    openFeedbackLink(feedbackKind, title, body);
+  });
 }
 
 function closeFeedbackModal() {
   document.getElementById('feedback-overlay').classList.add('hidden');
+  document.getElementById('feedback-input-title').value = '';
+  document.getElementById('feedback-input-body').value = '';
+  document.getElementById('feedback-error').classList.add('hidden');
+  setFeedbackKind('bug');
 }
 
 async function openFeedbackModal() {
-  let version = '';
+  feedbackVersion = '';
   if (window.appInfo) {
     try {
-      version = await window.appInfo.getVersion();
+      feedbackVersion = await window.appInfo.getVersion();
     } catch (e) {
       /* leave blank on failure */
     }
   }
-  document.getElementById('feedback-version').textContent = version ? `v${version}` : '—';
+  document.getElementById('feedback-version').textContent = feedbackVersion
+    ? `v${feedbackVersion}`
+    : '—';
 
   document.getElementById('feedback-overlay').classList.remove('hidden');
 }
