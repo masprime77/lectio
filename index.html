@@ -134,23 +134,23 @@
         <button id="feedback-close" class="icon-btn" aria-label="Close feedback"></button>
       </div>
 
-      <p class="feedback-intro">Found a problem or have an idea? Let us know — this opens a pre-filled issue on GitHub.</p>
+      <div class="feedback-type-toggle">
+        <button type="button" id="feedback-type-bug" class="btn feedback-type-btn active">🐛 Bug report</button>
+        <button type="button" id="feedback-type-feature" class="btn feedback-type-btn">💡 Feature request</button>
+      </div>
 
-      <div class="feedback-options">
-        <button type="button" id="feedback-bug" class="feedback-option">
-          <span class="feedback-option-icon"></span>
-          <span class="feedback-option-text">
-            <span class="feedback-option-title">Report a bug</span>
-            <span class="feedback-option-desc">Something isn't working as expected</span>
-          </span>
-        </button>
-        <button type="button" id="feedback-feature" class="feedback-option">
-          <span class="feedback-option-icon"></span>
-          <span class="feedback-option-text">
-            <span class="feedback-option-title">Suggest a feature</span>
-            <span class="feedback-option-desc">Share an idea to improve Lectio</span>
-          </span>
-        </button>
+      <label for="feedback-input-title">Title
+        <input type="text" id="feedback-input-title" placeholder="Short title…" />
+      </label>
+      <label for="feedback-input-body">Description
+        <textarea id="feedback-input-body" rows="5" placeholder="Describe the bug or feature in detail…"></textarea>
+      </label>
+
+      <span id="feedback-error" class="hidden">Title and description are required.</span>
+
+      <div class="feedback-actions">
+        <button type="button" id="feedback-cancel" class="btn">Cancel</button>
+        <button type="button" id="feedback-submit" class="btn btn-primary">Open in GitHub →</button>
       </div>
 
       <p class="feedback-footer">Lectio <span id="feedback-version">—</span></p>
