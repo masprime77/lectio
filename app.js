@@ -273,28 +273,19 @@ function render() {
 
 // Return a sorted copy of `courses` per state.sortOrder. Pure: never mutates
 // the input array (callers pass sem.courses, which must stay in its on-disk
-// order). Progress sorts use courseProgress; week sorts use each course's
-// earliest week that has any reading or task (Infinity if it has none).
+// order). Progress sorts use courseProgress. Week sorts do NOT reorder courses
+// — they only reorder the weeks themselves (handled in the render functions),
+// so the course/column order falls back to alphabetical (A → Z) for them.
 function sortedCourses(courses) {
   const copy = [...courses];
   if (state.sortOrder === 'progress-asc')
     return copy.sort((a, b) => courseProgress(a) - courseProgress(b));
   if (state.sortOrder === 'progress-desc')
     return copy.sort((a, b) => courseProgress(b) - courseProgress(a));
-  if (state.sortOrder === 'alpha-asc')
-    return copy.sort((a, b) => a.name.localeCompare(b.name));
   if (state.sortOrder === 'alpha-desc')
     return copy.sort((a, b) => b.name.localeCompare(a.name));
-  const firstWeek = (c) => {
-    const weeks = [
-      ...c.readings.map((r) => r.week),
-      ...c.tasks.map((t) => t.week),
-    ];
-    return weeks.length ? Math.min(...weeks) : Infinity;
-  };
-  if (state.sortOrder === 'week-asc')
-    return copy.sort((a, b) => firstWeek(a) - firstWeek(b));
-  return copy.sort((a, b) => firstWeek(b) - firstWeek(a)); // week-desc
+  // alpha-asc, week-asc and week-desc all use alphabetical (A → Z) order.
+  return copy.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 // Course order for the Weekly view. Only week-based sorts reorder courses
