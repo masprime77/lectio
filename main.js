@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, dialog, shell } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const fs = require('fs');
 const path = require('path');
@@ -187,6 +187,21 @@ function writeSettings(data) {
 ipcMain.handle('get-settings', () => readSettings());
 ipcMain.handle('save-settings', (event, data) => writeSettings(data));
 ipcMain.handle('get-version', () => app.getVersion());
+
+// Open an external link in the user's default browser. Restricted to https
+// github.com URLs (used for the pre-filled feedback/bug-report issue links) so
+// the renderer can't ask the OS to open arbitrary URLs.
+ipcMain.handle('open-external', (event, url) => {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'https:' && parsed.hostname === 'github.com') {
+      return shell.openExternal(parsed.href);
+    }
+  } catch (e) {
+    /* malformed URL → ignore */
+  }
+  return Promise.resolve();
+});
 
 // ---------------------------------------------------------------------------
 // App lifecycle

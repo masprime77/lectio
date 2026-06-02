@@ -178,6 +178,12 @@ const ICONS = {
   check: '<path d="M5 12l5 5l10 -10" />',
   settings:
     '<path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" /><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" />',
+  help:
+    '<path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M12 17l0 .01" /><path d="M12 13.5a1.5 1.5 0 0 1 1 -1.5a2.6 2.6 0 1 0 -3 -4" />',
+  bug:
+    '<path d="M9 9v-1a3 3 0 0 1 6 0v1" /><path d="M8 9h8a6 6 0 0 1 1 3v3a5 5 0 0 1 -10 0v-3a6 6 0 0 1 1 -3" /><path d="M3 13l4 0" /><path d="M17 13l4 0" /><path d="M12 20l0 -6" /><path d="M4 19l3.35 -2" /><path d="M20 19l-3.35 -2" /><path d="M4 7l3.75 2.4" /><path d="M20 7l-3.75 2.4" />',
+  bulb:
+    '<path d="M3 12h1m8 -9v1m8 8h1m-15.4 -6.4l.7 .7m12.1 -.7l-.7 .7" /><path d="M9 16a5 5 0 1 1 6 0a3.5 3.5 0 0 0 -1 3a2 2 0 0 1 -4 0a3.5 3.5 0 0 0 -1 -3" /><path d="M9.7 17l4.6 0" />',
 };
 
 function icon(name) {
@@ -663,6 +669,7 @@ async function init() {
   setupUpdater();
   setupSave();
   setupSettings();
+  setupFeedback();
 }
 
 // ---------------------------------------------------------------------------
@@ -1007,6 +1014,63 @@ async function openSettingsModal() {
   document.getElementById('set-version').textContent = version || '—';
 
   document.getElementById('settings-overlay').classList.remove('hidden');
+}
+
+// ---------------------------------------------------------------------------
+// Feedback: opens a pre-filled GitHub issue (bug report / feature request) in
+// the default browser via the window.external bridge (main restricts to
+// github.com). The repo's issue templates live in .github/ISSUE_TEMPLATE.
+// ---------------------------------------------------------------------------
+const FEEDBACK_URLS = {
+  bug: 'https://github.com/masprime77/lectio/issues/new?template=bug_report.md&title=[Bug]%20&labels=bug',
+  feature:
+    'https://github.com/masprime77/lectio/issues/new?template=feature_request.md&title=[Feature]%20&labels=enhancement',
+};
+
+function openFeedbackLink(kind) {
+  const url = FEEDBACK_URLS[kind];
+  if (url && window.external) window.external.openExternal(url);
+  closeFeedbackModal();
+}
+
+function setupFeedback() {
+  const btn = document.getElementById('feedback-btn');
+  btn.innerHTML = icon('help');
+  btn.addEventListener('click', openFeedbackModal);
+
+  const overlay = document.getElementById('feedback-overlay');
+  const close = document.getElementById('feedback-close');
+  close.innerHTML = icon('x');
+  close.addEventListener('click', closeFeedbackModal);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeFeedbackModal();
+  });
+
+  const bug = document.getElementById('feedback-bug');
+  bug.querySelector('.feedback-option-icon').innerHTML = icon('bug');
+  bug.addEventListener('click', () => openFeedbackLink('bug'));
+
+  const feature = document.getElementById('feedback-feature');
+  feature.querySelector('.feedback-option-icon').innerHTML = icon('bulb');
+  feature.addEventListener('click', () => openFeedbackLink('feature'));
+}
+
+function closeFeedbackModal() {
+  document.getElementById('feedback-overlay').classList.add('hidden');
+}
+
+async function openFeedbackModal() {
+  let version = '';
+  if (window.appInfo) {
+    try {
+      version = await window.appInfo.getVersion();
+    } catch (e) {
+      /* leave blank on failure */
+    }
+  }
+  document.getElementById('feedback-version').textContent = version ? `v${version}` : '—';
+
+  document.getElementById('feedback-overlay').classList.remove('hidden');
 }
 
 init();
