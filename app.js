@@ -165,6 +165,8 @@ const { READING_CYCLE, TASK_CYCLE, nextStatus, courseProgress, uid } = window.Pl
 // ---------------------------------------------------------------------------
 const ICONS = {
   'chevron-right': '<path d="M9 6l6 6l-6 6" />',
+  'chevrons-down': '<path d="M7 7l5 5l5 -5" /><path d="M7 13l5 5l5 -5" />',
+  'chevrons-up': '<path d="M7 11l5 -5l5 5" /><path d="M7 17l5 -5l5 5" />',
   x: '<path d="M18 6l-12 12" /><path d="M6 6l12 12" />',
   pencil:
     '<path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" /><path d="M13.5 6.5l4 4" />',
@@ -399,6 +401,34 @@ function renderWeekView() {
 function toggleWeek(week) {
   if (state.openWeeks.has(week)) state.openWeeks.delete(week);
   else state.openWeeks.add(week);
+  renderPlanner();
+}
+
+// ---------------------------------------------------------------------------
+// Bulk expand/collapse for the active view's week sections.
+// Operates on state.openWeeks (Weekly view) or state.openCourseWeeks
+// (All Courses view) depending on which layout is showing.
+// ---------------------------------------------------------------------------
+function setAllWeeksOpen(mode) {
+  const sem = state.semester;
+  if (!sem) return;
+  const cw = currentWeek(sem);
+
+  if (state.view === 'course') {
+    sem.courses.forEach((course) => {
+      for (let w = 1; w <= sem.weeks; w++) {
+        const open = mode === 'all' || (mode === 'current' && w === cw);
+        state.openCourseWeeks[course.id + '-' + w] = open;
+      }
+    });
+  } else {
+    state.openWeeks = new Set();
+    if (mode === 'all') {
+      for (let w = 1; w <= sem.weeks; w++) state.openWeeks.add(w);
+    } else if (mode === 'current' && cw) {
+      state.openWeeks.add(cw);
+    }
+  }
   renderPlanner();
 }
 
@@ -723,6 +753,17 @@ async function init() {
   // Icon buttons in the header
   document.getElementById('edit-semester-btn').innerHTML = icon('pencil');
   document.getElementById('delete-semester-btn').innerHTML = icon('trash');
+
+  // Bulk expand/collapse controls (apply to whichever view is active)
+  const expandAllBtn = document.getElementById('expand-all-btn');
+  const collapseAllBtn = document.getElementById('collapse-all-btn');
+  const expandCurrentBtn = document.getElementById('expand-current-btn');
+  expandAllBtn.innerHTML = icon('chevrons-down');
+  collapseAllBtn.innerHTML = icon('chevrons-up');
+  expandCurrentBtn.innerHTML = icon('calendar');
+  expandAllBtn.addEventListener('click', () => setAllWeeksOpen('all'));
+  collapseAllBtn.addEventListener('click', () => setAllWeeksOpen('none'));
+  expandCurrentBtn.addEventListener('click', () => setAllWeeksOpen('current'));
 
   const list = await populateSelector();
   if (list.length) {

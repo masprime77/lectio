@@ -264,6 +264,24 @@ body {
 .view-btn + .view-btn { border-left: 1px solid var(--border); }
 .view-btn:hover { background: var(--hover); }
 .view-btn.active { background: var(--primary); color: var(--on-accent); }
+.collapse-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.collapse-btn {
+  border: none;
+  background: var(--surface);
+  color: var(--muted);
+  padding: 0.45rem 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+.collapse-btn + .collapse-btn { border-left: 1px solid var(--border); }
+.collapse-btn:hover { background: var(--hover); color: var(--text); }
+.collapse-btn .ti { width: 16px; height: 16px; }
 .btn-danger { color: var(--danger); border: none; background: none; }
 .btn-danger:hover { background: var(--danger-bg); }
 
