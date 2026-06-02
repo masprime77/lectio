@@ -12,6 +12,7 @@ and writes the JSON files directly via Node.js.
 ![Vanilla JS](https://img.shields.io/badge/frontend-vanilla%20JS-yellow)
 ![Electron](https://img.shields.io/badge/runtime-electron-47848F)
 ![macOS](https://img.shields.io/badge/platform-macOS-lightgrey)
+![Windows](https://img.shields.io/badge/platform-Windows-lightgrey)
 
 ## Download
 
@@ -22,6 +23,11 @@ release. Open it, drag **Lectio** onto Applications, and launch it (see
 [First launch on macOS](#first-launch-on-macos-gatekeeper) the first time). You
 can also browse the [releases page](https://github.com/masprime77/lectio/releases/latest)
 or install via [Homebrew](#install-via-homebrew-tap).
+
+**[⬇ Download for Windows](https://github.com/masprime77/lectio/releases/latest)** —
+grab the `Lectio Setup <version>.exe` installer from the **latest** release. Run
+it and follow **Next → Next → Install** (see
+[First launch on Windows](#first-launch-on-windows-smartscreen) the first time).
 
 ## Features
 
@@ -138,6 +144,29 @@ This is only needed on first launch; updates after that open normally.
 notarized signature Gatekeeper distrusts the app. The `xattr` command removes
 that flag. The build is ad-hoc signed via the `afterPack` hook so its signature
 is valid (which is what avoids the unrecoverable "damaged" state).
+
+### First launch on Windows (SmartScreen)
+
+On Windows, build the installer with:
+
+```bash
+npm run build:win
+```
+
+This produces, in the **`dist/`** folder, a **`Lectio Setup <version>.exe`**
+[NSIS](https://www.electron.build/configuration/nsis) installer (plus a `.zip`
+of the app and `latest.yml` for auto-updates). Run the installer and follow
+**Next → Next → Install** — you can pick the install directory, and it creates
+**Desktop** and **Start Menu** shortcuts.
+
+The installer and app are **not** signed with a paid certificate, so the first
+time you run a freshly downloaded copy, **Windows Defender SmartScreen** may show
+a blue *"Windows protected your PC"* warning. Do this once:
+
+> **First launch:** click **More info** → **Run anyway**. This only appears once.
+
+This is the Windows equivalent of macOS Gatekeeper above; once you've allowed it,
+updates after that launch normally.
 
 To produce a fully **signed + notarized** build instead — so downloads open with
 no prompt at all — set `APPLE_TEAM_ID` (plus `APPLE_ID` / `APPLE_ID_PASSWORD`,
