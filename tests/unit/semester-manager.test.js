@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import store from '../../lib/semester-store.js';
+import core from '../../lib/planner-core.js';
 
 let dir;
 beforeEach(() => {
@@ -32,9 +33,52 @@ describe('semester-store (filesystem layer)', () => {
     expect(list.find((s) => s.id === 'a').name).toBe('A');
   });
 
-  it('get-semester returns parsed JSON', () => {
+  it('get-semester returns parsed JSON with default tags migrated in', () => {
     store.saveSemester(dir, 'ss2025', sample);
-    expect(store.getSemester(dir, 'ss2025')).toEqual(sample);
+    expect(store.getSemester(dir, 'ss2025')).toEqual({
+      ...sample,
+      readingTags: core.DEFAULT_READING_TAGS,
+      taskTags: core.DEFAULT_TASK_TAGS,
+    });
+  });
+
+  it('migrateStatusToTagId rewrites legacy status strings to tag ids', () => {
+    const legacy = {
+      id: 's',
+      courses: [
+        {
+          id: 'c1',
+          readings: [{ status: 'pending' }, { status: 'studied' }, { status: 'bogus' }],
+          tasks: [{ status: 'not done' }, { status: 'done' }, { status: 'reviewed' }],
+        },
+      ],
+    };
+    const migrated = store.migrateStatusToTagId(legacy);
+    expect(migrated.readingTags.map((t) => t.id)).toEqual(
+      core.DEFAULT_READING_TAGS.map((t) => t.id)
+    );
+    expect(migrated.courses[0].readings.map((r) => r.status)).toEqual([
+      'r-pending',
+      'r-studied',
+      'r-pending', // unknown legacy value falls back to pending
+    ]);
+    expect(migrated.courses[0].tasks.map((t) => t.status)).toEqual([
+      't-pending',
+      't-done',
+      't-studied',
+    ]);
+  });
+
+  it('migrateStatusToTagId leaves an already-migrated semester untouched', () => {
+    const sem = {
+      id: 's',
+      readingTags: JSON.parse(JSON.stringify(core.DEFAULT_READING_TAGS)),
+      taskTags: JSON.parse(JSON.stringify(core.DEFAULT_TASK_TAGS)),
+      courses: [{ id: 'c1', readings: [{ status: 'r-seen' }], tasks: [{ status: 't-done' }] }],
+    };
+    store.migrateStatusToTagId(sem);
+    expect(sem.courses[0].readings[0].status).toBe('r-seen');
+    expect(sem.courses[0].tasks[0].status).toBe('t-done');
   });
 
   it('save-semester writes the correct data', () => {
