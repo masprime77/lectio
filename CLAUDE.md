@@ -4,11 +4,11 @@ Guidance for AI assistants (and humans) working in this repo.
 
 ## What this is
 
-**Lectio** — a native **macOS desktop app** (Electron) for planning a
-university semester: courses, weekly readings and tasks, status badges, and
-per-course progress. Framework-free **vanilla JS** renderer. **No server and no
-database** — each semester is a plain JSON file; the Electron main process reads
-and writes those files directly via Node's `fs`.
+**Lectio** — a native **desktop app for macOS and Windows** (Electron) for
+planning a university semester: courses, weekly readings and tasks, status
+badges, and per-course progress. Framework-free **vanilla JS** renderer. **No
+server and no database** — each semester is a plain JSON file; the Electron main
+process reads and writes those files directly via Node's `fs`.
 
 ## Commands
 
@@ -19,10 +19,16 @@ npm run dev            # run with DevTools open
 npm test               # Vitest suite (run once)
 npm run test:coverage  # coverage report (coverage/), thresholds enforced
 npm run build:mac      # build .dmg + .zip into dist/ (electron-builder)
-npm run icon           # rebuild assets/icon.icns from assets/icon.png
+npm run build:win      # build NSIS .exe + .zip into dist/ (electron-builder)
+npm run icon           # rebuild assets/icon.icns (macOS only: sips + iconutil)
+npm run icon:win       # rebuild assets/icon.ico (cross-platform: png-to-ico)
+npm run icons          # both icons (icon:win runs anywhere; icon needs macOS)
 ```
 
-Node 18+ (CI uses Node 20). macOS only for building/signing.
+Node 18+ for the app and tests (CI uses Node 20); `icon:win`/`png-to-ico`
+need Node 20+. Build each OS's installer on that OS: `.dmg`/`.icns` need
+macOS tooling; the `.exe` is produced on Windows in CI. The `.ico` is
+cross-platform, so it's generated once and **committed** (`assets/icon.ico`).
 
 ## Architecture
 
@@ -69,9 +75,11 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
 
 - Reading status: `pending → seen → summarized → studied` (cycles).
 - Task status: `not done → done → reviewed` (cycles).
-- **Where files live:** dev → project `semesters/`; packaged →
-  `~/Library/Application Support/Lectio/semesters/` (seeded from the
-  bundled `example.json` on first launch).
+- **Where files live:** dev → project `semesters/`; packaged → per-OS
+  `app.getPath('userData')`: macOS
+  `~/Library/Application Support/Lectio/semesters/`, Windows
+  `%APPDATA%\Lectio\semesters\` (seeded from the bundled `example.json` on
+  first launch).
 
 ## Key behaviours (renderer)
 
@@ -108,8 +116,10 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
 - **CI/CD:** `.github/workflows/ci.yml` (tests on macOS + Ubuntu) gates
   `release.yml`. Release flow: bump `version` in `package.json` → PR → merge →
   `git tag vX.Y.Z && git push origin vX.Y.Z`. The release workflow runs CI, then
-  builds and publishes the `.dmg`, `.zip`, and `latest-mac.yml` to the GitHub
-  Release (draft by default — publish it to make the download link live).
+  builds and publishes in two parallel, independent jobs — macOS
+  (`.dmg`/`.zip`/`latest-mac.yml`) and Windows (NSIS `.exe`/`.zip`/`latest.yml`) —
+  to the GitHub Release (draft by default — publish it to make the download
+  links live). The two `latest*.yml` files drive electron-updater per OS.
 - **Versioning:** semver. New features → minor bump; fixes → patch.
 - **Homebrew:** cask at `homebrew/Casks/lectio.rb` (installs the
   release `.zip`). After a release, `homebrew/sync-tap.sh` refreshes
@@ -126,7 +136,12 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
 - **iCloud:** building inside an iCloud-synced folder (e.g. `~/Documents`) can
   re-add xattrs that break local `codesign`; `afterPack` handles this gracefully
   (local copies aren't quarantined, so it's harmless). CI runs in a clean checkout.
-- **arm64 only** — no Intel/universal build yet (cask has `depends_on arch: :arm64`).
+- **Windows signing:** Windows builds are **unsigned** (no code-signing cert),
+  so a freshly downloaded `.exe` trips **SmartScreen** on first run → *More info
+  → Run anyway* (once). The `afterPack`/`afterSign` hooks are macOS-only and
+  no-op on Windows (`electronPlatformName !== 'darwin'`).
+- **arm64-only macOS build** — no Intel/universal mac build yet (cask has
+  `depends_on arch: :arm64`); the Windows target is x64.
 - **appId** is `com.masprime77.lectio` in `package.json`; changing it alters the
   bundle id (affects signing/updates and the userData folder location).
 - Don't touch the user's `../homebrew-tap` repo unless asked; `sync-tap.sh`
