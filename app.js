@@ -407,7 +407,11 @@ function renderWeekView() {
   root.innerHTML = '';
   const cw = currentWeek(sem);
 
-  for (let week = 1; week <= sem.weeks; week++) {
+  // Week display order: ascending by default, descending for week-desc.
+  let weekNumbers = Array.from({ length: sem.weeks }, (_, i) => i + 1);
+  if (state.sortOrder === 'week-desc') weekNumbers = weekNumbers.reverse();
+
+  weekNumbers.forEach((week) => {
     const isOpen = state.openWeeks.has(week);
     const start = weekStart(sem.startDate, week);
     const end = weekStart(sem.startDate, week);
@@ -444,7 +448,7 @@ function renderWeekView() {
 
     weekEl.appendChild(body);
     root.appendChild(weekEl);
-  }
+  });
 }
 
 function toggleWeek(week) {
@@ -532,13 +536,17 @@ function renderCourseView() {
     const body = document.createElement('div');
     body.className = 'course-column-body';
 
-    // Weeks (in order) that have any reading or task for this course.
+    // Week display order: ascending by default, descending for week-desc.
+    let weekNumbers = Array.from({ length: sem.weeks }, (_, i) => i + 1);
+    if (state.sortOrder === 'week-desc') weekNumbers = weekNumbers.reverse();
+
+    // Weeks (in display order) that have any reading or task for this course.
     const weeks = [];
-    for (let w = 1; w <= sem.weeks; w++) {
+    weekNumbers.forEach((w) => {
       const readings = course.readings.filter((r) => r.week === w);
       const tasks = course.tasks.filter((t) => t.week === w);
       if (readings.length || tasks.length) weeks.push({ w, readings, tasks });
-    }
+    });
 
     if (weeks.length === 0) {
       const empty = document.createElement('div');
