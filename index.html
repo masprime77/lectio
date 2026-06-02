@@ -50,12 +50,17 @@
           <button type="button" id="collapse-all-btn" class="collapse-btn" title="Collapse all weeks" aria-label="Collapse all weeks"></button>
           <button type="button" id="expand-current-btn" class="collapse-btn" title="Expand current week only" aria-label="Expand current week only"></button>
         </div>
-        <select id="sort-select" title="Sort courses">
-          <option value="progress-desc">Progress ↓</option>
-          <option value="progress-asc">Progress ↑</option>
-          <option value="week-asc">Week ↑</option>
-          <option value="week-desc">Week ↓</option>
-        </select>
+        <div class="sort-control">
+          <span id="sort-label" class="sort-label">Sort: Progress ↓</span>
+          <select id="sort-select" title="Sort courses" aria-label="Sort courses">
+            <option value="progress-desc">Progress ↓</option>
+            <option value="progress-asc">Progress ↑</option>
+            <option value="alpha-asc">A → Z</option>
+            <option value="alpha-desc">Z → A</option>
+            <option value="week-asc">Week ↑</option>
+            <option value="week-desc">Week ↓</option>
+          </select>
+        </div>
         <button type="button" id="add-item-btn" class="btn btn-small btn-icon-text hidden">
           <!-- icon injected by app.js -->
           <span>Add</span>
