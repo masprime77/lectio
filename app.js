@@ -1018,7 +1018,7 @@ async function openSettingsModal() {
 
 // ---------------------------------------------------------------------------
 // Feedback: opens a pre-filled GitHub issue (bug report / feature request) in
-// the default browser via the window.external bridge (main restricts to
+// the default browser via the window.externalLinks bridge (main restricts to
 // github.com). The repo's issue templates live in .github/ISSUE_TEMPLATE.
 // ---------------------------------------------------------------------------
 const FEEDBACK_URLS = {
@@ -1029,7 +1029,7 @@ const FEEDBACK_URLS = {
 
 function openFeedbackLink(kind) {
   const url = FEEDBACK_URLS[kind];
-  if (url && window.external) window.external.openExternal(url);
+  if (url && window.externalLinks) window.externalLinks.openExternal(url);
   closeFeedbackModal();
 }
 
