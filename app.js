@@ -387,6 +387,7 @@ function renderCourseView() {
     const header = document.createElement('div');
     header.className = 'course-column-header';
     header.textContent = course.name;
+    header.title = course.name;
     header.style.color = course.color;
     col.appendChild(header);
 
