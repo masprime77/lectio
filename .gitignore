@@ -6,3 +6,15 @@ npm-debug.log*
 dist/
 coverage/
 assets/logo_raw/
+
+# Secrets / credentials (defensive — none used today)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+credentials.*
+config/secrets.*

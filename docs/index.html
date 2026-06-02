@@ -289,6 +289,38 @@
           </a>
         </div>
 
+        <p style="margin-top: 1.25rem; color: var(--muted); font-size: 0.9rem;">
+          Or via Homebrew:
+        </p>
+        <div style="
+          display: inline-flex;
+          align-items: center;
+          gap: 0.6rem;
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          padding: 0.55rem 0.9rem;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+          font-size: 0.88rem;
+          color: var(--text);
+        ">
+          <span id="brew-cmd">brew tap masprime77/tap && brew install --cask lectio</span>
+          <button onclick="
+            navigator.clipboard.writeText(document.getElementById('brew-cmd').textContent);
+            this.textContent = 'Copied!';
+            setTimeout(() => this.textContent = 'Copy', 1500);
+          " style="
+            background: var(--primary);
+            color: var(--on-accent);
+            border: none;
+            border-radius: 6px;
+            padding: 0.25rem 0.6rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+          ">Copy</button>
+        </div>
+
         <div class="mac-note">
           <strong>⚠️ macOS: one extra step on first launch.</strong>
           <p>
@@ -296,11 +328,15 @@
             After downloading, you'll need to explicitly allow it.
           </p>
           <div class="placeholder">
-            <!-- ░░ PLACEHOLDER — replace with the exact steps ░░ -->
-            <strong>TODO (fill in):</strong> step-by-step instructions, e.g.
-            opening <em>System Settings → Privacy &amp; Security → “Open Anyway”</em>,
-            or running <code>xattr -cr /Applications/Lectio.app</code> in Terminal if
-            it's blocked. Replace this dashed box with the final wording.
+            <strong>Option A — System Settings (recommended):</strong>
+            Open <em>System Settings → Privacy &amp; Security</em>, scroll down to the
+            Security section, and click <strong>"Open Anyway"</strong> next to the
+            Lectio message. Then launch the app again and confirm.
+            <p style="margin: 0.6rem 0 0;">
+              <strong>Option B — Terminal:</strong> If the button doesn't appear, run
+              <code>xattr -cr /Applications/Lectio.app</code> in Terminal, then open
+              the app normally.
+            </p>
           </div>
         </div>
       </div>
