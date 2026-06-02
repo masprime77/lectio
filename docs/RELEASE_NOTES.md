@@ -13,3 +13,4 @@
 - Added alphabetical course sort options (A → Z and Z → A) to the sort control.
 - Scoped the progress and alphabetical sorts to the progress bar and All Courses columns only; the Weekly view keeps the original course order for those modes (only week sorts reorder it).
 - The Week ↓ sort now also reverses the order of the weeks themselves — weeks render N … 1 in both the Weekly view and inside each All Courses column (Week ↑ stays ascending).
+- Week sorts now affect only the order of the weeks (week sections in the Weekly view and within each course column); the progress bar and course-column order fall back to alphabetical (A → Z) instead of ordering courses by their earliest week.
