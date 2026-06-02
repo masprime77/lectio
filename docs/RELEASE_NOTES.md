@@ -1,5 +1,6 @@
 ## Unreleased
 
+- Week sections inside each course column (All Courses view) are now collapsible via a chevron toggle; the current week is expanded by default and all others are collapsed, with each section's open/closed state persisted while navigating.
 - Course view columns now render at a uniform fixed width (300px) regardless of course name length.
 - Long course names are truncated with an ellipsis and reveal the full name via a native tooltip on hover.
 - Renamed the header view toggle labels: "Week view" → "Weekly view" and "Course view" → "All Courses" (internal view values unchanged).

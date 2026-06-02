@@ -7,6 +7,7 @@ const state = {
   semesterId: null,   // current semester file id (filename without .json)
   semester: null,     // loaded semester object
   openWeeks: new Set(), // weeks currently expanded
+  openCourseWeeks: {}, // "courseId-week" -> true when that course-view week is expanded
   editingId: null,    // semester id being edited in the modal (null = create mode)
   view: restoreView(), // 'week' | 'course' — restored from last session
   focusedCourseId: null, // null = normal All Courses layout; course id = focused mode
@@ -467,12 +468,35 @@ function renderCourseView() {
       body.appendChild(addControls(course, currentWeek(sem) || 1));
     } else {
       weeks.forEach(({ w, readings, tasks }) => {
-        body.appendChild(weekDivider(sem, w));
-        body.appendChild(sectionTitle('Readings'));
-        body.appendChild(renderItemList(readings, 'reading', course, w));
-        body.appendChild(sectionTitle('Tasks'));
-        body.appendChild(renderItemList(tasks, 'task', course, w));
-        body.appendChild(addControls(course, w));
+        const key = course.id + '-' + w;
+        const isOpen = key in state.openCourseWeeks
+          ? state.openCourseWeeks[key]
+          : w === currentWeek(sem);
+        state.openCourseWeeks[key] = isOpen;
+
+        const start = weekStart(sem.startDate, w);
+        const end = weekStart(sem.startDate, w);
+        end.setDate(end.getDate() + 6);
+        const weekHeader = document.createElement('div');
+        weekHeader.className = 'course-week-header' + (isOpen ? ' open' : '');
+        weekHeader.innerHTML = `<span class="course-week-chevron">${icon('chevron-right')}</span>
+          <span class="week-divider-label">Week ${w}</span>
+          <span class="week-divider-dates">${formatDate(start)} – ${formatDate(end)}</span>`;
+        weekHeader.addEventListener('click', () => {
+          state.openCourseWeeks[key] = !state.openCourseWeeks[key];
+          renderCourseView();
+        });
+
+        const weekBody = document.createElement('div');
+        weekBody.className = 'course-week-body' + (isOpen ? ' open' : '');
+        weekBody.appendChild(sectionTitle('Readings'));
+        weekBody.appendChild(renderItemList(readings, 'reading', course, w));
+        weekBody.appendChild(sectionTitle('Tasks'));
+        weekBody.appendChild(renderItemList(tasks, 'task', course, w));
+        weekBody.appendChild(addControls(course, w));
+
+        body.appendChild(weekHeader);
+        body.appendChild(weekBody);
       });
     }
 
