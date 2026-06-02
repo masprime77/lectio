@@ -520,6 +520,43 @@ body {
 .week-divider-dates { font-size: 0.75rem; color: var(--muted); }
 .week-divider.current .week-divider-label { color: var(--primary); }
 
+/* Collapsible week sections inside course columns */
+.course-week-header {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+.course-week-header:first-child {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 0;
+}
+.course-week-header:hover {
+  background: var(--hover);
+  border-radius: 4px;
+}
+.course-week-chevron {
+  transition: transform 0.2s;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+}
+.course-week-chevron .ti { width: 14px; height: 14px; }
+.course-week-header.open .course-week-chevron {
+  transform: rotate(90deg);
+}
+.course-week-body {
+  display: none;
+}
+.course-week-body.open {
+  display: block;
+}
+
 /* Modal */
 .modal-overlay {
   position: fixed;
