@@ -1017,9 +1017,11 @@ async function openSettingsModal() {
 }
 
 // ---------------------------------------------------------------------------
-// Feedback: opens a pre-filled GitHub issue (bug report / feature request) in
-// the default browser via the window.externalLinks bridge (main restricts to
-// github.com). The repo's issue templates live in .github/ISSUE_TEMPLATE.
+// Feedback: the user fills in a title + description inside the app, then we
+// open a pre-filled GitHub new-issue page in the default browser via the
+// window.externalLinks bridge (main restricts to github.com) — they only need
+// to click "Submit new issue" there. The repo's issue templates live in
+// .github/ISSUE_TEMPLATE. The current app version is appended to the body.
 // ---------------------------------------------------------------------------
 const FEEDBACK_TEMPLATES = {
   bug: { template: 'bug_report.md', labels: 'bug' },
