@@ -30,6 +30,12 @@ contextBridge.exposeInMainWorld('appInfo', {
   getVersion: () => ipcRenderer.invoke('get-version'),
 });
 
+// External links: open a URL in the default browser. Main restricts this to
+// https github.com URLs (used for the pre-filled feedback issue links).
+contextBridge.exposeInMainWorld('external', {
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
+});
+
 // Settings bridge: file-based settings (settings.json) read/write, plus the
 // "open settings" signal from the menu / Cmd+, accelerator.
 contextBridge.exposeInMainWorld('settings', {
