@@ -287,6 +287,20 @@ body {
 }
 .current-week strong { color: var(--primary); }
 .progress-row { margin-bottom: 0.7rem; }
+/* Progress bar: dimmed / active states */
+.progress-course-name {
+  cursor: pointer;
+}
+.progress-course-name:hover {
+  text-decoration: underline;
+}
+.progress-row--dimmed {
+  opacity: 0.35;
+  transition: opacity 0.2s;
+}
+.progress-row--active .progress-course-name {
+  font-weight: 700;
+}
 .progress-label {
   display: flex;
   justify-content: space-between;
@@ -441,6 +455,23 @@ body {
   flex: 0 0 300px;
   width: 300px;
   max-width: 480px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--primary);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  max-height: 75vh;
+}
+/* Focused single-course column */
+.course-board--focused {
+  cursor: pointer; /* empty space is clickable to exit focus */
+}
+.course-column--focused {
+  cursor: default;
+  flex: 0 0 460px;
+  max-width: 460px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-top: 4px solid var(--primary);

@@ -9,6 +9,7 @@ const state = {
   openWeeks: new Set(), // weeks currently expanded
   editingId: null,    // semester id being edited in the modal (null = create mode)
   view: restoreView(), // 'week' | 'course' — restored from last session
+  focusedCourseId: null, // null = normal All Courses layout; course id = focused mode
 };
 
 // ---------------------------------------------------------------------------
@@ -93,6 +94,10 @@ function setupSave() {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
       e.preventDefault();
       saveNow();
+    }
+    // Esc exits focused single-course mode (when not in a modal/input).
+    if (e.key === 'Escape' && state.focusedCourseId && !isTypingTarget(e.target)) {
+      clearCourseFocus();
     }
   });
   if (window.saver) {
@@ -233,6 +238,7 @@ async function loadSemester(id) {
   state.semesterId = id;
   state.semester = await api.load(id);
   state.openWeeks = new Set();
+  state.focusedCourseId = null; // focus never persists across semester switches
   const cw = currentWeek(state.semester);
   if (cw) state.openWeeks.add(cw); // auto-expand current week
   document.getElementById('semester-select').value = id;
@@ -269,10 +275,16 @@ function renderDashboard() {
   } else {
     sem.courses.forEach((course) => {
       const pct = courseProgress(course);
+      let rowClass = 'progress-row';
+      if (state.focusedCourseId) {
+        rowClass += state.focusedCourseId === course.id
+          ? ' progress-row--active'
+          : ' progress-row--dimmed';
+      }
       bars += `
-        <div class="progress-row">
+        <div class="${rowClass}" data-course-id="${escapeHtml(course.id)}">
           <div class="progress-label">
-            <span>${escapeHtml(course.name)}</span>
+            <span class="progress-course-name">${escapeHtml(course.name)}</span>
             <span>${pct}%</span>
           </div>
           <div class="progress-bar">
@@ -283,8 +295,29 @@ function renderDashboard() {
   }
 
   root.innerHTML = heading + weekLine + bars;
+
+  // Wire up clickable course names: toggle focused single-course mode.
+  root.querySelectorAll('.progress-row').forEach((row) => {
+    const nameEl = row.querySelector('.progress-course-name');
+    if (!nameEl) return;
+    nameEl.addEventListener('click', () => {
+      const id = row.getAttribute('data-course-id');
+      state.focusedCourseId = state.focusedCourseId === id ? null : id;
+      renderDashboard();
+      renderPlanner();
+    });
+  });
+
   // Always offer a persistent way to add a course, empty or not.
   root.appendChild(addCourseButton('dashboard-add-course'));
+}
+
+// True when the event target is a field the user is typing into, so global
+// shortcuts (e.g. Esc to exit focus) don't hijack in-progress edits.
+function isTypingTarget(el) {
+  if (!el) return false;
+  const tag = el.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
 }
 
 function escapeHtml(s) {
@@ -368,6 +401,14 @@ function toggleWeek(week) {
   renderPlanner();
 }
 
+// Exit focused single-course mode and return to the full All Courses layout.
+function clearCourseFocus() {
+  if (!state.focusedCourseId) return;
+  state.focusedCourseId = null;
+  renderDashboard();
+  renderPlanner();
+}
+
 // ---------------------------------------------------------------------------
 // Course view: one column per course, entries grouped by week dividers
 // ---------------------------------------------------------------------------
@@ -379,9 +420,25 @@ function renderCourseView() {
   const board = document.createElement('div');
   board.className = 'course-board';
 
-  sem.courses.forEach((course) => {
+  // Focused mode: isolate the selected course in a single centred column.
+  const focused = state.focusedCourseId
+    ? sem.courses.some((c) => c.id === state.focusedCourseId)
+    : false;
+  const courses = focused
+    ? sem.courses.filter((c) => c.id === state.focusedCourseId)
+    : sem.courses;
+  if (focused) {
+    board.style.justifyContent = 'center';
+    board.classList.add('course-board--focused');
+    // Clicking the empty space around the column exits focused mode.
+    board.addEventListener('click', (e) => {
+      if (e.target === board) clearCourseFocus();
+    });
+  }
+
+  courses.forEach((course) => {
     const col = document.createElement('div');
-    col.className = 'course-column';
+    col.className = focused ? 'course-column--focused' : 'course-column';
     col.style.borderTopColor = course.color;
 
     const header = document.createElement('div');
@@ -423,8 +480,8 @@ function renderCourseView() {
     board.appendChild(col);
   });
 
-  // Persistent "+ Add course" column at the end of the row.
-  board.appendChild(addCourseColumn());
+  // Persistent "+ Add course" column at the end of the row (not in focused mode).
+  if (!focused) board.appendChild(addCourseColumn());
 
   root.appendChild(board);
 }
