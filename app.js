@@ -43,9 +43,12 @@ function restoreView() {
 // Restore the saved course sort order, defaulting to "progress-desc".
 function restoreSort() {
   const v = readPref('lastSortOrder');
-  return ['progress-desc', 'progress-asc', 'week-asc', 'week-desc'].includes(v)
-    ? v
-    : 'progress-desc';
+  const valid = [
+    'progress-desc', 'progress-asc',
+    'alpha-asc', 'alpha-desc',
+    'week-asc', 'week-desc',
+  ];
+  return valid.includes(v) ? v : 'progress-desc';
 }
 
 // ---------------------------------------------------------------------------
@@ -278,6 +281,10 @@ function sortedCourses(courses) {
     return copy.sort((a, b) => courseProgress(a) - courseProgress(b));
   if (state.sortOrder === 'progress-desc')
     return copy.sort((a, b) => courseProgress(b) - courseProgress(a));
+  if (state.sortOrder === 'alpha-asc')
+    return copy.sort((a, b) => a.name.localeCompare(b.name));
+  if (state.sortOrder === 'alpha-desc')
+    return copy.sort((a, b) => b.name.localeCompare(a.name));
   const firstWeek = (c) => {
     const weeks = [
       ...c.readings.map((r) => r.week),
@@ -288,6 +295,16 @@ function sortedCourses(courses) {
   if (state.sortOrder === 'week-asc')
     return copy.sort((a, b) => firstWeek(a) - firstWeek(b));
   return copy.sort((a, b) => firstWeek(b) - firstWeek(a)); // week-desc
+}
+
+// Course order for the Weekly view. Only week-based sorts reorder courses
+// here; progress and alpha sorts apply to the dashboard/columns only, so the
+// Weekly view keeps the original on-disk course order for them.
+function sortedCoursesForWeekView(courses) {
+  if (state.sortOrder === 'week-asc' || state.sortOrder === 'week-desc') {
+    return sortedCourses(courses);
+  }
+  return [...courses]; // preserve original order
 }
 
 // ---------------------------------------------------------------------------
@@ -420,7 +437,7 @@ function renderWeekView() {
       body.appendChild(empty);
       body.appendChild(addCourseButton());
     } else {
-      sortedCourses(sem.courses).forEach((course) => {
+      sortedCoursesForWeekView(sem.courses).forEach((course) => {
         body.appendChild(renderCourseCard(course, week));
       });
     }
@@ -913,15 +930,32 @@ function updateViewToggle() {
     btn.classList.toggle('active', btn.dataset.view === state.view);
   });
   document.getElementById('sort-select').value = state.sortOrder;
+  updateSortLabel();
 }
 
-// Course sort control (Progress / Week), persisted to localStorage.
+// Keep the header "Sort: <mode>" label in sync with the current sort order.
+function updateSortLabel() {
+  const labels = {
+    'progress-desc': 'Progress ↓',
+    'progress-asc':  'Progress ↑',
+    'alpha-asc':     'A → Z',
+    'alpha-desc':    'Z → A',
+    'week-asc':      'Week ↑',
+    'week-desc':     'Week ↓',
+  };
+  document.getElementById('sort-label').textContent =
+    'Sort: ' + (labels[state.sortOrder] || state.sortOrder);
+}
+
+// Course sort control (Progress / Alpha / Week), persisted to localStorage.
 function setupSort() {
   const sel = document.getElementById('sort-select');
   sel.value = state.sortOrder;
+  updateSortLabel();
   sel.addEventListener('change', () => {
     state.sortOrder = sel.value;
     writePref('lastSortOrder', state.sortOrder);
+    updateSortLabel();
     if (state.semester) {
       renderDashboard();
       renderPlanner();

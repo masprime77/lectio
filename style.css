@@ -226,6 +226,18 @@ body {
   cursor: pointer;
 }
 
+.sort-control {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.sort-label {
+  font-size: 0.85rem;
+  color: var(--text);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 /* Buttons */
 .btn {
   border: 1px solid var(--border);
