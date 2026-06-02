@@ -9,7 +9,7 @@
 - Focused mode can also be exited by clicking the empty space around the column or pressing the Esc key.
 - Added a global "+ Add" button in the header (shown once a semester is loaded) that opens a modal for adding a reading or task to any course and week of the current semester, with a Reading/Task toggle (Task reveals an optional due-date field) and the current week pre-selected.
 - Added a header sort control to order courses by progress (↓/↑) or by their earliest week with content (↑/↓); the choice applies to the progress bars, course columns, and week-view cards, and persists across restarts (localStorage). Sorting is non-destructive — the underlying course order on disk is never changed.
-- The sort control now shows the active mode as a "Sort: <mode>" label in the header that updates as the selection changes.
+- The sort control bakes a "Sort: " prefix into each option label, so the active mode reads as "Sort: <mode>" directly in the select (no separate label element).
 - Added alphabetical course sort options (A → Z and Z → A) to the sort control.
 - Scoped the progress and alphabetical sorts to the progress bar and All Courses columns only; the Weekly view keeps the original course order for those modes (only week sorts reorder it).
 - The Week ↓ sort now also reverses the order of the weeks themselves — weeks render N … 1 in both the Weekly view and inside each All Courses column (Week ↑ stays ascending).

@@ -938,32 +938,15 @@ function updateViewToggle() {
     btn.classList.toggle('active', btn.dataset.view === state.view);
   });
   document.getElementById('sort-select').value = state.sortOrder;
-  updateSortLabel();
-}
-
-// Keep the header "Sort: <mode>" label in sync with the current sort order.
-function updateSortLabel() {
-  const labels = {
-    'progress-desc': 'Progress ↓',
-    'progress-asc':  'Progress ↑',
-    'alpha-asc':     'A → Z',
-    'alpha-desc':    'Z → A',
-    'week-asc':      'Week ↑',
-    'week-desc':     'Week ↓',
-  };
-  document.getElementById('sort-label').textContent =
-    'Sort: ' + (labels[state.sortOrder] || state.sortOrder);
 }
 
 // Course sort control (Progress / Alpha / Week), persisted to localStorage.
 function setupSort() {
   const sel = document.getElementById('sort-select');
   sel.value = state.sortOrder;
-  updateSortLabel();
   sel.addEventListener('change', () => {
     state.sortOrder = sel.value;
     writePref('lastSortOrder', state.sortOrder);
-    updateSortLabel();
     if (state.semester) {
       renderDashboard();
       renderPlanner();
