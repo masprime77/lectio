@@ -11,6 +11,7 @@ const state = {
   editingId: null,    // semester id being edited in the modal (null = create mode)
   view: restoreView(), // 'week' | 'course' — restored from last session
   focusedCourseId: null, // null = normal All Courses layout; course id = focused mode
+  sortOrder: restoreSort(), // course sort order — restored from last session
 };
 
 // ---------------------------------------------------------------------------
@@ -37,6 +38,14 @@ function writePref(key, value) {
 function restoreView() {
   const v = readPref('lastActiveView');
   return v === 'week' || v === 'course' ? v : 'week';
+}
+
+// Restore the saved course sort order, defaulting to "progress-desc".
+function restoreSort() {
+  const v = readPref('lastSortOrder');
+  return ['progress-desc', 'progress-asc', 'week-asc', 'week-desc'].includes(v)
+    ? v
+    : 'progress-desc';
 }
 
 // ---------------------------------------------------------------------------
@@ -259,6 +268,28 @@ function render() {
   renderPlanner();
 }
 
+// Return a sorted copy of `courses` per state.sortOrder. Pure: never mutates
+// the input array (callers pass sem.courses, which must stay in its on-disk
+// order). Progress sorts use courseProgress; week sorts use each course's
+// earliest week that has any reading or task (Infinity if it has none).
+function sortedCourses(courses) {
+  const copy = [...courses];
+  if (state.sortOrder === 'progress-asc')
+    return copy.sort((a, b) => courseProgress(a) - courseProgress(b));
+  if (state.sortOrder === 'progress-desc')
+    return copy.sort((a, b) => courseProgress(b) - courseProgress(a));
+  const firstWeek = (c) => {
+    const weeks = [
+      ...c.readings.map((r) => r.week),
+      ...c.tasks.map((t) => t.week),
+    ];
+    return weeks.length ? Math.min(...weeks) : Infinity;
+  };
+  if (state.sortOrder === 'week-asc')
+    return copy.sort((a, b) => firstWeek(a) - firstWeek(b));
+  return copy.sort((a, b) => firstWeek(b) - firstWeek(a)); // week-desc
+}
+
 // ---------------------------------------------------------------------------
 // Dashboard: per-course progress + current week indicator
 // (courseProgress comes from lib/planner-core.js)
@@ -277,7 +308,7 @@ function renderDashboard() {
   if (sem.courses.length === 0) {
     bars = '<div class="week-empty">No courses yet.</div>';
   } else {
-    sem.courses.forEach((course) => {
+    sortedCourses(sem.courses).forEach((course) => {
       const pct = courseProgress(course);
       let rowClass = 'progress-row';
       if (state.focusedCourseId) {
@@ -389,7 +420,7 @@ function renderWeekView() {
       body.appendChild(empty);
       body.appendChild(addCourseButton());
     } else {
-      sem.courses.forEach((course) => {
+      sortedCourses(sem.courses).forEach((course) => {
         body.appendChild(renderCourseCard(course, week));
       });
     }
@@ -456,9 +487,10 @@ function renderCourseView() {
   const focused = state.focusedCourseId
     ? sem.courses.some((c) => c.id === state.focusedCourseId)
     : false;
+  const sorted = sortedCourses(sem.courses);
   const courses = focused
-    ? sem.courses.filter((c) => c.id === state.focusedCourseId)
-    : sem.courses;
+    ? sorted.filter((c) => c.id === state.focusedCourseId)
+    : sorted;
   if (focused) {
     board.style.justifyContent = 'center';
     board.classList.add('course-board--focused');
@@ -788,6 +820,7 @@ async function init() {
   });
 
   setupViewToggle();
+  setupSort();
   setupTheme();
   setupModal();
   setupUpdater();
@@ -878,6 +911,21 @@ function setupViewToggle() {
 function updateViewToggle() {
   document.querySelectorAll('.view-btn').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.view === state.view);
+  });
+  document.getElementById('sort-select').value = state.sortOrder;
+}
+
+// Course sort control (Progress / Week), persisted to localStorage.
+function setupSort() {
+  const sel = document.getElementById('sort-select');
+  sel.value = state.sortOrder;
+  sel.addEventListener('change', () => {
+    state.sortOrder = sel.value;
+    writePref('lastSortOrder', state.sortOrder);
+    if (state.semester) {
+      renderDashboard();
+      renderPlanner();
+    }
   });
 }
 
