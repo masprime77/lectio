@@ -1,6 +1,6 @@
 name: Release
 
-# Build and publish the macOS app only for version tags.
+# Build and publish the macOS and Windows apps for version tags.
 on:
   push:
     tags: ['v*']
@@ -48,4 +48,45 @@ jobs:
             dist/*.dmg
             dist/*.zip
             dist/latest-mac.yml
+          if-no-files-found: error
+
+  build-windows:
+    name: Build & publish Windows app
+    # Same gate as macOS (waits for tests) but independent of the macOS `build`
+    # job, so one OS failing does not block the other's release assets.
+    needs: ci
+    runs-on: windows-latest
+    # Allow electron-builder to create/upload the GitHub Release via GITHUB_TOKEN.
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build & publish (.exe + .zip + latest.yml)
+        env:
+          # GitHub token so electron-builder can publish release assets,
+          # including the latest.yml metadata electron-updater reads on Windows.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Unsigned build in CI, mirroring macOS.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npm run build:win -- --publish always
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-app
+          path: |
+            dist/*.exe
+            dist/*.zip
+            dist/latest.yml
           if-no-files-found: error

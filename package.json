@@ -7,7 +7,10 @@
     "start": "electron .",
     "dev": "electron . --dev-tools",
     "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
     "icon": "bash assets/build-icns.sh",
+    "icon:win": "node assets/build-ico.js",
+    "icons": "npm run icon && npm run icon:win",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
@@ -24,6 +27,7 @@
     "@vitest/coverage-v8": "^2.1.9",
     "electron": "^31.0.0",
     "electron-builder": "^24.13.3",
+    "png-to-ico": "^3.0.1",
     "vitest": "^2.1.9"
   },
   "build": {
@@ -59,6 +63,21 @@
           "path": "/Applications"
         }
       ]
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico"
     },
     "afterPack": "build/afterPack.js",
     "afterSign": "build/afterSign.js",
