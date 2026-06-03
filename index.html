@@ -128,16 +128,29 @@
             Number of weeks
             <input type="number" id="ns-weeks" min="1" max="30" value="15" required />
           </label>
+          <div class="ns-semester-import-row">
+            <span class="ns-or-divider">— or —</span>
+            <button type="button" id="ns-import-semester-btn" class="btn btn-small btn-icon-text hidden">
+              <!-- icon injected by app.js -->
+              Import semester…
+            </button>
+          </div>
         </div>
 
         <!-- Tab: Courses -->
         <div class="modal-tab-panel hidden" data-panel="courses">
           <div class="ns-courses-header">
             <span>Courses</span>
-            <button type="button" id="ns-add-course" class="btn btn-small btn-icon-text">
-              <svg class="ti" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
-              Add course
-            </button>
+            <div style="display:flex;gap:0.5rem;">
+              <button type="button" id="ns-add-course" class="btn btn-small btn-icon-text">
+                <svg class="ti" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+                Add course
+              </button>
+              <button type="button" id="ns-import-course-btn" class="btn btn-small btn-icon-text">
+                <!-- icon injected by app.js -->
+                Import course…
+              </button>
+            </div>
           </div>
           <div id="ns-courses" class="ns-courses"></div>
         </div>
