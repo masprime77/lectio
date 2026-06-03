@@ -108,6 +108,17 @@ function saveIndicator(kind) {
   }
 }
 
+// Show a transient confirmation message in the header save-status area (used for
+// one-off actions like export/import that aren't part of the autosave cycle).
+function showSaveStatus(message, ms = 2000) {
+  const el = document.getElementById('save-status');
+  if (!el) return;
+  clearTimeout(save.fadeTimer);
+  el.className = 'save-status saved visible';
+  el.innerHTML = `${icon('check')} ${message}`;
+  save.fadeTimer = setTimeout(() => el.classList.remove('visible'), ms);
+}
+
 // Manual save: write immediately (Cmd/Ctrl+S or File → Save). Cancels any
 // pending debounce and flushes now.
 async function saveNow() {
@@ -225,6 +236,10 @@ const ICONS = {
     '<path d="M3 12h1m8 -9v1m8 8h1m-15.4 -6.4l.7 .7m12.1 -.7l-.7 .7" /><path d="M9 16a5 5 0 1 1 6 0a3.5 3.5 0 0 0 -1 3a2 2 0 0 1 -4 0a3.5 3.5 0 0 0 -1 -3" /><path d="M9.7 17l4.6 0" />',
   school:
     '<path d="M22 9l-10 -4l-10 4l10 4l10 -4v6" /><path d="M6 10.6v5.4a6 6 0 0 0 12 0v-5.4" />',
+  'file-export':
+    '<path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M11.5 21h-4.5a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v5m-5 6h7m-3 -3l3 3l-3 3" />',
+  'file-import':
+    '<path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M5 13v-8a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-5.5m-9.5 -2h7m-3 -3l-3 3l3 3" />',
 };
 
 function icon(name) {
@@ -1340,6 +1355,8 @@ async function init() {
 
   // Icon buttons in the header
   document.getElementById('edit-semester-btn').innerHTML = icon('pencil') + '<span style="font-size:0.75rem;margin-left:0.25rem;">Edit</span>';
+  document.getElementById('export-semester-btn').innerHTML = icon('file-export') + '<span style="font-size:0.75rem;margin-left:0.25rem;">Export</span>';
+  document.getElementById('import-semester-btn').innerHTML = icon('file-import') + '<span style="font-size:0.75rem;margin-left:0.25rem;">Import</span>';
   document.getElementById('delete-semester-btn').innerHTML = icon('trash') + '<span style="font-size:0.75rem;margin-left:0.25rem;">Delete</span>';
 
   // Bulk expand/collapse controls (apply to whichever view is active)
@@ -1370,6 +1387,17 @@ async function init() {
   document.getElementById('edit-semester-btn').addEventListener('click', () => {
     if (state.semesterId) openEditModal(state.semesterId);
   });
+  document.getElementById('export-semester-btn').addEventListener('click', exportSemester);
+  document.getElementById('import-semester-btn').addEventListener('click', async () => {
+    const { canceled, filePath } = await window.planner.showOpenDialog({ title: 'Import Semester' });
+    if (canceled) return;
+    try {
+      const payload = await window.planner.importFile({ filePath });
+      await importSemester(payload);
+    } catch (err) {
+      alert('Could not read file: ' + (err.message || err));
+    }
+  });
   document.getElementById('delete-semester-btn').addEventListener('click', () => {
     if (state.semesterId) deleteSemester(state.semesterId);
   });
@@ -1391,6 +1419,7 @@ async function init() {
   setupFeedback();
   setupAddItem();
   setupTutorial();
+  setupDragAndDrop();
 
   // Auto-launch on first run (no tutorial seen and at least one semester exists).
   if (!hasTutorialBeenSeen()) {
@@ -1522,6 +1551,8 @@ function renderEmptyState() {
 
 function setSemesterActionsEnabled(enabled) {
   document.getElementById('edit-semester-btn').disabled = !enabled;
+  document.getElementById('export-semester-btn').disabled = !enabled;
+  document.getElementById('import-semester-btn').disabled = !enabled;
   document.getElementById('delete-semester-btn').disabled = !enabled;
 }
 
@@ -1535,6 +1566,132 @@ async function deleteSemester(id) {
   const list = await populateSelector();
   if (list.length) await loadSemester(list[0].id);
   else renderEmptyState();
+}
+
+// ---------------------------------------------------------------------------
+// Semester export / import
+// ---------------------------------------------------------------------------
+async function exportSemester() {
+  if (!state.semester) return;
+  const sem = state.semester;
+  const defaultName = (sem.name || sem.id).replace(/[^a-z0-9_-]/gi, '_') + '.lectio.json';
+  const { canceled, filePath } = await window.planner.showSaveDialog({
+    defaultName,
+    title: 'Export Semester',
+  });
+  if (canceled) return;
+  try {
+    await window.planner.exportSemester({ filePath, semester: sem });
+    showSaveStatus('Semester exported', 2000);
+  } catch (err) {
+    alert('Export failed: ' + (err.message || err));
+  }
+}
+
+// parsedPayload is the already-parsed object returned by window.planner.importFile().
+async function importSemester(parsedPayload) {
+  if (!parsedPayload || parsedPayload._lectioType !== 'semester') {
+    alert('This file is not a Lectio semester export.');
+    return;
+  }
+  const sem = parsedPayload.semester;
+  if (!sem || !sem.id || !Array.isArray(sem.courses)) {
+    alert('The semester file appears corrupt or invalid.');
+    return;
+  }
+
+  // Check for id conflict
+  const existingList = await api.list();
+  const hasConflict = existingList.some((s) => s.id === sem.id);
+
+  // Show the import confirmation modal
+  const overlay = document.getElementById('import-sem-overlay');
+  document.getElementById('import-sem-info').textContent =
+    `"${sem.name}" — ${sem.courses.length} course(s), ${sem.weeks} week(s)`;
+  const conflictSection = document.getElementById('import-sem-conflict-section');
+  conflictSection.classList.toggle('hidden', !hasConflict);
+
+  overlay.classList.remove('hidden');
+
+  // Wait for user confirmation or cancel
+  await new Promise((resolve) => {
+    document.getElementById('import-sem-cancel').onclick = () => {
+      overlay.classList.add('hidden');
+      resolve(false);
+    };
+    document.getElementById('import-sem-confirm').onclick = async () => {
+      overlay.classList.add('hidden');
+
+      const keepStatus = document.querySelector('input[name="import-sem-status"]:checked').value === 'keep';
+      const conflictChoice = hasConflict
+        ? document.querySelector('input[name="import-sem-conflict"]:checked').value
+        : 'replace';
+
+      // Deep clone to avoid mutating the parsed payload
+      let toSave = JSON.parse(JSON.stringify(sem));
+
+      // Reset statuses if requested (default status ids in the tag model).
+      if (!keepStatus) {
+        toSave.courses.forEach((c) => {
+          (c.readings || []).forEach((r) => { r.status = 'r-pending'; });
+          (c.tasks || []).forEach((t) => { t.status = 't-pending'; });
+        });
+      }
+
+      // Resolve id conflict
+      let targetId = toSave.id;
+      if (hasConflict && conflictChoice === 'new') {
+        const ids = new Set(existingList.map((s) => s.id));
+        let base = slugify(toSave.name);
+        let n = 2;
+        targetId = base;
+        while (ids.has(targetId)) targetId = `${base}-${n++}`;
+        toSave.id = targetId;
+      }
+
+      try {
+        await api.save(targetId, toSave);
+        await populateSelector();
+        await loadSemester(targetId);
+        showSaveStatus('Semester imported', 2000);
+      } catch (err) {
+        alert('Import failed: ' + (err.message || err));
+      }
+      resolve(true);
+    };
+  });
+}
+
+// Accept .lectio.json files dropped anywhere on the window (semester or course).
+function setupDragAndDrop() {
+  document.body.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+
+  document.body.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    // Electron exposes the real fs path on File objects in the renderer.
+    const filePath = file.path;
+    if (!filePath || !filePath.endsWith('.lectio.json')) {
+      alert('Only .lectio.json files can be dropped here.');
+      return;
+    }
+    try {
+      const payload = await window.planner.importFile({ filePath });
+      if (payload._lectioType === 'semester') {
+        await importSemester(payload);
+      } else if (payload._lectioType === 'course') {
+        await importCourse(payload);
+      } else {
+        alert('Unrecognised Lectio file type.');
+      }
+    } catch (err) {
+      alert('Could not read file: ' + (err.message || err));
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
