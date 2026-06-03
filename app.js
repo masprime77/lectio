@@ -705,7 +705,7 @@ function renderCourseView() {
     editBtn.className = 'icon-btn';
     editBtn.innerHTML = icon('pencil');
     editBtn.title = 'Edit semester (to rename/recolor this course)';
-    editBtn.addEventListener('click', () => openEditModal(state.semesterId));
+    editBtn.addEventListener('click', () => openEditModal(state.semesterId, 'courses'));
     header.appendChild(editBtn);
 
     // Export
@@ -1938,6 +1938,25 @@ function resetModalToFirstTab() {
   document.querySelectorAll('.modal-tab-panel').forEach((p, i) => p.classList.toggle('hidden', i !== 0));
 }
 
+// Activate a specific tab by its data-tab value ('semester' | 'courses' | 'tags').
+// Falls back to the first tab if the value is not found.
+function activateModalTab(tabName) {
+  const tabs   = document.querySelectorAll('.modal-tab');
+  const panels = document.querySelectorAll('.modal-tab-panel');
+  let activated = false;
+  tabs.forEach((tab, i) => {
+    const match = tab.dataset.tab === tabName;
+    tab.classList.toggle('active', match);
+    panels[i].classList.toggle('hidden', !match);
+    if (match) activated = true;
+  });
+  // Fallback: activate the first tab if tabName was not found.
+  if (!activated) {
+    tabs[0].classList.add('active');
+    panels[0].classList.remove('hidden');
+  }
+}
+
 function closeModal() {
   document.getElementById('modal-overlay').classList.add('hidden');
 }
@@ -1970,7 +1989,7 @@ function openCreateModal() {
 // same flow as the New Semester modal (existing courses keep their data on save).
 async function openAddCourse() {
   if (!state.semesterId) return;
-  await openEditModal(state.semesterId);
+  await openEditModal(state.semesterId, 'courses');
   // openEditModal leaves at least one (blank) row; only append an extra blank
   // when courses already exist, so we always end on a single fresh, focused row.
   if (state.semester && state.semester.courses.length > 0) addCourseField();
@@ -1980,7 +1999,7 @@ async function openAddCourse() {
 }
 
 // Open the modal in "edit" mode, pre-filled with the semester's current data.
-async function openEditModal(id) {
+async function openEditModal(id, startTab = 'semester') {
   const sem =
     id === state.semesterId && state.semester ? state.semester : await api.load(id);
   state.editingId = id;
@@ -1996,7 +2015,7 @@ async function openEditModal(id) {
   // The Tags tab edits this semester object live (persisted on each change).
   state.editingSemester = sem;
   renderTagsEditor(sem);
-  resetModalToFirstTab();
+  activateModalTab(startTab);
   document.getElementById('modal-overlay').classList.remove('hidden');
   updateModalFooter();
 }
