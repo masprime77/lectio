@@ -1046,6 +1046,18 @@ body.electron-app .header-inner { padding-left: 80px; }
   color: var(--muted);
   font-size: 0.8rem;
 }
+.feedback-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.5rem 0;
+  text-align: center;
+  color: var(--text);
+}
+.feedback-success span { font-size: 2rem; }
+.feedback-success p { margin: 0; font-size: 0.95rem; }
 
 /* Theme segmented control (Settings modal) */
 .theme-segmented {
