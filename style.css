@@ -860,6 +860,26 @@ body.electron-app .header-inner { padding-left: 80px; }
   font-size: 0.8rem;
 }
 
+/* Theme segmented control (Settings modal) */
+.theme-segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.theme-seg-btn {
+  border: none;
+  background: var(--surface);
+  color: var(--muted);
+  padding: 0.3rem 0.7rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.theme-seg-btn + .theme-seg-btn { border-left: 1px solid var(--border); }
+.theme-seg-btn:hover { background: var(--hover); color: var(--text); }
+.theme-seg-btn.active { background: var(--primary); color: var(--on-accent); }
+
 /* Toggle switch */
 .switch { position: relative; display: inline-block; width: 40px; height: 22px; flex-shrink: 0; }
 .switch input { opacity: 0; width: 0; height: 0; }

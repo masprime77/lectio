@@ -974,35 +974,24 @@ function setupUpdater() {
 // Theme: Light -> Dark -> Auto, persisted in localStorage
 // ---------------------------------------------------------------------------
 const THEME_MODES = ['light', 'dark', 'auto'];
-const THEME_META = {
-  light: { icon: 'sun', label: 'Light' },
-  dark: { icon: 'moon', label: 'Dark' },
-  auto: { icon: 'device-desktop', label: 'Auto' },
-};
 
 function applyTheme(mode) {
   // Auto = no attribute, so the prefers-color-scheme media query takes over.
   if (mode === 'auto') document.documentElement.removeAttribute('data-theme');
   else document.documentElement.setAttribute('data-theme', mode);
   localStorage.setItem('theme', mode);
-
-  const meta = THEME_META[mode];
-  const btn = document.getElementById('theme-toggle');
-  btn.querySelector('.theme-icon').innerHTML = icon(meta.icon);
-  btn.querySelector('.theme-label').textContent = meta.label;
-  btn.title = `Theme: ${meta.label} (click to change)`;
+  // Sync the segmented control if it exists (modal may not be open yet).
+  document.querySelectorAll('.theme-seg-btn').forEach((b) => {
+    b.classList.toggle('active', b.dataset.themeVal === mode);
+  });
 }
 
 function setupTheme() {
+  // Theme selection is handled inside setupSettings() / openSettingsModal().
   let mode = localStorage.getItem('theme');
-  if (!THEME_MODES.includes(mode)) mode = 'auto'; // default on first load
+  if (!THEME_MODES.includes(mode)) mode = 'auto';
   applyTheme(mode);
-
-  document.getElementById('theme-toggle').addEventListener('click', () => {
-    const current = localStorage.getItem('theme') || 'auto';
-    const next = THEME_MODES[(THEME_MODES.indexOf(current) + 1) % THEME_MODES.length];
-    applyTheme(next);
-  });
+  // Note: the click listener is on the segmented control in the Settings modal.
 }
 
 // View toggle (Week / Course), persisted to localStorage.
@@ -1474,6 +1463,13 @@ function setupSettings() {
     writePref('autosave', e.target.checked ? 'true' : 'false');
   });
 
+  // Theme segmented control (Light / Dark / Auto).
+  document.querySelectorAll('.theme-seg-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      applyTheme(btn.dataset.themeVal);
+    });
+  });
+
   // Auto-update preference lives in settings.json (read by main on launch).
   document.getElementById('set-autoupdate').addEventListener('change', async (e) => {
     if (!window.settings) return;
@@ -1508,6 +1504,12 @@ async function openSettingsModal() {
     autoUpdate = s.autoUpdate !== false;
   }
   document.getElementById('set-autoupdate').checked = autoUpdate;
+
+  // Sync theme segmented control
+  const currentTheme = localStorage.getItem('theme') || 'auto';
+  document.querySelectorAll('.theme-seg-btn').forEach((b) => {
+    b.classList.toggle('active', b.dataset.themeVal === currentTheme);
+  });
 
   let version = '';
   if (window.appInfo) {
