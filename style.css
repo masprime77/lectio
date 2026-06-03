@@ -214,6 +214,34 @@ body.electron-app .header-inner { padding-left: 80px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .header-controls { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
 .selector-group { display: flex; gap: 0.25rem; align-items: center; }
+
+/* Semester action buttons: paired pill that visually attaches to the select */
+.semester-actions {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.semester-action-btn {
+  border: none;
+  background: var(--surface);
+  color: var(--muted);
+  padding: 0.45rem 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: background 0.15s, color 0.15s;
+  height: 100%;
+}
+.semester-action-btn + .semester-action-btn { border-left: 1px solid var(--border); }
+.semester-action-btn:hover { background: var(--hover); color: var(--text); }
+.semester-action-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.semester-action-btn:disabled:hover { background: var(--surface); color: var(--muted); }
+.semester-action-delete:hover { background: var(--danger-bg); color: var(--danger); }
+.semester-action-btn .ti { width: 15px; height: 15px; }
+
 .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .icon-btn:disabled:hover { background: none; }
 

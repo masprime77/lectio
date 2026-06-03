@@ -36,8 +36,10 @@
       <div class="header-controls">
         <div class="selector-group">
           <select id="semester-select" class="semester-select" aria-label="Select semester"></select>
-          <button id="edit-semester-btn" class="icon-btn" title="Edit semester" aria-label="Edit semester"></button>
-          <button id="delete-semester-btn" class="icon-btn" title="Delete semester" aria-label="Delete semester"></button>
+          <div class="semester-actions">
+            <button id="edit-semester-btn" class="semester-action-btn" title="Edit semester" aria-label="Edit semester"></button>
+            <button id="delete-semester-btn" class="semester-action-btn semester-action-delete" title="Delete semester" aria-label="Delete semester"></button>
+          </div>
         </div>
         <div class="view-toggle" role="group" aria-label="Layout view">
           <button type="button" id="view-week" class="view-btn" data-view="week">Weekly view</button>
