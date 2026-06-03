@@ -61,13 +61,9 @@
           <option value="week-asc">Sort: Week ↑</option>
           <option value="week-desc">Sort: Week ↓</option>
         </select>
-        <button type="button" id="add-item-btn" class="btn btn-small btn-icon-text hidden">
+        <button id="new-btn" class="btn btn-primary btn-icon-text">
           <!-- icon injected by app.js -->
-          <span>Add</span>
-        </button>
-        <button id="new-semester-btn" class="btn btn-primary btn-icon-text">
-          <svg class="ti" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
-          New Semester
+          <span>New</span>
         </button>
         <button id="feedback-btn" class="icon-btn" title="Feedback" aria-label="Feedback"></button>
         <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings"></button>
@@ -89,6 +85,7 @@
           <button type="button" class="modal-tab active" data-tab="semester">Semester</button>
           <button type="button" class="modal-tab" data-tab="courses">Courses</button>
           <button type="button" class="modal-tab" data-tab="tags">Tags</button>
+          <button type="button" class="modal-tab" data-tab="add-item">Reading / Task</button>
         </div>
 
         <!-- Tab: Semester -->
@@ -151,6 +148,50 @@
               </div>
             </div>
 
+          </div>
+        </div>
+
+        <!-- Tab: Reading / Task (quick-add, mirrors the standalone modal) -->
+        <div class="modal-tab-panel hidden" data-panel="add-item">
+
+          <div class="add-item-type-toggle" style="margin-bottom:0.75rem;">
+            <button type="button" id="ns-add-item-type-reading" class="btn btn-small add-item-type-btn active">Reading</button>
+            <button type="button" id="ns-add-item-type-task"    class="btn btn-small add-item-type-btn">Task</button>
+          </div>
+
+          <label>
+            Course
+            <select id="ns-add-item-course"
+              style="display:block;width:100%;margin-top:0.25rem;padding:0.5rem;
+                     border:1px solid var(--border);border-radius:6px;
+                     font-size:0.9rem;color:var(--text);background:var(--surface);"></select>
+          </label>
+
+          <label style="display:block;margin-top:0.75rem;">
+            Week
+            <select id="ns-add-item-week"
+              style="display:block;width:100%;margin-top:0.25rem;padding:0.5rem;
+                     border:1px solid var(--border);border-radius:6px;
+                     font-size:0.9rem;color:var(--text);background:var(--surface);"></select>
+          </label>
+
+          <label style="display:block;margin-top:0.75rem;">
+            Title
+            <input type="text" id="ns-add-item-title" placeholder="Title…"
+              style="display:block;width:100%;margin-top:0.25rem;" />
+          </label>
+
+          <label id="ns-add-item-due-row" style="display:none;margin-top:0.75rem;">
+            Due date (optional)
+            <input type="date" id="ns-add-item-due"
+              style="display:block;width:100%;margin-top:0.25rem;" />
+          </label>
+
+          <span id="ns-add-item-error" class="hidden"
+            style="display:block;font-size:0.8rem;color:var(--danger);margin-top:0.4rem;"></span>
+
+          <div class="modal-actions" style="margin-top:1rem;">
+            <button type="button" id="ns-add-item-submit" class="btn btn-primary">Add</button>
           </div>
         </div>
 

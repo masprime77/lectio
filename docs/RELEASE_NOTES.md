@@ -21,3 +21,9 @@
 - The new Tags tab manages each semester's reading and task tags: add a tag to a section, recolor any tag, rename or delete custom tags, and drag to reorder them. Protected tags ("pending"/"studied") keep a locked name, disabled delete, and a fixed position, but can still be recolored.
 - Added a Study Mode toggle in the header (persisted across restarts). While on, course progress counts only items tagged "studied" — items with other Done tags no longer contribute — and the button is highlighted; turning it off restores the normal progress calculation.
 - While Study Mode is on, the status dropdown gains a distinct green "Studied" shortcut at the bottom for quickly marking an item studied (the studied tag still appears under Done as well).
+- Hid the native title-bar text on macOS (`hiddenInset` title bar) so only the traffic-light buttons show, with header padding reserved so content never overlaps them.
+- Added a small rounded app logo next to the "Lectio" wordmark in the header.
+- Moved theme selection out of the header into the Settings modal as a Light / Dark / Auto segmented control.
+- Replaced the floating edit/delete semester icon buttons with a labelled "Edit"/"Delete" group that visually attaches to the semester selector.
+- Normalised every interactive header control to a uniform 32px height.
+- Merged the "+ Add" and "+ New Semester" header buttons into a single "＋ New" button; the semester modal gains a "Reading / Task" tab for quickly adding a reading or task to the current semester without leaving the modal.
