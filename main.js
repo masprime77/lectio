@@ -189,6 +189,29 @@ ipcMain.handle('get-settings', () => readSettings());
 ipcMain.handle('save-settings', (event, data) => writeSettings(data));
 ipcMain.handle('get-version', () => app.getVersion());
 
+// Native file dialogs for export/import. The renderer calls these to choose a
+// destination/source path, then passes the path to the export/import IPC
+// handlers in lib/ipc-handlers.js.
+ipcMain.handle('show-save-dialog', async (event, { defaultName, title }) => {
+  const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+    title: title || 'Export',
+    defaultPath: defaultName || 'export.lectio.json',
+    filters: [{ name: 'Lectio JSON', extensions: ['lectio.json'] }],
+  });
+  if (canceled || !filePath) return { canceled: true };
+  return { canceled: false, filePath };
+});
+
+ipcMain.handle('show-open-dialog', async (event, { title }) => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: title || 'Import',
+    filters: [{ name: 'Lectio JSON', extensions: ['lectio.json'] }],
+    properties: ['openFile'],
+  });
+  if (canceled || !filePaths.length) return { canceled: true };
+  return { canceled: false, filePath: filePaths[0] };
+});
+
 // Open an external link in the user's default browser. Restricted to https
 // github.com URLs (used for the pre-filled feedback/bug-report issue links) so
 // the renderer can't ask the OS to open arbitrary URLs.
