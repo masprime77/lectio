@@ -2070,9 +2070,10 @@ function setupFeedback() {
 
     try {
       await submitFeedback(feedbackKind, title, body, feedbackVersion);
-      // Show success state
-      submitBtn.textContent = 'Sent';
+      // Show success state: hide the form and the action buttons, leaving only
+      // the X close button.
       document.getElementById('feedback-form-body').classList.add('hidden');
+      document.getElementById('feedback-actions').classList.add('hidden');
       document.getElementById('feedback-success').classList.remove('hidden');
     } catch (err) {
       error.textContent = 'Could not send feedback. Please try again.';
@@ -2091,6 +2092,7 @@ function closeFeedbackModal() {
   document.getElementById('feedback-error').classList.add('hidden');
   document.getElementById('feedback-error').textContent = 'Title and description are required.';
   document.getElementById('feedback-form-body').classList.remove('hidden');
+  document.getElementById('feedback-actions').classList.remove('hidden');
   document.getElementById('feedback-success').classList.add('hidden');
   const submitBtn = document.getElementById('feedback-submit');
   submitBtn.disabled = false;
