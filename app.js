@@ -674,17 +674,59 @@ function renderItemList(items, type, course, week) {
       li.appendChild(due);
     }
 
-    const badge = document.createElement('button');
-    badge.className = 'badge ' + item.status.replace(/\s+/g, '');
-    badge.textContent = item.status;
-    badge.title = 'Click to change status';
-    badge.addEventListener('click', () => {
-      const cycle = type === 'reading' ? READING_CYCLE : TASK_CYCLE;
-      item.status = nextStatus(cycle, item.status);
-      persist();
-      render();
+    const wrapper = document.createElement('div');
+    wrapper.className = 'tag-dropdown-wrapper';
+
+    // The trigger button shows the current tag's name and color.
+    const trigger = document.createElement('button');
+    trigger.className = 'badge tag-trigger';
+    const tags = type === 'reading'
+      ? getReadingTags(state.semester)
+      : getTaskTags(state.semester);
+    const currentTag = tags.find((t) => t.id === item.status)
+      || { name: '-', color: '#999', section: 'pending' }; // ghost fallback
+    trigger.textContent = currentTag.name;
+    trigger.style.setProperty('--tag-color', currentTag.color);
+    trigger.title = 'Click to change status';
+
+    // The dropdown menu (hidden by default).
+    const menu = document.createElement('div');
+    menu.className = 'tag-menu hidden';
+
+    // Build two sections: Pending and Done.
+    ['pending', 'done'].forEach((section) => {
+      const sectionTags = tags.filter((t) => t.section === section);
+      if (sectionTags.length === 0) return;
+      const label = document.createElement('div');
+      label.className = 'tag-menu-section-label';
+      label.textContent = section === 'pending' ? 'Pending' : 'Done';
+      menu.appendChild(label);
+      sectionTags.forEach((tag) => {
+        const opt = document.createElement('button');
+        opt.className = 'tag-menu-option' + (tag.id === item.status ? ' active' : '');
+        opt.textContent = tag.name;
+        opt.style.setProperty('--tag-color', tag.color);
+        opt.addEventListener('click', (e) => {
+          e.stopPropagation();
+          item.status = tag.id;
+          persist();
+          render();
+        });
+        menu.appendChild(opt);
+      });
     });
-    li.appendChild(badge);
+
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = !menu.classList.contains('hidden');
+      // Close all other open menus first.
+      document.querySelectorAll('.tag-menu').forEach((m) => m.classList.add('hidden'));
+      if (!isOpen) menu.classList.remove('hidden');
+    });
+
+    wrapper.appendChild(trigger);
+    wrapper.appendChild(menu);
+    li.appendChild(wrapper);
 
     const del = document.createElement('button');
     del.className = 'icon-btn';
@@ -774,14 +816,14 @@ function addRow(type, course, week) {
     const v = title.value.trim();
     if (!v) return;
     if (type === 'reading') {
-      course.readings.push({ id: uid('r'), week, title: v, status: 'pending' });
+      course.readings.push({ id: uid('r'), week, title: v, status: 'r-pending' });
     } else {
       course.tasks.push({
         id: uid('t'),
         week,
         title: v,
         dueDate: due.value || '',
-        status: 'not done',
+        status: 't-pending',
       });
     }
     persist();
@@ -837,6 +879,11 @@ async function init() {
   });
   document.getElementById('delete-semester-btn').addEventListener('click', () => {
     if (state.semesterId) deleteSemester(state.semesterId);
+  });
+
+  // Close any open status dropdown when clicking outside of it.
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.tag-menu').forEach((m) => m.classList.add('hidden'));
   });
 
   setupViewToggle();
@@ -1350,14 +1397,14 @@ function setupAddItem() {
     if (!course) return;
 
     if (addItemType === 'reading') {
-      course.readings.push({ id: uid('r'), week, title: titleVal, status: 'pending' });
+      course.readings.push({ id: uid('r'), week, title: titleVal, status: 'r-pending' });
     } else {
       course.tasks.push({
         id: uid('t'),
         week,
         title: titleVal,
         dueDate: document.getElementById('add-item-due').value || '',
-        status: 'not done',
+        status: 't-pending',
       });
     }
 
