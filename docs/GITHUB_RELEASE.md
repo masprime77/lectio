@@ -1,19 +1,25 @@
 ---
 ## What's new in v1.8.0
 
-<!-- Fill in before releasing. -->
+This release is all about moving your data between files. You can now export and import whole semesters or individual courses as `.lectio.json` files — from the New/Edit modal, from per-course buttons in All Courses view, or by dragging a file onto the window.
 
-### Planner
-- Added a "Breakdown" toggle button to the dashboard header that opens an inline panel splitting each course's progress into separate readings and tasks mini-bars with done/total counts, plus a "Total" summary row for the whole semester; the panel respects the current sort order and Study Mode, and the existing progress bars are unchanged.
-- Added inline editing of a task's due date directly in the planner: tasks with a date show a clickable "due YYYY-MM-DD" that opens an inline date picker (committing on blur/Enter, cancelling on Escape, clearing the field removes the date), and tasks without one reveal a "＋ date" affordance on row hover to set one.
+### Import & export
+- Export a full semester (including its tag definitions) to a `.lectio.json` file via a native save dialog.
+- Export a single course (without tags) to a `.lectio.json` file via a native save dialog.
+- Import a semester from a `.lectio.json` file, with a confirmation modal to keep or reset reading/task statuses and, on an id clash, to replace the existing semester or save it as a new one.
+- Import a course from a `.lectio.json` file into the current semester with freshly generated ids.
+- Drag and drop a `.lectio.json` file onto the window to import it as a semester or a course.
 
-### Semester modal
-- Removed the "Reading / Task" quick-add tab from the semester modal (the standalone "Add reading / task" modal is unaffected).
-- Renamed the semester modal title in create mode from "Create New Semester" to "New".
+### Where import/export lives
+- Semester import/export now lives in the New/Edit modal footer instead of the header toolbar; the semester selector keeps only the Edit and Delete buttons.
+- The New/Edit modal footer has tab-aware Import/Export buttons: the Semester tab imports a full semester and (in edit mode) exports the current one; the Courses tab imports a course into the semester being built or edited; the Tags tab shows neither, since tags can't be imported/exported yet.
+- Importing a course from the Courses tab works in both create mode (adds a draft course row, kept with its readings/tasks on save) and edit mode (adds it to the live semester and refreshes the course list).
+- Each course-column header in All Courses view gains Edit, Export, Import, and Delete icon buttons.
+- The header **New** button now opens the create-semester modal directly (no popover).
+- Editing the semester from a course column's pencil button or via "+ Add course" now opens the modal on the Courses tab.
 
-### Onboarding & feedback
-- Added an interactive onboarding tour that auto-launches on first run and can be replayed any time from Settings → Start tour: each step spotlights a real UI element with a cutout, shows a titled tooltip, and supports Back/Next/Skip plus keyboard navigation (arrows, Enter, Escape). Steps live in a single `TUTORIAL_STEPS` array so new features only need an entry there (see `docs/TUTORIAL_STEPS.md`).
-- Replaced the feedback flow's GitHub redirect with a direct submission to the Vercel `/api/feedback` endpoint, so feedback is sent without leaving the app or needing a GitHub account; the submit button now shows a "Sending…" state, then an in-modal success confirmation, with inline error recovery on failure.
+### Docs
+- Synced the README and user stories to the shipped v1.8.0 feature set and added user stories US-036–US-046 with corrected test references and coverage totals.
 
 ---
 **Full changelog:** [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md)
@@ -34,12 +40,12 @@ After merging the PR into main:
 
   git checkout main
   git pull origin main
-  git tag v1.7.0
-  git push origin v1.7.0
+  git tag v1.8.0
+  git push origin v1.8.0
 
 The release.yml workflow will then run CI and, if it passes, build and
 publish the macOS (.dmg + .zip + latest-mac.yml) and Windows (.exe + .zip +
-latest.yml) assets to a new GitHub Release for the v1.7.0 tag. Once the
+latest.yml) assets to a new GitHub Release for the v1.8.0 tag. Once the
 draft release appears in GitHub, paste the content of docs/GITHUB_RELEASE.md
 into the description field and publish it to make the download links live.
 
