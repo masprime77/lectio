@@ -170,7 +170,11 @@ async function flushSave() {
 }
 
 // Shared pure logic, loaded from lib/planner-core.js before this script.
-const { READING_CYCLE, TASK_CYCLE, nextStatus, courseProgress, uid } = window.PlannerCore;
+const {
+  getReadingTags, getTaskTags,
+  isProtectedTag, addTag, deleteTag, editTag, reorderTags,
+  courseProgress, uid,
+} = window.PlannerCore;
 
 // ---------------------------------------------------------------------------
 // Tabler icons (inline SVG — no external dependency, works offline)
@@ -279,9 +283,9 @@ function render() {
 function sortedCourses(courses) {
   const copy = [...courses];
   if (state.sortOrder === 'progress-asc')
-    return copy.sort((a, b) => courseProgress(a) - courseProgress(b));
+    return copy.sort((a, b) => courseProgress(a, state.semester) - courseProgress(b, state.semester));
   if (state.sortOrder === 'progress-desc')
-    return copy.sort((a, b) => courseProgress(b) - courseProgress(a));
+    return copy.sort((a, b) => courseProgress(b, state.semester) - courseProgress(a, state.semester));
   if (state.sortOrder === 'alpha-desc')
     return copy.sort((a, b) => b.name.localeCompare(a.name));
   // alpha-asc, week-asc and week-desc all use alphabetical (A → Z) order.
@@ -317,7 +321,7 @@ function renderDashboard() {
     bars = '<div class="week-empty">No courses yet.</div>';
   } else {
     sortedCourses(sem.courses).forEach((course) => {
-      const pct = courseProgress(course);
+      const pct = courseProgress(course, sem);
       let rowClass = 'progress-row';
       if (state.focusedCourseId) {
         rowClass += state.focusedCourseId === course.id
