@@ -7,6 +7,11 @@ contextBridge.exposeInMainWorld('planner', {
   getSemester: (id) => ipcRenderer.invoke('get-semester', id),
   saveSemester: (id, data) => ipcRenderer.invoke('save-semester', id, data),
   deleteSemester: (id) => ipcRenderer.invoke('delete-semester', id),
+  showSaveDialog: (opts) => ipcRenderer.invoke('show-save-dialog', opts),
+  showOpenDialog: (opts) => ipcRenderer.invoke('show-open-dialog', opts),
+  exportCourse: (args) => ipcRenderer.invoke('export-course', args),
+  exportSemester: (args) => ipcRenderer.invoke('export-semester', args),
+  importFile: (args) => ipcRenderer.invoke('import-file', args),
 });
 
 // Auto-update bridge. Main → renderer notifications plus a restart trigger.

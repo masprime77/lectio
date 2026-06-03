@@ -108,6 +108,17 @@ function saveIndicator(kind) {
   }
 }
 
+// Show a transient confirmation message in the header save-status area (used for
+// one-off actions like export/import that aren't part of the autosave cycle).
+function showSaveStatus(message, ms = 2000) {
+  const el = document.getElementById('save-status');
+  if (!el) return;
+  clearTimeout(save.fadeTimer);
+  el.className = 'save-status saved visible';
+  el.innerHTML = `${icon('check')} ${message}`;
+  save.fadeTimer = setTimeout(() => el.classList.remove('visible'), ms);
+}
+
 // Manual save: write immediately (Cmd/Ctrl+S or File → Save). Cancels any
 // pending debounce and flushes now.
 async function saveNow() {
@@ -188,7 +199,7 @@ async function flushSave() {
 const {
   getReadingTags, getTaskTags,
   isProtectedTag, addTag, deleteTag, editTag, reorderTags,
-  courseProgress, uid,
+  courseProgress, uid, deleteCourse,
 } = window.PlannerCore;
 
 // ---------------------------------------------------------------------------
@@ -225,6 +236,10 @@ const ICONS = {
     '<path d="M3 12h1m8 -9v1m8 8h1m-15.4 -6.4l.7 .7m12.1 -.7l-.7 .7" /><path d="M9 16a5 5 0 1 1 6 0a3.5 3.5 0 0 0 -1 3a2 2 0 0 1 -4 0a3.5 3.5 0 0 0 -1 -3" /><path d="M9.7 17l4.6 0" />',
   school:
     '<path d="M22 9l-10 -4l-10 4l10 4l10 -4v6" /><path d="M6 10.6v5.4a6 6 0 0 0 12 0v-5.4" />',
+  'file-export':
+    '<path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M11.5 21h-4.5a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v5m-5 6h7m-3 -3l3 3l-3 3" />',
+  'file-import':
+    '<path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M5 13v-8a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-5.5m-9.5 -2h7m-3 -3l-3 3l3 3" />',
 };
 
 function icon(name) {
@@ -677,9 +692,60 @@ function renderCourseView() {
 
     const header = document.createElement('div');
     header.className = 'course-column-header';
-    header.textContent = course.name;
-    header.title = course.name;
-    header.style.color = course.color;
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'course-column-header-name';
+    nameSpan.textContent = course.name;
+    nameSpan.title = course.name;
+    nameSpan.style.color = course.color;
+    header.appendChild(nameSpan);
+
+    // Edit (opens the semester editor, the existing way to rename/recolor a course)
+    const editBtn = document.createElement('button');
+    editBtn.className = 'icon-btn';
+    editBtn.innerHTML = icon('pencil');
+    editBtn.title = 'Edit semester (to rename/recolor this course)';
+    editBtn.addEventListener('click', () => openEditModal(state.semesterId, 'courses'));
+    header.appendChild(editBtn);
+
+    // Export
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'icon-btn';
+    exportBtn.innerHTML = icon('file-export');
+    exportBtn.title = 'Export course';
+    exportBtn.addEventListener('click', () => exportCourse(course));
+    header.appendChild(exportBtn);
+
+    // Import (imports a course into this semester, not "replace this course")
+    const importCourseBtn = document.createElement('button');
+    importCourseBtn.className = 'icon-btn';
+    importCourseBtn.innerHTML = icon('file-import');
+    importCourseBtn.title = 'Import a course into this semester';
+    importCourseBtn.addEventListener('click', async () => {
+      const { canceled, filePath } = await window.planner.showOpenDialog({ title: 'Import Course' });
+      if (canceled) return;
+      try {
+        const payload = await window.planner.importFile({ filePath });
+        await importCourse(payload);
+      } catch (err) {
+        alert('Could not read file: ' + (err.message || err));
+      }
+    });
+    header.appendChild(importCourseBtn);
+
+    // Delete
+    const delBtn = document.createElement('button');
+    delBtn.className = 'icon-btn btn-danger';
+    delBtn.innerHTML = icon('trash');
+    delBtn.title = 'Delete course';
+    delBtn.addEventListener('click', () => {
+      if (!confirm(`Delete course "${course.name}"? All its readings and tasks will be lost.`)) return;
+      deleteCourse(state.semester, course.id);
+      persist();
+      render();
+    });
+    header.appendChild(delBtn);
+
     col.appendChild(header);
 
     const body = document.createElement('div');
@@ -1342,6 +1408,12 @@ async function init() {
   document.getElementById('edit-semester-btn').innerHTML = icon('pencil') + '<span style="font-size:0.75rem;margin-left:0.25rem;">Edit</span>';
   document.getElementById('delete-semester-btn').innerHTML = icon('trash') + '<span style="font-size:0.75rem;margin-left:0.25rem;">Delete</span>';
 
+  // Import/Export buttons inside the semester modal footer
+  document.getElementById('modal-import-btn').innerHTML =
+    icon('file-import') + '<span>Import</span>';
+  document.getElementById('modal-export-btn').innerHTML =
+    icon('file-export') + '<span>Export</span>';
+
   // Bulk expand/collapse controls (apply to whichever view is active)
   const expandAllBtn = document.getElementById('expand-all-btn');
   const collapseAllBtn = document.getElementById('collapse-all-btn');
@@ -1391,6 +1463,7 @@ async function init() {
   setupFeedback();
   setupAddItem();
   setupTutorial();
+  setupDragAndDrop();
 
   // Auto-launch on first run (no tutorial seen and at least one semester exists).
   if (!hasTutorialBeenSeen()) {
@@ -1538,6 +1611,242 @@ async function deleteSemester(id) {
 }
 
 // ---------------------------------------------------------------------------
+// Semester export / import
+// ---------------------------------------------------------------------------
+async function exportSemester() {
+  if (!state.semester) return;
+  const sem = state.semester;
+  const defaultName = (sem.name || sem.id).replace(/[^a-z0-9_-]/gi, '_') + '.lectio.json';
+  const { canceled, filePath } = await window.planner.showSaveDialog({
+    defaultName,
+    title: 'Export Semester',
+  });
+  if (canceled) return;
+  try {
+    await window.planner.exportSemester({ filePath, semester: sem });
+    showSaveStatus('Semester exported', 2000);
+  } catch (err) {
+    alert('Export failed: ' + (err.message || err));
+  }
+}
+
+// parsedPayload is the already-parsed object returned by window.planner.importFile().
+async function importSemester(parsedPayload) {
+  if (!parsedPayload || parsedPayload._lectioType !== 'semester') {
+    alert('This file is not a Lectio semester export.');
+    return;
+  }
+  const sem = parsedPayload.semester;
+  if (!sem || !sem.id || !Array.isArray(sem.courses)) {
+    alert('The semester file appears corrupt or invalid.');
+    return;
+  }
+
+  // Check for id conflict
+  const existingList = await api.list();
+  const hasConflict = existingList.some((s) => s.id === sem.id);
+
+  // Show the import confirmation modal
+  const overlay = document.getElementById('import-sem-overlay');
+  document.getElementById('import-sem-info').textContent =
+    `"${sem.name}" — ${sem.courses.length} course(s), ${sem.weeks} week(s)`;
+  const conflictSection = document.getElementById('import-sem-conflict-section');
+  conflictSection.classList.toggle('hidden', !hasConflict);
+
+  overlay.classList.remove('hidden');
+
+  // Wait for user confirmation or cancel
+  await new Promise((resolve) => {
+    document.getElementById('import-sem-cancel').onclick = () => {
+      overlay.classList.add('hidden');
+      resolve(false);
+    };
+    document.getElementById('import-sem-confirm').onclick = async () => {
+      overlay.classList.add('hidden');
+
+      const keepStatus = document.querySelector('input[name="import-sem-status"]:checked').value === 'keep';
+      const conflictChoice = hasConflict
+        ? document.querySelector('input[name="import-sem-conflict"]:checked').value
+        : 'replace';
+
+      // Deep clone to avoid mutating the parsed payload
+      let toSave = JSON.parse(JSON.stringify(sem));
+
+      // Reset statuses if requested (default status ids in the tag model).
+      if (!keepStatus) {
+        toSave.courses.forEach((c) => {
+          (c.readings || []).forEach((r) => { r.status = 'r-pending'; });
+          (c.tasks || []).forEach((t) => { t.status = 't-pending'; });
+        });
+      }
+
+      // Resolve id conflict
+      let targetId = toSave.id;
+      if (hasConflict && conflictChoice === 'new') {
+        const ids = new Set(existingList.map((s) => s.id));
+        let base = slugify(toSave.name);
+        let n = 2;
+        targetId = base;
+        while (ids.has(targetId)) targetId = `${base}-${n++}`;
+        toSave.id = targetId;
+      }
+
+      try {
+        await api.save(targetId, toSave);
+        await populateSelector();
+        await loadSemester(targetId);
+        showSaveStatus('Semester imported', 2000);
+      } catch (err) {
+        alert('Import failed: ' + (err.message || err));
+      }
+      resolve(true);
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Course export / import
+// ---------------------------------------------------------------------------
+async function exportCourse(course) {
+  const defaultName = (course.name || course.id).replace(/[^a-z0-9_-]/gi, '_') + '.lectio.json';
+  const { canceled, filePath } = await window.planner.showSaveDialog({
+    defaultName,
+    title: 'Export Course',
+  });
+  if (canceled) return;
+
+  // Export only the fields that belong to the course schema (no tags).
+  const clean = {
+    id: course.id,
+    name: course.name,
+    color: course.color,
+    readings: course.readings.map(({ id, week, title, status }) => ({ id, week, title, status })),
+    tasks: course.tasks.map(({ id, week, title, dueDate, status }) => ({ id, week, title, dueDate, status })),
+  };
+
+  try {
+    await window.planner.exportCourse({ filePath, course: clean });
+    showSaveStatus('Course exported', 2000);
+  } catch (err) {
+    alert('Export failed: ' + (err.message || err));
+  }
+}
+
+// parsedPayload is the already-parsed object returned by window.planner.importFile().
+async function importCourse(parsedPayload) {
+  if (!parsedPayload || parsedPayload._lectioType !== 'course') {
+    alert('This file is not a Lectio course export.');
+    return;
+  }
+  if (!state.semester) {
+    alert('No semester is currently open. Open or create a semester first.');
+    return;
+  }
+
+  const incoming = parsedPayload.course;
+  if (!incoming || !incoming.name) {
+    alert('The course file appears corrupt or invalid.');
+    return;
+  }
+
+  // Always assign a fresh id to avoid collisions within the current semester.
+  const newCourse = {
+    id: uid('course'),
+    name: incoming.name,
+    color: incoming.color || '#4A90D9',
+    readings: (incoming.readings || []).map((r) => ({ ...r, id: uid('r') })),
+    tasks: (incoming.tasks || []).map((t) => ({ ...t, id: uid('t') })),
+  };
+
+  state.semester.courses.push(newCourse);
+  persist();
+  render();
+  showSaveStatus(`Course "${newCourse.name}" imported`, 2000);
+}
+
+// Import a course from the New/Edit modal's Courses tab. Works in both modes:
+// in edit mode it adds the course to the live semester; in create mode it adds
+// a draft course row so the course (with its readings/tasks) is saved on submit.
+async function importCourseFromModal() {
+  const { canceled, filePath } = await window.planner.showOpenDialog({
+    title: 'Import Course',
+  });
+  if (canceled) return;
+
+  let payload;
+  try {
+    payload = await window.planner.importFile({ filePath });
+  } catch (err) {
+    alert('Could not read file: ' + (err.message || err));
+    return;
+  }
+
+  if (!payload || payload._lectioType !== 'course' || !payload.course || !payload.course.name) {
+    alert('This file is not a valid Lectio course export.');
+    return;
+  }
+
+  const incoming = payload.course;
+  // Fresh ids so the course never collides with existing ones.
+  const newCourse = {
+    id: uid('course'),
+    name: incoming.name,
+    color: incoming.color || '#4A90D9',
+    readings: (incoming.readings || []).map((r) => ({ ...r, id: uid('r') })),
+    tasks: (incoming.tasks || []).map((t) => ({ ...t, id: uid('t') })),
+  };
+
+  if (state.editingId) {
+    // Edit mode: add to the live semester and refresh the modal's course rows.
+    state.semester.courses.push(newCourse);
+    persist();
+    render();
+    const courses = document.getElementById('ns-courses');
+    courses.innerHTML = '';
+    state.semester.courses.forEach((c) => addCourseField(c));
+  } else {
+    // Create mode: stash the full course in the draft (so submitModal can keep
+    // its readings/tasks) and add a matching row to the modal.
+    if (!state.editingSemester.courses) state.editingSemester.courses = [];
+    state.editingSemester.courses.push(newCourse);
+    addCourseField(newCourse);
+  }
+  showSaveStatus(`Course "${newCourse.name}" imported`, 2000);
+}
+
+// Accept .lectio.json files dropped anywhere on the window (semester or course).
+function setupDragAndDrop() {
+  document.body.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+
+  document.body.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    // Electron exposes the real fs path on File objects in the renderer.
+    const filePath = file.path;
+    if (!filePath || !filePath.endsWith('.lectio.json')) {
+      alert('Only .lectio.json files can be dropped here.');
+      return;
+    }
+    try {
+      const payload = await window.planner.importFile({ filePath });
+      if (payload._lectioType === 'semester') {
+        await importSemester(payload);
+      } else if (payload._lectioType === 'course') {
+        await importCourse(payload);
+      } else {
+        alert('Unrecognised Lectio file type.');
+      }
+    } catch (err) {
+      alert('Could not read file: ' + (err.message || err));
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
 // New semester modal
 // ---------------------------------------------------------------------------
 const DEFAULT_COLORS = ['#4A90D9', '#E2725B', '#7E57C2', '#5CB85C', '#F0AD4E', '#5BC0DE'];
@@ -1546,6 +1855,35 @@ function setupModal() {
   const overlay = document.getElementById('modal-overlay');
   document.getElementById('modal-cancel').addEventListener('click', closeModal);
   document.getElementById('ns-add-course').addEventListener('click', () => addCourseField());
+
+  // Footer Import is tab-aware: on the Courses tab it imports a course into the
+  // semester being built/edited; on the Semester tab it imports a full semester.
+  document.getElementById('modal-import-btn').addEventListener('click', async () => {
+    const activeTab = document.querySelector('.modal-tab.active');
+    if (activeTab && activeTab.dataset.tab === 'courses') {
+      await importCourseFromModal();
+      return;
+    }
+    closeModal();
+    const { canceled, filePath } = await window.planner.showOpenDialog({
+      title: 'Import Semester',
+    });
+    if (canceled) return;
+    try {
+      const payload = await window.planner.importFile({ filePath });
+      await importSemester(payload);
+    } catch (err) {
+      alert('Could not read file: ' + (err.message || err));
+    }
+  });
+
+  document.getElementById('modal-export-btn').addEventListener('click', () => {
+    // Export the semester that is currently being edited. We close the modal
+    // first so the save dialog isn't layered on top of it.
+    closeModal();
+    exportSemester();
+  });
+
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) closeModal();
   });
@@ -1566,21 +1904,57 @@ function setupModal() {
       if (tab.dataset.tab === 'tags' && state.editingSemester) {
         renderTagsEditor(state.editingSemester);
       }
+      updateModalFooter();
     });
   });
 }
 
-// The header "＋ New" button opens the semester-creation modal.
+// Show/hide the footer Import & Export buttons based on the active tab and mode.
+// Import shows on the Semester tab (semester import) and Courses tab (course
+// import), in both create and edit modes. Export only appears on the Semester
+// tab in edit mode. The Tags tab shows neither — tags can't be im/exported yet.
+function updateModalFooter() {
+  const activeTab = document.querySelector('.modal-tab.active');
+  const tab = activeTab ? activeTab.dataset.tab : 'semester';
+  const isEdit = !!state.editingId;
+  document
+    .getElementById('modal-import-btn')
+    .classList.toggle('hidden', tab === 'tags');
+  document
+    .getElementById('modal-export-btn')
+    .classList.toggle('hidden', !(tab === 'semester' && isEdit));
+}
+
+// The header "＋ New" button opens the semester-creation modal directly.
 function setupNewBtn() {
   const btn = document.getElementById('new-btn');
   btn.innerHTML = icon('plus') + '<span>New</span>';
-  btn.addEventListener('click', openCreateModal);
+  btn.addEventListener('click', () => openCreateModal());
 }
 
 // Reset the modal to its first (Semester) tab — used whenever it opens.
 function resetModalToFirstTab() {
   document.querySelectorAll('.modal-tab').forEach((t, i) => t.classList.toggle('active', i === 0));
   document.querySelectorAll('.modal-tab-panel').forEach((p, i) => p.classList.toggle('hidden', i !== 0));
+}
+
+// Activate a specific tab by its data-tab value ('semester' | 'courses' | 'tags').
+// Falls back to the first tab if the value is not found.
+function activateModalTab(tabName) {
+  const tabs   = document.querySelectorAll('.modal-tab');
+  const panels = document.querySelectorAll('.modal-tab-panel');
+  let activated = false;
+  tabs.forEach((tab, i) => {
+    const match = tab.dataset.tab === tabName;
+    tab.classList.toggle('active', match);
+    panels[i].classList.toggle('hidden', !match);
+    if (match) activated = true;
+  });
+  // Fallback: activate the first tab if tabName was not found.
+  if (!activated) {
+    tabs[0].classList.add('active');
+    panels[0].classList.remove('hidden');
+  }
 }
 
 function closeModal() {
@@ -1607,6 +1981,7 @@ function openCreateModal() {
   renderTagsEditor(state.editingSemester);
   resetModalToFirstTab();
   document.getElementById('modal-overlay').classList.remove('hidden');
+  updateModalFooter();
 }
 
 // "+ Add course": open the existing semester editor with a fresh, focused
@@ -1614,7 +1989,7 @@ function openCreateModal() {
 // same flow as the New Semester modal (existing courses keep their data on save).
 async function openAddCourse() {
   if (!state.semesterId) return;
-  await openEditModal(state.semesterId);
+  await openEditModal(state.semesterId, 'courses');
   // openEditModal leaves at least one (blank) row; only append an extra blank
   // when courses already exist, so we always end on a single fresh, focused row.
   if (state.semester && state.semester.courses.length > 0) addCourseField();
@@ -1624,7 +1999,7 @@ async function openAddCourse() {
 }
 
 // Open the modal in "edit" mode, pre-filled with the semester's current data.
-async function openEditModal(id) {
+async function openEditModal(id, startTab = 'semester') {
   const sem =
     id === state.semesterId && state.semester ? state.semester : await api.load(id);
   state.editingId = id;
@@ -1640,8 +2015,9 @@ async function openEditModal(id) {
   // The Tags tab edits this semester object live (persisted on each change).
   state.editingSemester = sem;
   renderTagsEditor(sem);
-  resetModalToFirstTab();
+  activateModalTab(startTab);
   document.getElementById('modal-overlay').classList.remove('hidden');
+  updateModalFooter();
 }
 
 // `course` is optional; when given, the row is pre-filled and remembers its id
@@ -1723,17 +2099,23 @@ async function submitModal() {
   }
 
   // Creating: build a fresh semester with a unique id derived from the name.
+  // Imported courses live in the draft (state.editingSemester.courses) keyed by
+  // their row's courseId, so we can keep their readings/tasks; typed-in rows
+  // start empty.
+  const draftById = new Map(
+    (state.editingSemester && state.editingSemester.courses
+      ? state.editingSemester.courses
+      : []
+    ).map((c) => [c.id, c])
+  );
   const courses = [];
   rows.forEach((row) => {
     const cname = row.querySelector('.ns-course-name').value.trim();
     if (!cname) return;
-    courses.push({
-      id: uid('course'),
-      name: cname,
-      color: row.querySelector('.ns-course-color').value,
-      readings: [],
-      tasks: [],
-    });
+    const color = row.querySelector('.ns-course-color').value;
+    const drafted = draftById.get(row.dataset.courseId);
+    if (drafted) courses.push({ ...drafted, name: cname, color });
+    else courses.push({ id: uid('course'), name: cname, color, readings: [], tasks: [] });
   });
 
   const existing = await api.list();

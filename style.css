@@ -275,6 +275,7 @@ body.electron-app .header-inner { padding-left: 80px; }
 .semester-action-delete:hover { background: var(--danger-bg); color: var(--danger); }
 .semester-action-btn .ti { width: 15px; height: 15px; }
 
+/* --- New-button popover --- */
 .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .icon-btn:disabled:hover { background: none; }
 
@@ -793,10 +794,17 @@ body.electron-app .header-inner { padding-left: 80px; }
   border-bottom: 1px solid var(--border);
   background: var(--surface);
   border-radius: var(--radius) var(--radius) 0 0;
-  white-space: nowrap;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.course-column-header-name {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-width: 0;
+  white-space: nowrap;
 }
 .course-column-body {
   padding: 0 0.9rem 0.9rem;
@@ -920,10 +928,14 @@ body.electron-app .header-inner { padding-left: 80px; }
 }
 .modal-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   gap: 0.5rem;
   margin-top: 1.25rem;
 }
+
+.modal-actions-left  { display: flex; gap: 0.5rem; }
+.modal-actions-right { display: flex; gap: 0.5rem; }
 
 /* Modal tabs */
 .modal-tabs {
@@ -1189,4 +1201,31 @@ body.electron-app .header-inner { padding-left: 80px; }
 .tutorial-nav {
   display: flex;
   gap: 0.4rem;
+}
+
+/* Import-semester confirmation modal */
+.import-sem-info {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin: 0 0 1rem;
+}
+.import-sem-fieldset {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.9rem;
+}
+.import-sem-fieldset legend {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0 0.35rem;
+  color: var(--muted);
+}
+.import-sem-radio {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  margin-top: 0.4rem;
+  cursor: pointer;
 }

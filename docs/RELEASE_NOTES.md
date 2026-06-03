@@ -1,5 +1,25 @@
 ## Unreleased
 
+- Added IPC handlers for exporting a single course (`export-course`) and a full semester (`export-semester`) to `.lectio.json` files, and for reading a `.lectio.json` file back (`import-file`).
+- Added native save/open file-dialog IPC handlers (`show-save-dialog`, `show-open-dialog`) scoped to the `.lectio.json` extension.
+- Exposed the new export/import and dialog methods on `window.planner` in the preload bridge.
+- Semester export/import now lives in the edit modal footer instead of the header toolbar; the semester selector keeps only the Edit and Delete buttons.
+- Export semester writes the full semester (including tag definitions) to a `.lectio.json` file via a native save dialog.
+- Import semester reads a `.lectio.json` file and shows a confirmation modal to keep or reset reading/task statuses and, on an id clash, to replace the existing semester or save it as a new one.
+- Added drag-and-drop: dropping a `.lectio.json` file onto the window imports it as a semester or a course.
+- Added Edit, Export, Import, and Delete icon buttons to each course-column header in Course view.
+- Export course writes a single course (without tags) to a `.lectio.json` file via a native save dialog.
+- Import course adds a course from a `.lectio.json` file into the current semester with freshly generated ids.
+- The header **New** button now opens the create-semester modal directly (no popover).
+- The New/Edit modal footer has tab-aware Import/Export buttons: on the Semester tab, Import brings in a full semester and Export (edit mode only) writes the current one; on the Courses tab, Import adds a course to the semester being built or edited; the Tags tab shows neither, since tags can't be imported/exported yet.
+- Importing a course from the Courses tab works in both create mode (adds a draft course row, kept with its readings/tasks on save) and edit mode (adds it to the live semester and refreshes the course list).
+- Editing the semester from a course column's pencil button or via "+ Add course" now opens the modal on the Courses tab instead of the Semester tab.
+- Docs: rewrote the README Features list to match the v1.7.0 feature set (Breakdown panel, focus mode, bulk collapse controls, custom tags, Study Mode, sort control, inline due-date editing, three-tab semester modal, onboarding tour, in-app feedback, per-OS auto-updates).
+- Docs: updated the README Download section to use the `Lectio-Setup.exe` artifact name and added the Homebrew one-line install command.
+- Docs: added the `icon:win` and `icons` npm scripts to the README icon-build commands.
+- Docs: added user stories US-036–US-046 (custom tags, tag management UI, Study Mode, sort control, focus mode, collapsible weeks, breakdown panel, inline due-date editing, onboarding tour, in-app feedback, Windows platform).
+- Docs: appended US-036–US-046 to the traceability matrix, corrected the US-036/US-037/US-038 test references to the real test files (`semester-manager.test.js`, `ipc.test.js`, `progress.test.js`, `status.test.js`), and updated the coverage summary to 12 covered / 6 partial / 28 not covered (46 stories).
+
 ## v1.7.0
 
 _Released: 2026-06-03_

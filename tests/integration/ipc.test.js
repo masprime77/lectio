@@ -34,10 +34,13 @@ afterEach(() => {
 const sample = { id: 'x', name: 'X', startDate: '2025-01-06', weeks: 4, courses: [] };
 
 describe('IPC handlers', () => {
-  it('registers all four semester channels', () => {
+  it('registers the semester and export/import channels', () => {
     expect(ipc.channels()).toEqual([
       'delete-semester',
+      'export-course',
+      'export-semester',
       'get-semester',
+      'import-file',
       'list-semesters',
       'save-semester',
     ]);

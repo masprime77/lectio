@@ -319,6 +319,142 @@ Test references use the form `file › test name`.
 
 ---
 
+## Tags
+
+**US-036 — Custom tag system**
+- As a student, I want to define my own reading and task tags per semester so that I can label items in a way that fits my workflow.
+- Acceptance criteria:
+  - [ ] Each semester stores `readingTags` and `taskTags` arrays; new semesters receive the default tag sets.
+  - [ ] Tags have `id`, `name`, `color`, and `section` (`pending`/`done`); done-section tags count toward progress.
+  - [ ] Protected tag ids (`r-pending`, `r-studied`, `t-pending`, `t-studied`) cannot be renamed or deleted.
+  - [ ] Legacy semesters are migrated on load: default tags added and status strings rewritten to tag ids.
+- Linked tests: `tests/unit/semester-manager.test.js › get-semester returns parsed JSON with default tags migrated in`; `tests/unit/semester-manager.test.js › migrateStatusToTagId rewrites legacy status strings to tag ids`; `tests/integration/ipc.test.js › get-semester migrates legacy reading/task statuses to tag ids`; `tests/unit/progress.test.js › counts readings whose tag is in the done section`; `tests/unit/status.test.js › isProtectedTag protects the pending and studied tags of each kind`
+
+**US-037 — Tag management UI**
+- As a student, I want to add, rename, recolor, and reorder tags from the semester editor so that I can keep my tag set up to date.
+- Acceptance criteria:
+  - [ ] The semester modal has a Tags tab listing reading and task tags in their sections.
+  - [ ] Custom tags can be added to any section, renamed, recolored, deleted, and dragged to reorder.
+  - [ ] Protected tags show a locked name and disabled delete but allow recoloring.
+- Linked tests: tag mutation logic covered by `tests/unit/status.test.js › addTag appends a tag with a generated reading-tag id`; `tests/unit/status.test.js › editTag renames and recolors an unprotected tag`; `tests/unit/status.test.js › editTag locks the name of a protected tag but allows recoloring`; `tests/unit/status.test.js › deleteTag refuses to delete a protected tag`; `tests/unit/status.test.js › reorderTags reorders the tag list to match the given ids`. The Tags-tab UI is verified manually.
+
+---
+
+## Study Mode
+
+**US-038 — Study Mode**
+- As a student, I want to toggle Study Mode so that progress shows only items I have deeply studied.
+- Acceptance criteria:
+  - [ ] A "Study Mode" toggle button in the header switches the mode on/off and persists across restarts.
+  - [ ] While on, only items tagged with the "studied" tag id (`r-studied` / `t-studied`) count toward progress.
+  - [ ] The status dropdown gains a distinct green "Studied" shortcut at the bottom while Study Mode is on.
+  - [ ] Turning Study Mode off restores the normal progress calculation without modifying any item.
+- Linked tests: `tests/unit/progress.test.js › counts only studied tags for readings and tasks`; `tests/unit/progress.test.js › does NOT count other done-section tags when study mode is on`; `tests/unit/progress.test.js › does not count ghost items when study mode is on`; `tests/unit/progress.test.js › omitting the third arg behaves identically to studyMode=false` (header toggle + dropdown shortcut verified manually)
+
+---
+
+## Sort
+
+**US-039 — Sort control**
+- As a student, I want to sort courses so that the most relevant ones appear first.
+- Acceptance criteria:
+  - [ ] A sort select in the header offers: Progress ↓, Progress ↑, A→Z, Z→A, Week ↑, Week ↓.
+  - [ ] The selected sort applies to the progress bar row and (where applicable) the layout views.
+  - [ ] Progress and alphabetical sorts apply to dashboard and All Courses; week sorts also reorder the weeks themselves.
+  - [ ] The choice persists in `localStorage`; the underlying JSON file is never modified.
+- Linked tests: _none (UI/localStorage; verified manually)_
+
+---
+
+## Focus mode
+
+**US-040 — Focus mode**
+- As a student, I want to click a course name to isolate it so that I can concentrate on one course at a time.
+- Acceptance criteria:
+  - [ ] Clicking a course name in the progress bar centres and widens its column and dims the other progress rows.
+  - [ ] Clicking the course name again, pressing Esc, or clicking the empty space around the column restores the normal layout.
+- Linked tests: _none (UI; verified manually)_
+
+---
+
+## Views (continued)
+
+**US-041 — Collapsible week sections in All Courses view**
+- As a student, I want to collapse weeks I don't need so that each course column stays manageable.
+- Acceptance criteria:
+  - [ ] Each per-week divider in the All Courses view has a chevron toggle.
+  - [ ] The current week is expanded by default; all others are collapsed.
+  - [ ] Each section's open/closed state persists while navigating.
+  - [ ] Header buttons allow bulk Expand all / Collapse all / Expand current week for the active layout.
+- Linked tests: _none (UI; verified manually)_
+
+---
+
+## Breakdown
+
+**US-042 — Breakdown panel**
+- As a student, I want to see readings and tasks progress separately so that I can tell which type of work remains.
+- Acceptance criteria:
+  - [ ] A "Breakdown" toggle button in the dashboard header opens an inline panel.
+  - [ ] The panel shows separate mini-bars for readings and tasks per course with done/total counts.
+  - [ ] A "Total" summary row summarises the whole semester.
+  - [ ] The panel respects the current sort order and Study Mode.
+- Linked tests: _none (UI; verified manually)_
+
+---
+
+## Tasks (continued)
+
+**US-043 — Inline due-date editing**
+- As a student, I want to set or change a task's due date directly in the planner so that I don't have to open a separate modal.
+- Acceptance criteria:
+  - [ ] Tasks with a due date show a clickable "due YYYY-MM-DD" badge that opens an inline date picker.
+  - [ ] The picker commits on blur or Enter, cancels on Escape.
+  - [ ] Clearing the date field removes the due date from the task.
+  - [ ] Tasks without a due date reveal a "＋ date" affordance on row hover.
+- Linked tests: _none (UI; verified manually)_
+
+---
+
+## Onboarding
+
+**US-044 — Onboarding tour**
+- As a new user, I want a guided tour on first launch so that I learn the app's key features without reading documentation.
+- Acceptance criteria:
+  - [ ] The tour auto-launches on first run (tracked via `localStorage`).
+  - [ ] It can be replayed at any time from Settings → Tutorial.
+  - [ ] Each step spotlights a real UI element with a cutout, shows a titled tooltip, and supports Back / Next / Skip.
+  - [ ] Arrow keys, Enter, and Escape navigate or dismiss the tour.
+  - [ ] Steps are defined in a single `TUTORIAL_STEPS` array; adding a new step only requires an entry there.
+- Linked tests: _none (UI/onboarding; verified manually)_
+
+---
+
+## Feedback
+
+**US-045 — In-app feedback submission**
+- As a user, I want to send feedback without leaving the app or needing a GitHub account.
+- Acceptance criteria:
+  - [ ] The feedback modal submits directly to the `/api/feedback` endpoint.
+  - [ ] The submit button shows a "Sending…" state, then an in-modal success confirmation.
+  - [ ] On failure, an inline error message appears with the option to retry.
+- Linked tests: _none (UI/network; verified manually)_
+
+---
+
+## Distribution (continued)
+
+**US-046 — Windows platform**
+- As a Windows user, I want to download and install Lectio on Windows so that I can plan my semester without needing a Mac.
+- Acceptance criteria:
+  - [ ] `npm run build:win` produces a `Lectio-Setup.exe` NSIS installer and a `.zip` in `dist/`.
+  - [ ] The installer creates Desktop and Start Menu shortcuts and allows choosing the install directory.
+  - [ ] Auto-updates are delivered via `latest.yml` on GitHub Releases and applied by electron-updater.
+  - [ ] A `latest.yml` is published alongside the Windows assets in the release workflow.
+- Linked tests: _none (platform build; gated by CI in `release.yml`)_
+
+---
+
 ## Traceability matrix
 
 | Story  | Feature area        | Linked test file(s)                          | Status        |
@@ -358,8 +494,19 @@ Test references use the form `file › test name`.
 | US-033 | Adding courses      | semester.test.js (+ smoke)                   | partial       |
 | US-034 | Session restore     | — (Electron smoke)                           | not covered   |
 | US-035 | Session restore     | — (Electron smoke)                           | not covered   |
+| US-036 | Tags                | semester-manager.test.js, ipc.test.js, progress.test.js, status.test.js | covered |
+| US-037 | Tags                | status.test.js                               | partial       |
+| US-038 | Study Mode          | progress.test.js                             | partial       |
+| US-039 | Sort                | —                                            | not covered   |
+| US-040 | Focus mode          | —                                            | not covered   |
+| US-041 | Views               | —                                            | not covered   |
+| US-042 | Breakdown           | —                                            | not covered   |
+| US-043 | Tasks               | —                                            | not covered   |
+| US-044 | Onboarding          | —                                            | not covered   |
+| US-045 | Feedback            | —                                            | not covered   |
+| US-046 | Distribution        | — (gated by CI)                              | not covered   |
 
-**Coverage summary:** 12 covered, 4 partial, 19 not covered (35 stories). The
+**Coverage summary:** 12 covered, 6 partial, 28 not covered (46 stories). The
 Vitest suite focuses on the pure logic and filesystem/IPC layers in `lib/`
 (100% lines and functions; threshold 70%). UI, Electron-process, and packaging
 behaviours are validated manually or with hidden-window Electron smoke tests.
