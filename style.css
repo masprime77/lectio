@@ -423,13 +423,65 @@ body {
   border: none;
   text-transform: capitalize;
 }
-.badge.pending { background: var(--st-pending); }
-.badge.seen { background: var(--st-seen); }
-.badge.summarized { background: var(--st-summarized); }
-.badge.studied { background: var(--st-studied); }
-.badge.not.done, .badge.notdone { background: var(--st-notdone); }
-.badge.done { background: var(--st-done); }
-.badge.reviewed { background: var(--st-reviewed); }
+
+/* Tag dropdown */
+.tag-dropdown-wrapper { position: relative; display: inline-block; }
+.tag-trigger {
+  background: var(--tag-color, var(--border));
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+.tag-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 100;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  min-width: 140px;
+  padding: 0.3rem 0;
+}
+.tag-menu.hidden { display: none; }
+.tag-menu-section-label {
+  font-size: 0.7rem;
+  color: var(--muted);
+  padding: 0.35rem 0.75rem 0.15rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.tag-menu-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+.tag-menu-option:hover { background: var(--hover); }
+.tag-menu-option.active {
+  color: var(--tag-color, var(--primary));
+  font-weight: 700;
+}
+.tag-menu-option::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tag-color, transparent);
+  margin-right: 0.5rem;
+  vertical-align: middle;
+}
 
 .icon-btn {
   border: none;
