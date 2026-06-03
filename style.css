@@ -213,6 +213,22 @@ body.electron-app .header-inner { padding-left: 80px; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .header-controls { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+
+/* Uniform height for all header controls */
+.header-controls .btn,
+.header-controls .view-btn,
+.header-controls .collapse-btn,
+.header-controls .semester-select,
+.header-controls #sort-select,
+.header-controls .semester-action-btn,
+.header-controls .study-mode-btn {
+  height: 32px;
+  box-sizing: border-box;
+  padding-top: 0;
+  padding-bottom: 0;
+  display: inline-flex;
+  align-items: center;
+}
 .selector-group { display: flex; gap: 0.25rem; align-items: center; }
 
 /* Semester action buttons: paired pill that visually attaches to the select */
@@ -278,7 +294,7 @@ body.electron-app .header-inner { padding-left: 80px; }
 .btn:hover { background: var(--hover); }
 .btn-primary { background: var(--primary); color: var(--on-accent); border-color: var(--primary); }
 .btn-primary:hover { background: var(--primary-hover); }
-.btn-small { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
+.btn-small { padding: 0 0.55rem; font-size: 0.8rem; }
 .btn-icon-text {
   display: inline-flex;
   align-items: center;
