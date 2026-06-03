@@ -171,6 +171,13 @@ body.electron-app .header-inner { padding-left: 80px; }
 }
 
 .logo { font-size: 1.2rem; margin: 0; }
+.app-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  flex-shrink: 0;
+  display: block;
+}
 .header-left { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
 
 /* Save status indicator */
