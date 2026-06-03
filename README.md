@@ -32,40 +32,52 @@ it and follow **Next → Next → Install** (see
 ## Features
 
 - **Semester selector** — switch between all `.json` files in `semesters/`,
-  with inline **edit** and **delete** (the delete asks for confirmation).
-- **Two layouts** — toggle between **Week view** and **Course view**; the choice
-  is remembered in `localStorage`:
-  - *Week view* — weeks as collapsible sections (current week auto-expands),
+  with labelled **Edit** and **Delete** controls attached to the selector
+  (delete asks for confirmation).
+- **Two layouts** — toggle between **Weekly view** and **All Courses**; the
+  choice is remembered in `localStorage`:
+  - *Weekly view* — weeks as collapsible sections (current week auto-expands),
     with one card per course showing that week's readings and tasks.
-  - *Course view* — one column per course laid out side by side, each grouping
-    its readings and tasks under per-week dividers, with independent scrolling.
-- **Dashboard** — per-course progress bars and a current-week indicator.
-- **Status cycling** — click a badge to advance its status:
-  - Readings: `pending → seen → summarized → studied → pending`
-  - Tasks: `not done → done → reviewed → not done`
+  - *All Courses* — one column per course laid out side by side. Each column
+    groups its readings and tasks under collapsible per-week dividers (current
+    week auto-expanded). Columns scroll independently and are a uniform 300 px
+    wide.
+- **Dashboard** — per-course progress bars and a current-week indicator. Click
+  a course name to enter **focus mode**: that course's column centres and
+  widens while the others are dimmed. Click again (or press Esc) to exit.
+- **Custom tag system** — each semester defines its own reading tags and task
+  tags organised into *Pending* and *Done* sections. Clicking a status badge
+  opens a dropdown to pick any tag. Tags that count as "done" contribute to
+  course progress; protected tags ("pending" / "studied") cannot be renamed or
+  deleted, but can be recolored.
+- **Study Mode** — a header toggle (persisted across restarts) that narrows
+  progress to items tagged "studied" only. A green "Studied" shortcut appears
+  in the status dropdown while Study Mode is on.
+- **Sort control** — order courses by progress (↓/↑), alphabetically (A → Z /
+  Z → A), or by week (↑/↓); choice persists in `localStorage` and never
+  rewrites the JSON file.
 - **Inline editing** — click a title to rename, the `×` button to delete, and
   use the add row at the bottom of each section to add new readings/tasks.
-- **New / edit semester modal** — name, start date, week count, and courses with
-  colors; editing preserves each course's existing readings and tasks.
-- **Add courses anytime** — a persistent **+ Add course** button in the dashboard
-  and in both views (no need to create a new semester). Empty course columns and
-  week sections offer low-weight **+ Reading** / **+ Task** entry points.
-- **Autosave & manual save** — every change autosaves after a 500ms debounce,
+- **＋ New button** — one button opens the semester modal. The modal has four
+  tabs: *Semester* (name, start date, weeks), *Courses* (add/edit courses with
+  colors), *Tags* (manage reading and task tags per semester), and
+  *Reading / Task* (quickly add a reading or task to any course and week of the
+  current semester without leaving the modal).
+- **Autosave & manual save** — every change autosaves after a 500 ms debounce,
   with a header indicator (**Saving…** → **✓ Saved**). Save immediately with
   **⌘S / Ctrl+S** or **File → Save**. An **Unsaved changes** indicator and a
   save-before-quit prompt protect your work.
 - **Session restore** — on launch the app reopens the **last active semester**
   and the **last view** (falling back gracefully if that semester was deleted).
-- **Theme** — a header toggle cycles **Light → Dark → Auto**; Auto follows your
-  system's `prefers-color-scheme` (and updates live when it changes). The choice
-  is saved in `localStorage` and applied before first paint to avoid any flash.
+- **Theme** — select **Light**, **Dark**, or **Auto** in Settings (⌘,); Auto
+  follows your system's `prefers-color-scheme` and updates live. Applied before
+  first paint to avoid any flash.
 - **Typography** — [Inter](https://fonts.google.com/specimen/Inter) for body
   text and [Outfit](https://fonts.google.com/specimen/Outfit) for headings and
   course names, loaded from Google Fonts.
 - **Auto-updates** — the packaged app checks GitHub Releases on launch and
   downloads new versions in the background, showing a dismissible banner with a
   one-click **Restart to update**.
-- **Mobile-friendly**, English-only, clean minimal UI with inline Tabler icons.
 
 ## Development
 
@@ -298,8 +310,12 @@ Field reference:
   the "current week" indicator are computed from this.
 - `weeks` — total number of weeks in the semester.
 - `color` — any CSS color; used as the course card's accent and progress bar.
-- Reading `status` — `pending` | `seen` | `summarized` | `studied`.
-- Task `status` — `not done` | `done` | `reviewed`.
+- Reading `status` — a tag id from the semester's `readingTags` list
+  (e.g. `"r-pending"`, `"r-studied"`). Legacy strings (`"pending"`,
+  `"seen"`, etc.) are migrated automatically on load.
+- Task `status` — a tag id from the semester's `taskTags` list
+  (e.g. `"t-pending"`, `"t-done"`). Legacy strings (`"not done"`, `"done"`,
+  etc.) are migrated automatically on load.
 - All `id` values must be unique within their list.
 
 The directory is read each time the list loads, so a new file shows up in the
@@ -312,8 +328,10 @@ Releases are built and published automatically by CI:
 1. Bump `version` in `package.json` and commit.
 2. Push a matching tag, e.g. `git tag v1.0.1 && git push origin v1.0.1`.
 3. [`release.yml`](.github/workflows/release.yml) runs the full CI suite first
-   (`needs: ci`) and, only if it passes, builds on macOS and publishes the
-   `.dmg`, `.zip`, and **`latest-mac.yml`** to the GitHub Release for that tag.
+   (`needs: ci`) and, only if it passes, builds on macOS and Windows in parallel
+   and publishes the `.dmg`, `.zip`, and **`latest-mac.yml`** (macOS), and the
+   `.exe`, `.zip`, and **`latest.yml`** (Windows) to the GitHub Release for that
+   tag.
 
 To build locally without publishing, run `npm run build:mac` (artifacts land in
 `dist/`).

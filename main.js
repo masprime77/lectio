@@ -39,6 +39,7 @@ function createWindow() {
     height: 800,
     minWidth: 500,
     minHeight: 400,
+    titleBarStyle: 'hiddenInset',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
