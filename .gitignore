@@ -6,6 +6,8 @@ npm-debug.log*
 dist/
 coverage/
 assets/logo_raw/
+semesters/dev-test-semester.json
+
 
 # Secrets / credentials (defensive — none used today)
 .env
