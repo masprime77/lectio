@@ -1119,9 +1119,9 @@ const TUTORIAL_STEPS = [
   },
   {
     id: 'item-status',
-    title: 'Reading and task status',
+    title: 'Reading and task tags',
     description:
-      'Click any reading or task badge to cycle its status. Readings go: Pending → Seen → Summarized → Studied. Tasks go: Not done → Done → Reviewed.',
+      'Click any reading or task badge to open its tag menu and pick a tag. Default reading tags are Pending, Seen, Summarized, and Studied; tasks use Pending, Done, and Studied. Tags in the "done" group count toward progress, and you can add, rename, recolor, or reorder your own.',
     targetSelector: '#planner',
     setup: null,
   },
@@ -1137,7 +1137,7 @@ const TUTORIAL_STEPS = [
     id: 'study-mode',
     title: 'Study Mode',
     description:
-      'Study Mode recalculates progress counting only items marked "Studied" or "Reviewed" — useful during revision week. Toggle it on and off any time.',
+      'Study Mode recalculates progress counting only items tagged "Studied" — useful during revision week. Toggle it on and off any time.',
     targetSelector: '#study-mode-btn',
     setup: null,
   },
