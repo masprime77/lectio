@@ -1,5 +1,9 @@
 ## Unreleased
 
+- Added IPC handlers for exporting a single course (`export-course`) and a full semester (`export-semester`) to `.lectio.json` files, and for reading a `.lectio.json` file back (`import-file`).
+- Added native save/open file-dialog IPC handlers (`show-save-dialog`, `show-open-dialog`) scoped to the `.lectio.json` extension.
+- Exposed the new export/import and dialog methods on `window.planner` in the preload bridge.
+
 ## v1.7.0
 
 _Released: 2026-06-03_
