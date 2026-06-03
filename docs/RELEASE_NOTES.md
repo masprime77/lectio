@@ -7,6 +7,9 @@
 - Export semester writes the full semester (including tag definitions) to a `.lectio.json` file via a native save dialog.
 - Import semester reads a `.lectio.json` file and shows a confirmation modal to keep or reset reading/task statuses and, on an id clash, to replace the existing semester or save it as a new one.
 - Added drag-and-drop: dropping a `.lectio.json` file onto the window imports it as a semester or a course.
+- Added Edit, Export, Import, and Delete icon buttons to each course-column header in Course view.
+- Export course writes a single course (without tags) to a `.lectio.json` file via a native save dialog.
+- Import course adds a course from a `.lectio.json` file into the current semester with freshly generated ids.
 
 ## v1.7.0
 

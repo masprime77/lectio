@@ -199,7 +199,7 @@ async function flushSave() {
 const {
   getReadingTags, getTaskTags,
   isProtectedTag, addTag, deleteTag, editTag, reorderTags,
-  courseProgress, uid,
+  courseProgress, uid, deleteCourse,
 } = window.PlannerCore;
 
 // ---------------------------------------------------------------------------
@@ -692,9 +692,60 @@ function renderCourseView() {
 
     const header = document.createElement('div');
     header.className = 'course-column-header';
-    header.textContent = course.name;
-    header.title = course.name;
-    header.style.color = course.color;
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'course-column-header-name';
+    nameSpan.textContent = course.name;
+    nameSpan.title = course.name;
+    nameSpan.style.color = course.color;
+    header.appendChild(nameSpan);
+
+    // Edit (opens the semester editor, the existing way to rename/recolor a course)
+    const editBtn = document.createElement('button');
+    editBtn.className = 'icon-btn';
+    editBtn.innerHTML = icon('pencil');
+    editBtn.title = 'Edit semester (to rename/recolor this course)';
+    editBtn.addEventListener('click', () => openEditModal(state.semesterId));
+    header.appendChild(editBtn);
+
+    // Export
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'icon-btn';
+    exportBtn.innerHTML = icon('file-export');
+    exportBtn.title = 'Export course';
+    exportBtn.addEventListener('click', () => exportCourse(course));
+    header.appendChild(exportBtn);
+
+    // Import (imports a course into this semester, not "replace this course")
+    const importCourseBtn = document.createElement('button');
+    importCourseBtn.className = 'icon-btn';
+    importCourseBtn.innerHTML = icon('file-import');
+    importCourseBtn.title = 'Import a course into this semester';
+    importCourseBtn.addEventListener('click', async () => {
+      const { canceled, filePath } = await window.planner.showOpenDialog({ title: 'Import Course' });
+      if (canceled) return;
+      try {
+        const payload = await window.planner.importFile({ filePath });
+        await importCourse(payload);
+      } catch (err) {
+        alert('Could not read file: ' + (err.message || err));
+      }
+    });
+    header.appendChild(importCourseBtn);
+
+    // Delete
+    const delBtn = document.createElement('button');
+    delBtn.className = 'icon-btn btn-danger';
+    delBtn.innerHTML = icon('trash');
+    delBtn.title = 'Delete course';
+    delBtn.addEventListener('click', () => {
+      if (!confirm(`Delete course "${course.name}"? All its readings and tasks will be lost.`)) return;
+      deleteCourse(state.semester, course.id);
+      persist();
+      render();
+    });
+    header.appendChild(delBtn);
+
     col.appendChild(header);
 
     const body = document.createElement('div');
@@ -1660,6 +1711,66 @@ async function importSemester(parsedPayload) {
       resolve(true);
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+// Course export / import
+// ---------------------------------------------------------------------------
+async function exportCourse(course) {
+  const defaultName = (course.name || course.id).replace(/[^a-z0-9_-]/gi, '_') + '.lectio.json';
+  const { canceled, filePath } = await window.planner.showSaveDialog({
+    defaultName,
+    title: 'Export Course',
+  });
+  if (canceled) return;
+
+  // Export only the fields that belong to the course schema (no tags).
+  const clean = {
+    id: course.id,
+    name: course.name,
+    color: course.color,
+    readings: course.readings.map(({ id, week, title, status }) => ({ id, week, title, status })),
+    tasks: course.tasks.map(({ id, week, title, dueDate, status }) => ({ id, week, title, dueDate, status })),
+  };
+
+  try {
+    await window.planner.exportCourse({ filePath, course: clean });
+    showSaveStatus('Course exported', 2000);
+  } catch (err) {
+    alert('Export failed: ' + (err.message || err));
+  }
+}
+
+// parsedPayload is the already-parsed object returned by window.planner.importFile().
+async function importCourse(parsedPayload) {
+  if (!parsedPayload || parsedPayload._lectioType !== 'course') {
+    alert('This file is not a Lectio course export.');
+    return;
+  }
+  if (!state.semester) {
+    alert('No semester is currently open. Open or create a semester first.');
+    return;
+  }
+
+  const incoming = parsedPayload.course;
+  if (!incoming || !incoming.name) {
+    alert('The course file appears corrupt or invalid.');
+    return;
+  }
+
+  // Always assign a fresh id to avoid collisions within the current semester.
+  const newCourse = {
+    id: uid('course'),
+    name: incoming.name,
+    color: incoming.color || '#4A90D9',
+    readings: (incoming.readings || []).map((r) => ({ ...r, id: uid('r') })),
+    tasks: (incoming.tasks || []).map((t) => ({ ...t, id: uid('t') })),
+  };
+
+  state.semester.courses.push(newCourse);
+  persist();
+  render();
+  showSaveStatus(`Course "${newCourse.name}" imported`, 2000);
 }
 
 // Accept .lectio.json files dropped anywhere on the window (semester or course).
