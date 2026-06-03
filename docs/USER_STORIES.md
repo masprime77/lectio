@@ -328,7 +328,7 @@ Test references use the form `file › test name`.
   - [ ] Tags have `id`, `name`, `color`, and `section` (`pending`/`done`); done-section tags count toward progress.
   - [ ] Protected tag ids (`r-pending`, `r-studied`, `t-pending`, `t-studied`) cannot be renamed or deleted.
   - [ ] Legacy semesters are migrated on load: default tags added and status strings rewritten to tag ids.
-- Linked tests: `tests/unit/planner-core.test.js` (tag migration and progress with custom tags — verify the exact test names by reading the file)
+- Linked tests: `tests/unit/semester-manager.test.js › get-semester returns parsed JSON with default tags migrated in`; `tests/unit/semester-manager.test.js › migrateStatusToTagId rewrites legacy status strings to tag ids`; `tests/integration/ipc.test.js › get-semester migrates legacy reading/task statuses to tag ids`; `tests/unit/progress.test.js › counts readings whose tag is in the done section`; `tests/unit/status.test.js › isProtectedTag protects the pending and studied tags of each kind`
 
 **US-037 — Tag management UI**
 - As a student, I want to add, rename, recolor, and reorder tags from the semester editor so that I can keep my tag set up to date.
@@ -336,7 +336,7 @@ Test references use the form `file › test name`.
   - [ ] The semester modal has a Tags tab listing reading and task tags in their sections.
   - [ ] Custom tags can be added to any section, renamed, recolored, deleted, and dragged to reorder.
   - [ ] Protected tags show a locked name and disabled delete but allow recoloring.
-- Linked tests: _none (UI; verified manually)_
+- Linked tests: tag mutation logic covered by `tests/unit/status.test.js › addTag appends a tag with a generated reading-tag id`; `tests/unit/status.test.js › editTag renames and recolors an unprotected tag`; `tests/unit/status.test.js › editTag locks the name of a protected tag but allows recoloring`; `tests/unit/status.test.js › deleteTag refuses to delete a protected tag`; `tests/unit/status.test.js › reorderTags reorders the tag list to match the given ids`. The Tags-tab UI is verified manually.
 
 ---
 
@@ -349,7 +349,7 @@ Test references use the form `file › test name`.
   - [ ] While on, only items tagged with the "studied" tag id (`r-studied` / `t-studied`) count toward progress.
   - [ ] The status dropdown gains a distinct green "Studied" shortcut at the bottom while Study Mode is on.
   - [ ] Turning Study Mode off restores the normal progress calculation without modifying any item.
-- Linked tests: `tests/unit/progress.test.js` (study-mode variants — verify exact test names)
+- Linked tests: `tests/unit/progress.test.js › counts only studied tags for readings and tasks`; `tests/unit/progress.test.js › does NOT count other done-section tags when study mode is on`; `tests/unit/progress.test.js › does not count ghost items when study mode is on`; `tests/unit/progress.test.js › omitting the third arg behaves identically to studyMode=false` (header toggle + dropdown shortcut verified manually)
 
 ---
 
@@ -494,8 +494,8 @@ Test references use the form `file › test name`.
 | US-033 | Adding courses      | semester.test.js (+ smoke)                   | partial       |
 | US-034 | Session restore     | — (Electron smoke)                           | not covered   |
 | US-035 | Session restore     | — (Electron smoke)                           | not covered   |
-| US-036 | Tags                | planner-core.test.js                         | partial       |
-| US-037 | Tags                | —                                            | not covered   |
+| US-036 | Tags                | semester-manager.test.js, ipc.test.js, progress.test.js, status.test.js | covered |
+| US-037 | Tags                | status.test.js                               | partial       |
 | US-038 | Study Mode          | progress.test.js                             | partial       |
 | US-039 | Sort                | —                                            | not covered   |
 | US-040 | Focus mode          | —                                            | not covered   |
