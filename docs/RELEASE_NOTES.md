@@ -14,6 +14,11 @@
 - The New/Edit modal footer has tab-aware Import/Export buttons: on the Semester tab, Import brings in a full semester and Export (edit mode only) writes the current one; on the Courses tab, Import adds a course to the semester being built or edited; the Tags tab shows neither, since tags can't be imported/exported yet.
 - Importing a course from the Courses tab works in both create mode (adds a draft course row, kept with its readings/tasks on save) and edit mode (adds it to the live semester and refreshes the course list).
 - Editing the semester from a course column's pencil button or via "+ Add course" now opens the modal on the Courses tab instead of the Semester tab.
+- Docs: rewrote the README Features list to match the v1.7.0 feature set (Breakdown panel, focus mode, bulk collapse controls, custom tags, Study Mode, sort control, inline due-date editing, three-tab semester modal, onboarding tour, in-app feedback, per-OS auto-updates).
+- Docs: updated the README Download section to use the `Lectio-Setup.exe` artifact name and added the Homebrew one-line install command.
+- Docs: added the `icon:win` and `icons` npm scripts to the README icon-build commands.
+- Docs: added user stories US-036–US-046 (custom tags, tag management UI, Study Mode, sort control, focus mode, collapsible weeks, breakdown panel, inline due-date editing, onboarding tour, in-app feedback, Windows platform).
+- Docs: appended US-036–US-046 to the traceability matrix and updated the coverage summary to 12 covered / 6 partial / 28 not covered (46 stories).
 
 ## v1.7.0
 

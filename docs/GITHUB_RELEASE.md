@@ -1,7 +1,7 @@
 ---
-## What's new in v1.7.0
+## What's new in v1.8.0
 
-This release sharpens the planner and onboarding experience. You can now break down each course's progress into separate readings/tasks bars, edit a task's due date inline, and get walked through the app by an interactive tour on first run. The semester modal is leaner, and sending feedback no longer leaves the app.
+<!-- Fill in before releasing. -->
 
 ### Planner
 - Added a "Breakdown" toggle button to the dashboard header that opens an inline panel splitting each course's progress into separate readings and tasks mini-bars with done/total counts, plus a "Total" summary row for the whole semester; the panel respects the current sort order and Study Mode, and the existing progress bars are unchanged.
