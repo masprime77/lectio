@@ -191,6 +191,20 @@
       border-radius: 5px;
       font-size: 0.85em;
     }
+    /* ---- Windows warning ---- */
+    .win-note {
+      max-width: 620px;
+      margin: 1rem auto 0;
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      border-radius: var(--radius);
+      padding: 1rem 1.15rem;
+      text-align: left;
+      font-size: 0.92rem;
+      color: var(--text);
+    }
+    .win-note strong { color: var(--warn); }
+    .win-note p { margin: 0.5rem 0 0; }
     /* Placeholder block — replace the content, then optionally drop the dashed border. */
     .placeholder {
       margin-top: 0.75rem;
@@ -272,7 +286,7 @@
         <h1>Plan your semester, calmly.</h1>
         <p class="tagline">
           A minimal desktop app for tracking courses, weekly readings, and tasks —
-          with click-to-cycle status badges and per-course progress. No account, no
+          with customizable status badges and per-course progress. No account, no
           server: every semester is a plain file on your machine.
         </p>
 
@@ -339,6 +353,19 @@
             </p>
           </div>
         </div>
+
+        <div class="win-note">
+          <strong>⚠️ Windows: one extra step on first launch.</strong>
+          <p>
+            Lectio isn't signed with a verified publisher certificate, so Windows
+            SmartScreen blocks it the first time. This is expected.
+          </p>
+          <p>
+            In the SmartScreen dialog, click <strong>"More info"</strong> and then
+            <strong>"Run anyway"</strong> to proceed. You'll only need to do this once.
+          </p>
+        </div>
+
       </div>
     </section>
 
