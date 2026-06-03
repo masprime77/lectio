@@ -1414,6 +1414,12 @@ async function init() {
   document.getElementById('modal-import-btn').innerHTML =
     icon('file-import') + '<span>Import</span>';
 
+  // Import buttons inside the New/Edit modal tabs
+  document.getElementById('ns-import-semester-btn').innerHTML =
+    icon('file-import') + '<span>Import semester…</span>';
+  document.getElementById('ns-import-course-btn').innerHTML =
+    icon('file-import') + '<span>Import course…</span>';
+
   // Bulk expand/collapse controls (apply to whichever view is active)
   const expandAllBtn = document.getElementById('expand-all-btn');
   const collapseAllBtn = document.getElementById('collapse-all-btn');
@@ -1806,6 +1812,46 @@ function setupModal() {
   document.getElementById('modal-cancel').addEventListener('click', closeModal);
   document.getElementById('ns-add-course').addEventListener('click', () => addCourseField());
 
+  // Import semester from inside the New modal (Semester tab, create mode only).
+  document.getElementById('ns-import-semester-btn').addEventListener('click', async () => {
+    closeModal();
+    const { canceled, filePath } = await window.planner.showOpenDialog({
+      title: 'Import Semester',
+    });
+    if (canceled) return;
+    try {
+      const payload = await window.planner.importFile({ filePath });
+      await importSemester(payload);
+    } catch (err) {
+      alert('Could not read file: ' + (err.message || err));
+    }
+  });
+
+  // Import course from inside the New/Edit modal (Courses tab, both modes).
+  document.getElementById('ns-import-course-btn').addEventListener('click', async () => {
+    // In create mode there is no active semester yet, so we cannot import a course.
+    // Show a hint and do nothing else.
+    if (!state.editingId) {
+      alert('Create the semester first, then import courses from the Edit modal.');
+      return;
+    }
+    const { canceled, filePath } = await window.planner.showOpenDialog({
+      title: 'Import Course',
+    });
+    if (canceled) return;
+    try {
+      const payload = await window.planner.importFile({ filePath });
+      await importCourse(payload);
+      // Refresh the course rows so the newly imported course appears in the list.
+      const sem = state.semester;
+      const courses = document.getElementById('ns-courses');
+      courses.innerHTML = '';
+      sem.courses.forEach((c) => addCourseField(c));
+    } catch (err) {
+      alert('Could not read file: ' + (err.message || err));
+    }
+  });
+
   document.getElementById('modal-export-btn').addEventListener('click', () => {
     // Export the semester that is currently being edited. We close the modal
     // first so the save dialog isn't layered on top of it.
@@ -1928,6 +1974,7 @@ function openCreateModal() {
   document.getElementById('modal-overlay').classList.remove('hidden');
   document.getElementById('modal-export-btn').classList.add('hidden');
   document.getElementById('modal-import-btn').classList.add('hidden');
+  document.getElementById('ns-import-semester-btn').classList.remove('hidden');
 }
 
 // "+ Add course": open the existing semester editor with a fresh, focused
@@ -1965,6 +2012,7 @@ async function openEditModal(id) {
   document.getElementById('modal-overlay').classList.remove('hidden');
   document.getElementById('modal-export-btn').classList.remove('hidden');
   document.getElementById('modal-import-btn').classList.remove('hidden');
+  document.getElementById('ns-import-semester-btn').classList.add('hidden');
 }
 
 // `course` is optional; when given, the row is pre-filled and remembers its id

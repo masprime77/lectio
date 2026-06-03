@@ -12,6 +12,8 @@
 - Import course adds a course from a `.lectio.json` file into the current semester with freshly generated ids.
 - Added Export and Import buttons to the semester edit modal footer (shown only in edit mode), so a semester can be exported or imported without first closing the modal.
 - The header **New** button now opens an inline popover with "New semester" and "Import from file…" options, so a semester can be imported directly from the New button.
+- Added an "Import semester…" button to the New modal's Semester tab (create mode only) that runs the existing import-semester flow without leaving the modal.
+- Added an "Import course…" button to the New/Edit modal's Courses tab; in edit mode it imports a course into the live semester and refreshes the course rows, and in create mode it hints to create the semester first.
 
 ## v1.7.0
 
