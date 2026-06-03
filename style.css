@@ -465,6 +465,9 @@ body.electron-app .header-inner { padding-left: 80px; }
 }
 .bd-th-course { width: 35%; }
 .bd-th-type   { width: 32.5%; }
+/* Gutter between the Readings and Tasks columns. */
+.breakdown-table th:nth-child(3),
+.breakdown-table td:nth-child(3) { padding-left: 1.75rem; }
 .breakdown-table td { padding: 0.2rem 0; vertical-align: middle; }
 .bd-name {
   font-size: 0.82rem;
