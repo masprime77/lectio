@@ -1,4 +1,5 @@
-## v1.6.1
+## v1.6.2
+
 _Released: 2026-06-03_
 
 - Added a Windows SmartScreen first-launch warning to the landing page, explaining that the installer is unsigned and describing the "More info → Run anyway" workaround.
@@ -6,6 +7,7 @@ _Released: 2026-06-03_
 - Fixed the window being immovable under the `hiddenInset` title bar: the header is now a drag region, with interactive controls opted out so clicks still work.
 
 ## v1.6.0
+
 _Released: 2026-06-03_
 
 - Week sections inside each course column (All Courses view) are now collapsible via a chevron toggle; the current week is expanded by default and all others are collapsed, with each section's open/closed state persisted while navigating.
@@ -17,7 +19,7 @@ _Released: 2026-06-03_
 - Focused mode can also be exited by clicking the empty space around the column or pressing the Esc key.
 - Added a global "+ Add" button in the header (shown once a semester is loaded) that opens a modal for adding a reading or task to any course and week of the current semester, with a Reading/Task toggle (Task reveals an optional due-date field) and the current week pre-selected.
 - Added a header sort control to order courses by progress (↓/↑) or by their earliest week with content (↑/↓); the choice applies to the progress bars, course columns, and week-view cards, and persists across restarts (localStorage). Sorting is non-destructive — the underlying course order on disk is never changed.
-- The sort control bakes a "Sort: " prefix into each option label, so the active mode reads as "Sort: <mode>" directly in the select (no separate label element).
+- The sort control bakes a "Sort: " prefix into each option label, so the active mode reads as "Sort: `<mode>`" directly in the select (no separate label element).
 - Added alphabetical course sort options (A → Z and Z → A) to the sort control.
 - Scoped the progress and alphabetical sorts to the progress bar and All Courses columns only; the Weekly view keeps the original course order for those modes (only week sorts reorder it).
 - The Week ↓ sort now also reverses the order of the weeks themselves — weeks render N … 1 in both the Weekly view and inside each All Courses column (Week ↑ stays ascending).

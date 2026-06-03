@@ -1,5 +1,5 @@
 ---
-## What's new in v1.6.1
+## What's new in v1.6.2
 
 This is a patch release that fixes two regressions introduced by the v1.6.0 header redesign.
 
@@ -8,17 +8,14 @@ The small rounded logo next to the "Lectio" wordmark was missing in the packaged
 
 ### Window is draggable again
 Hiding the native title bar with `hiddenInset` left no drag region — every pixel of the header belonged to a button or select, making the window impossible to move. The header is now a native drag region, with interactive controls explicitly opted out so clicks still work normally.
-
 ---
-
 **Full changelog:** [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md)
 
-**macOS:** download `Lectio-arm64.dmg` below → drag to Applications.  
-**Windows:** download `Lectio-Setup.exe` below → Next → Next → Install.  
-**Homebrew:** `brew tap masprime77/tap && brew install --cask lectio`
+**macOS:** download `Lectio-arm64.dmg` below → drag to Applications.**Windows:** download `Lectio-Setup.exe` below → Next → Next → Install.**Homebrew:** `brew tap masprime77/tap && brew install --cask lectio`
 
-> First launch on macOS: right-click → Open (Gatekeeper), or run `xattr -cr /Applications/Lectio.app` in Terminal.  
+> First launch on macOS: right-click → Open (Gatekeeper), or run `xattr -cr /Applications/Lectio.app` in Terminal.
 > First launch on Windows: click **More info → Run anyway** (SmartScreen).
+
 ---
 
 <!--
