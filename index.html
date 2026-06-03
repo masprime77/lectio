@@ -61,10 +61,20 @@
           <option value="week-asc">Sort: Week ↑</option>
           <option value="week-desc">Sort: Week ↓</option>
         </select>
-        <button id="new-btn" class="btn btn-primary btn-icon-text">
-          <!-- icon injected by app.js -->
-          <span>New</span>
-        </button>
+        <div class="new-btn-wrapper">
+          <button id="new-btn" class="btn btn-primary btn-icon-text">
+            <!-- icon injected by app.js -->
+            <span>New</span>
+          </button>
+          <div id="new-btn-popover" class="new-btn-popover hidden" role="menu">
+            <button type="button" id="new-create-option" class="new-btn-option" role="menuitem">
+              <span>New semester</span>
+            </button>
+            <button type="button" id="new-import-option" class="new-btn-option" role="menuitem">
+              <span>Import from file…</span>
+            </button>
+          </div>
+        </div>
         <button id="feedback-btn" class="icon-btn" title="Feedback" aria-label="Feedback"></button>
         <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings"></button>
       </div>

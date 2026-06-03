@@ -1854,7 +1854,46 @@ function setupModal() {
 function setupNewBtn() {
   const btn = document.getElementById('new-btn');
   btn.innerHTML = icon('plus') + '<span>New</span>';
-  btn.addEventListener('click', openCreateModal);
+
+  const popover = document.getElementById('new-btn-popover');
+
+  // Inject icons into options
+  document.getElementById('new-create-option').prepend(
+    (() => { const s = document.createElement('span'); s.innerHTML = icon('plus'); return s; })()
+  );
+  document.getElementById('new-import-option').prepend(
+    (() => { const s = document.createElement('span'); s.innerHTML = icon('file-import'); return s; })()
+  );
+
+  // Toggle popover on #new-btn click
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    popover.classList.toggle('hidden');
+  });
+
+  // "New semester" option
+  document.getElementById('new-create-option').addEventListener('click', () => {
+    popover.classList.add('hidden');
+    openCreateModal();
+  });
+
+  // "Import from file…" option
+  document.getElementById('new-import-option').addEventListener('click', async () => {
+    popover.classList.add('hidden');
+    const { canceled, filePath } = await window.planner.showOpenDialog({
+      title: 'Import Semester',
+    });
+    if (canceled) return;
+    try {
+      const payload = await window.planner.importFile({ filePath });
+      await importSemester(payload);
+    } catch (err) {
+      alert('Could not read file: ' + (err.message || err));
+    }
+  });
+
+  // Close popover when clicking anywhere else
+  document.addEventListener('click', () => popover.classList.add('hidden'));
 }
 
 // Reset the modal to its first (Semester) tab — used whenever it opens.
