@@ -1,6 +1,9 @@
-## Unreleased
+## v1.6.1
+_Released: 2026-06-03_
 
 - Added a Windows SmartScreen first-launch warning to the landing page, explaining that the installer is unsigned and describing the "More info → Run anyway" workaround.
+- Fixed the broken header logo image: it now points to the always-bundled `assets/icon.png` so it renders in both development and the packaged app.
+- Fixed the window being immovable under the `hiddenInset` title bar: the header is now a drag region, with interactive controls opted out so clicks still work.
 
 ## v1.6.0
 _Released: 2026-06-03_
