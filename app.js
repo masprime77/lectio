@@ -15,6 +15,8 @@ const state = {
   sortOrder: restoreSort(), // course sort order — restored from last session
   studyMode: restoreStudyMode(), // Study Mode overlay — restored from last session
   breakdownOpen: false, // progress breakdown panel visibility
+  tutorialStep: 0,   // current step index (0-based)
+  tutorialActive: false, // whether the overlay is visible
 };
 
 // ---------------------------------------------------------------------------
@@ -57,6 +59,11 @@ function restoreSort() {
 // Restore the saved Study Mode toggle, defaulting to off.
 function restoreStudyMode() {
   return readPref('studyMode') === 'true';
+}
+
+// Whether the user has already seen (finished/skipped) the tutorial.
+function hasTutorialBeenSeen() {
+  return readPref('tutorialSeen') === 'true';
 }
 
 // ---------------------------------------------------------------------------
@@ -216,6 +223,8 @@ const ICONS = {
     '<path d="M9 9v-1a3 3 0 0 1 6 0v1" /><path d="M8 9h8a6 6 0 0 1 1 3v3a5 5 0 0 1 -10 0v-3a6 6 0 0 1 1 -3" /><path d="M3 13l4 0" /><path d="M17 13l4 0" /><path d="M12 20l0 -6" /><path d="M4 19l3.35 -2" /><path d="M20 19l-3.35 -2" /><path d="M4 7l3.75 2.4" /><path d="M20 7l-3.75 2.4" />',
   bulb:
     '<path d="M3 12h1m8 -9v1m8 8h1m-15.4 -6.4l.7 .7m12.1 -.7l-.7 .7" /><path d="M9 16a5 5 0 1 1 6 0a3.5 3.5 0 0 0 -1 3a2 2 0 0 1 -4 0a3.5 3.5 0 0 0 -1 -3" /><path d="M9.7 17l4.6 0" />',
+  school:
+    '<path d="M22 9l-10 -4l-10 4l10 4l10 -4v6" /><path d="M6 10.6v5.4a6 6 0 0 0 12 0v-5.4" />',
 };
 
 function icon(name) {
@@ -1060,6 +1069,272 @@ function addRow(type, course, week) {
 // ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Tutorial steps
+// To add a step for a new feature: append an object to this array.
+// Fields: id (string), title (string), description (string),
+//         targetSelector (CSS selector | null), setup (async fn | null).
+// Steps run in order; setup() is awaited before the overlay is shown.
+// ---------------------------------------------------------------------------
+const TUTORIAL_STEPS = [
+  {
+    id: 'welcome',
+    title: 'Welcome to Lectio',
+    description:
+      'Lectio helps you plan your university semester: courses, weekly readings, and tasks — all in one place. This quick tour will show you around. Click Next to begin.',
+    targetSelector: null,
+    setup: null,
+  },
+  {
+    id: 'example-semester',
+    title: 'Your semester',
+    description:
+      'This is the semester selector. Lectio comes with an example semester so you can explore right away. You can create your own with the "New" button.',
+    targetSelector: '#semester-select',
+    setup: async () => {
+      // Ensure the example semester (id "ss2025") is loaded, if it exists.
+      // If the user already has a different semester active, do nothing.
+      const list = await api.list();
+      const example = list.find((s) => s.id === 'ss2025');
+      if (example && state.semesterId !== 'ss2025') {
+        await loadSemester('ss2025');
+      }
+    },
+  },
+  {
+    id: 'dashboard',
+    title: 'Progress dashboard',
+    description:
+      'The dashboard shows each course with a progress bar. The percentage reflects how many readings and tasks are marked done. Click a course name to focus on it.',
+    targetSelector: '#dashboard',
+    setup: null,
+  },
+  {
+    id: 'views',
+    title: 'Two views',
+    description:
+      'Switch between Weekly view (readings and tasks grouped by week) and All Courses view (a column per course). Use the buttons in the header.',
+    targetSelector: '.view-toggle',
+    setup: null,
+  },
+  {
+    id: 'item-status',
+    title: 'Reading and task status',
+    description:
+      'Click any reading or task badge to cycle its status. Readings go: Pending → Seen → Summarized → Studied. Tasks go: Not done → Done → Reviewed.',
+    targetSelector: '#planner',
+    setup: null,
+  },
+  {
+    id: 'sort',
+    title: 'Sort courses',
+    description:
+      'Use the sort dropdown to reorder courses by progress, alphabetically, or by the week with the most pending work.',
+    targetSelector: '#sort-select',
+    setup: null,
+  },
+  {
+    id: 'study-mode',
+    title: 'Study Mode',
+    description:
+      'Study Mode recalculates progress counting only items marked "Studied" or "Reviewed" — useful during revision week. Toggle it on and off any time.',
+    targetSelector: '#study-mode-btn',
+    setup: null,
+  },
+  {
+    id: 'new-semester',
+    title: 'Create your own semester',
+    description:
+      'Ready to start planning? Click "New" to create a semester: give it a name, a start date, a number of weeks, and add your courses. You can always edit it later.',
+    targetSelector: '#new-btn',
+    setup: null,
+  },
+  {
+    id: 'done',
+    title: "You're all set",
+    description:
+      'That\'s everything you need to know. You can replay this tour any time from Settings → Tutorial. Good luck with your semester!',
+    targetSelector: null,
+    setup: null,
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Tutorial engine
+// ---------------------------------------------------------------------------
+
+function isTutorialElementVisible(selector) {
+  if (!selector) return true;
+  const el = document.querySelector(selector);
+  return !!el;
+}
+
+// Position the tooltip relative to the spotlight target.
+// Returns { top, left } in px, clamped to viewport with 12px margin.
+function tutorialTooltipPosition(targetEl) {
+  const PAD = 12; // gap between spotlight edge and tooltip
+  const MARGIN = 12; // minimum distance from viewport edge
+  const tooltip = document.getElementById('tutorial-tooltip');
+  if (!tooltip || !targetEl) {
+    // Centered
+    return {
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+    };
+  }
+  const tRect = targetEl.getBoundingClientRect();
+  const tipRect = tooltip.getBoundingClientRect();
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  // Prefer placing below; fall back to above; then right; then centered.
+  let top, left;
+  if (tRect.bottom + PAD + tipRect.height + MARGIN < vh) {
+    top = tRect.bottom + PAD;
+    left = tRect.left;
+  } else if (tRect.top - PAD - tipRect.height - MARGIN > 0) {
+    top = tRect.top - PAD - tipRect.height;
+    left = tRect.left;
+  } else if (tRect.right + PAD + tipRect.width + MARGIN < vw) {
+    top = tRect.top;
+    left = tRect.right + PAD;
+  } else {
+    top = vh / 2 - tipRect.height / 2;
+    left = vw / 2 - tipRect.width / 2;
+  }
+
+  // Clamp to viewport
+  left = Math.max(MARGIN, Math.min(left, vw - tipRect.width - MARGIN));
+  top  = Math.max(MARGIN, Math.min(top,  vh - tipRect.height - MARGIN));
+
+  return { top: top + 'px', left: left + 'px', transform: 'none' };
+}
+
+// Update the spotlight cutout on the overlay SVG.
+// Uses a <clipPath> approach: the overlay is a full-screen div with a hole.
+function updateSpotlight(targetEl) {
+  const overlay = document.getElementById('tutorial-overlay');
+  const spotlight = document.getElementById('tutorial-spotlight');
+  if (!spotlight) return;
+
+  if (!targetEl) {
+    spotlight.style.display = 'none';
+    return;
+  }
+
+  const rect = targetEl.getBoundingClientRect();
+  const RADIUS = 6; // px, rounded corners on spotlight
+  const PAD = 6;    // extra padding around target
+  const x = rect.left - PAD;
+  const y = rect.top  - PAD;
+  const w = rect.width  + PAD * 2;
+  const h = rect.height + PAD * 2;
+
+  spotlight.style.display = 'block';
+  spotlight.style.left   = x + 'px';
+  spotlight.style.top    = y + 'px';
+  spotlight.style.width  = w + 'px';
+  spotlight.style.height = h + 'px';
+  spotlight.style.borderRadius = RADIUS + 'px';
+}
+
+async function showTutorialStep(index) {
+  const step = TUTORIAL_STEPS[index];
+  if (!step) return;
+
+  // Run setup before showing UI.
+  if (step.setup) await step.setup();
+
+  const overlay   = document.getElementById('tutorial-overlay');
+  const tooltip   = document.getElementById('tutorial-tooltip');
+  const titleEl   = document.getElementById('tutorial-title');
+  const descEl    = document.getElementById('tutorial-desc');
+  const prevBtn   = document.getElementById('tutorial-prev');
+  const nextBtn   = document.getElementById('tutorial-next');
+  const skipBtn   = document.getElementById('tutorial-skip');
+  const counter   = document.getElementById('tutorial-counter');
+
+  titleEl.textContent = step.title;
+  descEl.textContent  = step.description;
+
+  const total = TUTORIAL_STEPS.length;
+  counter.textContent = `${index + 1} / ${total}`;
+
+  prevBtn.disabled = (index === 0);
+  const isLast = (index === total - 1);
+  nextBtn.textContent = isLast ? 'Finish' : 'Next';
+
+  // Spotlight
+  const targetEl = step.targetSelector
+    ? document.querySelector(step.targetSelector)
+    : null;
+  updateSpotlight(targetEl);
+
+  // Show overlay (must happen before we measure tooltip for positioning).
+  overlay.classList.remove('hidden');
+  tooltip.style.transform = 'none';
+
+  // Position tooltip after a frame so the browser has laid it out.
+  requestAnimationFrame(() => {
+    const pos = tutorialTooltipPosition(targetEl);
+    tooltip.style.top       = pos.top;
+    tooltip.style.left      = pos.left;
+    tooltip.style.transform = pos.transform;
+  });
+}
+
+function closeTutorial(markSeen = true) {
+  document.getElementById('tutorial-overlay').classList.add('hidden');
+  state.tutorialActive = false;
+  if (markSeen) writePref('tutorialSeen', 'true');
+}
+
+async function startTutorial() {
+  state.tutorialActive = true;
+  state.tutorialStep   = 0;
+  await showTutorialStep(0);
+}
+
+function setupTutorial() {
+  const overlay = document.getElementById('tutorial-overlay');
+  const prevBtn = document.getElementById('tutorial-prev');
+  const nextBtn = document.getElementById('tutorial-next');
+  const skipBtn = document.getElementById('tutorial-skip');
+
+  prevBtn.addEventListener('click', async () => {
+    if (state.tutorialStep > 0) {
+      state.tutorialStep--;
+      await showTutorialStep(state.tutorialStep);
+    }
+  });
+
+  nextBtn.addEventListener('click', async () => {
+    const isLast = state.tutorialStep === TUTORIAL_STEPS.length - 1;
+    if (isLast) {
+      closeTutorial(true);
+    } else {
+      state.tutorialStep++;
+      await showTutorialStep(state.tutorialStep);
+    }
+  });
+
+  skipBtn.addEventListener('click', () => closeTutorial(true));
+
+  // Keyboard navigation: Right/Enter = next, Left = prev, Escape = skip.
+  document.addEventListener('keydown', (e) => {
+    if (!state.tutorialActive) return;
+    if (e.key === 'Escape') { closeTutorial(true); return; }
+    if (e.key === 'ArrowRight' || e.key === 'Enter') {
+      // Prevent Enter from also triggering a focused button.
+      if (e.key === 'Enter' && document.activeElement &&
+          document.activeElement !== document.body) return;
+      nextBtn.click();
+    }
+    if (e.key === 'ArrowLeft') prevBtn.click();
+  });
+}
+
 async function init() {
   document.body.classList.add('electron-app');
 
@@ -1115,6 +1390,13 @@ async function init() {
   setupSettings();
   setupFeedback();
   setupAddItem();
+  setupTutorial();
+
+  // Auto-launch on first run (no tutorial seen and at least one semester exists).
+  if (!hasTutorialBeenSeen()) {
+    // Small delay so the UI is fully rendered before the overlay appears.
+    setTimeout(() => startTutorial(), 300);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1702,6 +1984,18 @@ async function openSettingsModal() {
     }
   }
   document.getElementById('set-version').textContent = version || '—';
+
+  // Tutorial button: closes settings and starts the tour.
+  const tutorialBtn = document.getElementById('set-tutorial-btn');
+  if (tutorialBtn) {
+    // Re-attach listener each open to avoid duplicates (remove old first).
+    const fresh = tutorialBtn.cloneNode(true);
+    tutorialBtn.replaceWith(fresh);
+    fresh.addEventListener('click', () => {
+      closeSettingsModal();
+      startTutorial();
+    });
+  }
 
   document.getElementById('settings-overlay').classList.remove('hidden');
 }

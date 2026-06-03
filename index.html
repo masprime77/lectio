@@ -76,6 +76,23 @@
     <section id="planner" class="planner"></section>
   </main>
 
+  <!-- Tutorial overlay -->
+  <div id="tutorial-overlay" class="tutorial-overlay hidden" role="dialog" aria-modal="true" aria-label="Tutorial">
+    <div id="tutorial-spotlight" class="tutorial-spotlight" aria-hidden="true"></div>
+    <div id="tutorial-tooltip" class="tutorial-tooltip" role="document">
+      <p id="tutorial-counter" class="tutorial-counter"></p>
+      <h3 id="tutorial-title"></h3>
+      <p id="tutorial-desc"></p>
+      <div class="tutorial-actions">
+        <button type="button" id="tutorial-skip" class="btn btn-small">Skip tour</button>
+        <div class="tutorial-nav">
+          <button type="button" id="tutorial-prev" class="btn btn-small">Back</button>
+          <button type="button" id="tutorial-next" class="btn btn-small btn-primary">Next</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- New semester modal -->
   <div id="modal-overlay" class="modal-overlay hidden">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
@@ -189,6 +206,11 @@
           <input type="checkbox" id="set-autoupdate" />
           <span class="slider"></span>
         </label>
+      </div>
+
+      <div class="settings-row">
+        <span class="settings-label">Tutorial</span>
+        <button type="button" id="set-tutorial-btn" class="btn btn-small">Start tour</button>
       </div>
 
       <div class="settings-row">
