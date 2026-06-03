@@ -1406,8 +1406,6 @@ async function init() {
 
   // Icon buttons in the header
   document.getElementById('edit-semester-btn').innerHTML = icon('pencil') + '<span style="font-size:0.75rem;margin-left:0.25rem;">Edit</span>';
-  document.getElementById('export-semester-btn').innerHTML = icon('file-export') + '<span style="font-size:0.75rem;margin-left:0.25rem;">Export</span>';
-  document.getElementById('import-semester-btn').innerHTML = icon('file-import') + '<span style="font-size:0.75rem;margin-left:0.25rem;">Import</span>';
   document.getElementById('delete-semester-btn').innerHTML = icon('trash') + '<span style="font-size:0.75rem;margin-left:0.25rem;">Delete</span>';
 
   // Export/Import buttons inside the semester edit/create modal footer
@@ -1443,17 +1441,6 @@ async function init() {
   });
   document.getElementById('edit-semester-btn').addEventListener('click', () => {
     if (state.semesterId) openEditModal(state.semesterId);
-  });
-  document.getElementById('export-semester-btn').addEventListener('click', exportSemester);
-  document.getElementById('import-semester-btn').addEventListener('click', async () => {
-    const { canceled, filePath } = await window.planner.showOpenDialog({ title: 'Import Semester' });
-    if (canceled) return;
-    try {
-      const payload = await window.planner.importFile({ filePath });
-      await importSemester(payload);
-    } catch (err) {
-      alert('Could not read file: ' + (err.message || err));
-    }
   });
   document.getElementById('delete-semester-btn').addEventListener('click', () => {
     if (state.semesterId) deleteSemester(state.semesterId);
@@ -1608,8 +1595,6 @@ function renderEmptyState() {
 
 function setSemesterActionsEnabled(enabled) {
   document.getElementById('edit-semester-btn').disabled = !enabled;
-  document.getElementById('export-semester-btn').disabled = !enabled;
-  document.getElementById('import-semester-btn').disabled = !enabled;
   document.getElementById('delete-semester-btn').disabled = !enabled;
 }
 
