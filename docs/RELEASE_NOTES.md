@@ -10,6 +10,7 @@
 - Added Edit, Export, Import, and Delete icon buttons to each course-column header in Course view.
 - Export course writes a single course (without tags) to a `.lectio.json` file via a native save dialog.
 - Import course adds a course from a `.lectio.json` file into the current semester with freshly generated ids.
+- Added Export and Import buttons to the semester edit modal footer (shown only in edit mode), so a semester can be exported or imported without first closing the modal.
 
 ## v1.7.0
 

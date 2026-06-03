@@ -1410,6 +1410,12 @@ async function init() {
   document.getElementById('import-semester-btn').innerHTML = icon('file-import') + '<span style="font-size:0.75rem;margin-left:0.25rem;">Import</span>';
   document.getElementById('delete-semester-btn').innerHTML = icon('trash') + '<span style="font-size:0.75rem;margin-left:0.25rem;">Delete</span>';
 
+  // Export/Import buttons inside the semester edit/create modal footer
+  document.getElementById('modal-export-btn').innerHTML =
+    icon('file-export') + '<span>Export</span>';
+  document.getElementById('modal-import-btn').innerHTML =
+    icon('file-import') + '<span>Import</span>';
+
   // Bulk expand/collapse controls (apply to whichever view is active)
   const expandAllBtn = document.getElementById('expand-all-btn');
   const collapseAllBtn = document.getElementById('collapse-all-btn');
@@ -1814,6 +1820,27 @@ function setupModal() {
   const overlay = document.getElementById('modal-overlay');
   document.getElementById('modal-cancel').addEventListener('click', closeModal);
   document.getElementById('ns-add-course').addEventListener('click', () => addCourseField());
+
+  document.getElementById('modal-export-btn').addEventListener('click', () => {
+    // Export the semester that is currently being edited. We close the modal
+    // first so the save dialog isn't layered on top of it.
+    closeModal();
+    exportSemester();
+  });
+
+  document.getElementById('modal-import-btn').addEventListener('click', async () => {
+    closeModal();
+    const { canceled, filePath } = await window.planner.showOpenDialog({
+      title: 'Import Semester',
+    });
+    if (canceled) return;
+    try {
+      const payload = await window.planner.importFile({ filePath });
+      await importSemester(payload);
+    } catch (err) {
+      alert('Could not read file: ' + (err.message || err));
+    }
+  });
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) closeModal();
   });
@@ -1875,6 +1902,8 @@ function openCreateModal() {
   renderTagsEditor(state.editingSemester);
   resetModalToFirstTab();
   document.getElementById('modal-overlay').classList.remove('hidden');
+  document.getElementById('modal-export-btn').classList.add('hidden');
+  document.getElementById('modal-import-btn').classList.add('hidden');
 }
 
 // "+ Add course": open the existing semester editor with a fresh, focused
@@ -1910,6 +1939,8 @@ async function openEditModal(id) {
   renderTagsEditor(sem);
   resetModalToFirstTab();
   document.getElementById('modal-overlay').classList.remove('hidden');
+  document.getElementById('modal-export-btn').classList.remove('hidden');
+  document.getElementById('modal-import-btn').classList.remove('hidden');
 }
 
 // `course` is optional; when given, the row is pre-filled and remembers its id

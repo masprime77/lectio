@@ -927,10 +927,14 @@ body.electron-app .header-inner { padding-left: 80px; }
 }
 .modal-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   gap: 0.5rem;
   margin-top: 1.25rem;
 }
+
+.modal-actions-left  { display: flex; gap: 0.5rem; }
+.modal-actions-right { display: flex; gap: 0.5rem; }
 
 /* Modal tabs */
 .modal-tabs {
