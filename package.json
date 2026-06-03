@@ -89,7 +89,8 @@
       "app.js",
       "style.css",
       "lib/",
-      "semesters/"
+      "semesters/",
+      "assets/icon.png"
     ],
     "extraResources": [
       {
