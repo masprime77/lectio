@@ -414,6 +414,101 @@ body.electron-app .header-inner { padding-left: 80px; }
 }
 .progress-fill { height: 100%; border-radius: 5px; transition: width 0.3s; }
 
+/* Dashboard header row (title + breakdown button) */
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
+.dashboard-header h2 { margin: 0; }
+
+/* Breakdown toggle button */
+.breakdown-toggle {
+  font-size: 0.78rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.breakdown-toggle:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.breakdown-toggle--active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+/* Breakdown panel */
+.breakdown-panel {
+  margin-top: 0.75rem;
+  margin-bottom: 0.5rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.65rem;
+}
+.breakdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+.breakdown-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted);
+  padding-bottom: 0.3rem;
+}
+.bd-th-course { width: 35%; }
+.bd-th-type   { width: 32.5%; }
+/* Gutter between the Readings and Tasks columns. */
+.breakdown-table th:nth-child(3),
+.breakdown-table td:nth-child(3) { padding-left: 1.75rem; }
+.breakdown-table td { padding: 0.2rem 0; vertical-align: middle; }
+.bd-name {
+  font-size: 0.82rem;
+  padding-right: 0.5rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 0; /* forces ellipsis in table layout */
+}
+.bd-cell { padding-right: 0.5rem; }
+.bd-cell-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.bd-mini-bar-wrap {
+  flex: 1;
+  height: 5px;
+  background: var(--track);
+  border-radius: 3px;
+  overflow: hidden;
+  min-width: 30px;
+}
+.bd-mini-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+.bd-mini-bar--summary { background: var(--primary); }
+.bd-pct {
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.bd-summary td {
+  border-top: 1px solid var(--border);
+  padding-top: 0.35rem;
+  font-weight: 600;
+}
+.bd-summary .bd-pct { color: var(--text); }
+
 /* Weeks */
 .week {
   background: var(--surface);
@@ -481,7 +576,38 @@ body.electron-app .header-inner { padding-left: 80px; }
 }
 .item:last-child { border-bottom: none; }
 .item-title { flex: 1; font-size: 0.9rem; }
-.item-due { font-size: 0.75rem; color: var(--muted); }
+/* Due date on tasks */
+.item-due {
+  font-size: 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.item-due:hover { color: var(--text); text-decoration: underline; }
+
+/* Inline date input (replaces the span while editing) */
+.item-due-input {
+  font-size: 0.75rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--primary);
+  border-radius: 4px;
+  padding: 0.05rem 0.3rem;
+  outline: none;
+  width: 7.5rem;
+}
+
+/* "＋ date" affordance — hidden at rest, visible on row hover */
+.item-add-due {
+  font-size: 0.72rem;
+  color: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.1s;
+  user-select: none;
+}
+.item:hover .item-add-due { color: var(--muted); }
+.item-add-due:hover { color: var(--primary) !important; }
 
 /* Status badges */
 .badge {
@@ -920,6 +1046,18 @@ body.electron-app .header-inner { padding-left: 80px; }
   color: var(--muted);
   font-size: 0.8rem;
 }
+.feedback-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.5rem 0;
+  text-align: center;
+  color: var(--text);
+}
+.feedback-success span { font-size: 2rem; }
+.feedback-success p { margin: 0; font-size: 0.95rem; }
 
 /* Theme segmented control (Settings modal) */
 .theme-segmented {
@@ -987,4 +1125,68 @@ body.electron-app .header-inner { padding-left: 80px; }
   .view-toggle { flex: 1; }
   .view-btn { flex: 1; }
   .course-column { flex-basis: 82vw; max-width: 82vw; }
+}
+
+/* Tutorial */
+.tutorial-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  pointer-events: auto;
+  background: transparent;   /* scrim is produced by spotlight box-shadow */
+}
+.tutorial-overlay.hidden { display: none; }
+
+/* The "spotlight" is a cutout — a bright rounded rect that shows the target
+   element through the dark scrim. Achieved by making the element itself bright
+   with a large box-shadow that creates the dark surround. */
+.tutorial-spotlight {
+  position: fixed;
+  background: transparent;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+  border-radius: 6px;
+  pointer-events: none;
+  transition: top 0.25s ease, left 0.25s ease, width 0.25s ease, height 0.25s ease;
+  z-index: 301;
+}
+
+.tutorial-tooltip {
+  position: fixed;
+  z-index: 302;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.25rem 1rem;
+  max-width: 320px;
+  min-width: 240px;
+  box-shadow: var(--shadow);
+  transition: top 0.2s ease, left 0.2s ease;
+}
+.tutorial-tooltip h3 {
+  margin: 0 0 0.45rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.tutorial-tooltip p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.tutorial-counter {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin: 0 0 0.3rem !important;
+}
+.tutorial-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.9rem;
+  gap: 0.5rem;
+}
+.tutorial-nav {
+  display: flex;
+  gap: 0.4rem;
 }

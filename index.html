@@ -76,16 +76,32 @@
     <section id="planner" class="planner"></section>
   </main>
 
+  <!-- Tutorial overlay -->
+  <div id="tutorial-overlay" class="tutorial-overlay hidden" role="dialog" aria-modal="true" aria-label="Tutorial">
+    <div id="tutorial-spotlight" class="tutorial-spotlight" aria-hidden="true"></div>
+    <div id="tutorial-tooltip" class="tutorial-tooltip" role="document">
+      <p id="tutorial-counter" class="tutorial-counter"></p>
+      <h3 id="tutorial-title"></h3>
+      <p id="tutorial-desc"></p>
+      <div class="tutorial-actions">
+        <button type="button" id="tutorial-skip" class="btn btn-small">Skip tour</button>
+        <div class="tutorial-nav">
+          <button type="button" id="tutorial-prev" class="btn btn-small">Back</button>
+          <button type="button" id="tutorial-next" class="btn btn-small btn-primary">Next</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- New semester modal -->
   <div id="modal-overlay" class="modal-overlay hidden">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-      <h2 id="modal-title">Create New Semester</h2>
+      <h2 id="modal-title">New</h2>
       <form id="new-semester-form">
         <div class="modal-tabs">
           <button type="button" class="modal-tab active" data-tab="semester">Semester</button>
           <button type="button" class="modal-tab" data-tab="courses">Courses</button>
           <button type="button" class="modal-tab" data-tab="tags">Tags</button>
-          <button type="button" class="modal-tab" data-tab="add-item">Reading / Task</button>
         </div>
 
         <!-- Tab: Semester -->
@@ -151,50 +167,6 @@
           </div>
         </div>
 
-        <!-- Tab: Reading / Task (quick-add, mirrors the standalone modal) -->
-        <div class="modal-tab-panel hidden" data-panel="add-item">
-
-          <div class="add-item-type-toggle" style="margin-bottom:0.75rem;">
-            <button type="button" id="ns-add-item-type-reading" class="btn btn-small add-item-type-btn active">Reading</button>
-            <button type="button" id="ns-add-item-type-task"    class="btn btn-small add-item-type-btn">Task</button>
-          </div>
-
-          <label>
-            Course
-            <select id="ns-add-item-course"
-              style="display:block;width:100%;margin-top:0.25rem;padding:0.5rem;
-                     border:1px solid var(--border);border-radius:6px;
-                     font-size:0.9rem;color:var(--text);background:var(--surface);"></select>
-          </label>
-
-          <label style="display:block;margin-top:0.75rem;">
-            Week
-            <select id="ns-add-item-week"
-              style="display:block;width:100%;margin-top:0.25rem;padding:0.5rem;
-                     border:1px solid var(--border);border-radius:6px;
-                     font-size:0.9rem;color:var(--text);background:var(--surface);"></select>
-          </label>
-
-          <label style="display:block;margin-top:0.75rem;">
-            Title
-            <input type="text" id="ns-add-item-title" placeholder="Title…"
-              style="display:block;width:100%;margin-top:0.25rem;" />
-          </label>
-
-          <label id="ns-add-item-due-row" style="display:none;margin-top:0.75rem;">
-            Due date (optional)
-            <input type="date" id="ns-add-item-due"
-              style="display:block;width:100%;margin-top:0.25rem;" />
-          </label>
-
-          <span id="ns-add-item-error" class="hidden"
-            style="display:block;font-size:0.8rem;color:var(--danger);margin-top:0.4rem;"></span>
-
-          <div class="modal-actions" style="margin-top:1rem;">
-            <button type="button" id="ns-add-item-submit" class="btn btn-primary">Add</button>
-          </div>
-        </div>
-
         <div class="modal-actions">
           <button type="button" id="modal-cancel" class="btn">Cancel</button>
           <button type="submit" id="modal-submit" class="btn btn-primary">Create</button>
@@ -237,6 +209,11 @@
       </div>
 
       <div class="settings-row">
+        <span class="settings-label">Tutorial</span>
+        <button type="button" id="set-tutorial-btn" class="btn btn-small">Start tour</button>
+      </div>
+
+      <div class="settings-row">
         <span class="settings-label">Version</span>
         <span class="settings-value" id="set-version">—</span>
       </div>
@@ -251,23 +228,30 @@
         <button id="feedback-close" class="icon-btn" aria-label="Close feedback"></button>
       </div>
 
-      <div class="feedback-type-toggle">
-        <button type="button" id="feedback-type-bug" class="btn feedback-type-btn active">🐛 Bug report</button>
-        <button type="button" id="feedback-type-feature" class="btn feedback-type-btn">💡 Feature request</button>
+      <div id="feedback-form-body">
+        <div class="feedback-type-toggle">
+          <button type="button" id="feedback-type-bug" class="btn feedback-type-btn active">🐛 Bug report</button>
+          <button type="button" id="feedback-type-feature" class="btn feedback-type-btn">💡 Feature request</button>
+        </div>
+
+        <label for="feedback-input-title">Title
+          <input type="text" id="feedback-input-title" placeholder="Short title…" />
+        </label>
+        <label for="feedback-input-body">Description
+          <textarea id="feedback-input-body" rows="5" placeholder="Describe the bug or feature in detail…"></textarea>
+        </label>
+
+        <span id="feedback-error" class="hidden">Title and description are required.</span>
       </div>
 
-      <label for="feedback-input-title">Title
-        <input type="text" id="feedback-input-title" placeholder="Short title…" />
-      </label>
-      <label for="feedback-input-body">Description
-        <textarea id="feedback-input-body" rows="5" placeholder="Describe the bug or feature in detail…"></textarea>
-      </label>
+      <div id="feedback-success" class="hidden feedback-success">
+        <span>✅</span>
+        <p>Feedback sent — thank you!</p>
+      </div>
 
-      <span id="feedback-error" class="hidden">Title and description are required.</span>
-
-      <div class="feedback-actions">
+      <div id="feedback-actions" class="feedback-actions">
         <button type="button" id="feedback-cancel" class="btn">Cancel</button>
-        <button type="button" id="feedback-submit" class="btn btn-primary">Open in GitHub →</button>
+        <button type="button" id="feedback-submit" class="btn btn-primary">Send</button>
       </div>
 
       <p class="feedback-footer">Lectio <span id="feedback-version">—</span></p>

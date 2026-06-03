@@ -1,3 +1,16 @@
+## Unreleased
+
+## v1.7.0
+
+_Released: 2026-06-03_
+
+- Added a "Breakdown" toggle button to the dashboard header that opens an inline panel splitting each course's progress into separate readings and tasks mini-bars with done/total counts, plus a "Total" summary row for the whole semester; the panel respects the current sort order and Study Mode, and the existing progress bars are unchanged.
+- Added inline editing of a task's due date directly in the planner: tasks with a date show a clickable "due YYYY-MM-DD" that opens an inline date picker (committing on blur/Enter, cancelling on Escape, clearing the field removes the date), and tasks without one reveal a "＋ date" affordance on row hover to set one.
+- Removed the "Reading / Task" quick-add tab from the semester modal (the standalone "Add reading / task" modal is unaffected).
+- Renamed the semester modal title in create mode from "Create New Semester" to "New".
+- Added an interactive onboarding tour that auto-launches on first run and can be replayed any time from Settings → Start tour: each step spotlights a real UI element with a cutout, shows a titled tooltip, and supports Back/Next/Skip plus keyboard navigation (arrows, Enter, Escape). Steps live in a single `TUTORIAL_STEPS` array so new features only need an entry there (see `docs/TUTORIAL_STEPS.md`).
+- Replaced the feedback flow's GitHub redirect with a direct submission to the Vercel `/api/feedback` endpoint, so feedback is sent without leaving the app or needing a GitHub account; the submit button now shows a "Sending…" state, then an in-modal success confirmation, with inline error recovery on failure.
+
 ## v1.6.2
 
 _Released: 2026-06-03_
