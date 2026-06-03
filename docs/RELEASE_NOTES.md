@@ -18,7 +18,7 @@
 - Docs: updated the README Download section to use the `Lectio-Setup.exe` artifact name and added the Homebrew one-line install command.
 - Docs: added the `icon:win` and `icons` npm scripts to the README icon-build commands.
 - Docs: added user stories US-036–US-046 (custom tags, tag management UI, Study Mode, sort control, focus mode, collapsible weeks, breakdown panel, inline due-date editing, onboarding tour, in-app feedback, Windows platform).
-- Docs: appended US-036–US-046 to the traceability matrix and updated the coverage summary to 12 covered / 6 partial / 28 not covered (46 stories).
+- Docs: appended US-036–US-046 to the traceability matrix, corrected the US-036/US-037/US-038 test references to the real test files (`semester-manager.test.js`, `ipc.test.js`, `progress.test.js`, `status.test.js`), and updated the coverage summary to 12 covered / 6 partial / 28 not covered (46 stories).
 
 ## v1.7.0
 
