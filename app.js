@@ -888,8 +888,8 @@ async function init() {
   document.body.classList.add('electron-app');
 
   // Icon buttons in the header
-  document.getElementById('edit-semester-btn').innerHTML = icon('pencil');
-  document.getElementById('delete-semester-btn').innerHTML = icon('trash');
+  document.getElementById('edit-semester-btn').innerHTML = icon('pencil') + '<span style="font-size:0.75rem;margin-left:0.25rem;">Edit</span>';
+  document.getElementById('delete-semester-btn').innerHTML = icon('trash') + '<span style="font-size:0.75rem;margin-left:0.25rem;">Delete</span>';
 
   // Bulk expand/collapse controls (apply to whichever view is active)
   const expandAllBtn = document.getElementById('expand-all-btn');
