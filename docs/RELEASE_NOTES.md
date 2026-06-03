@@ -3,6 +3,10 @@
 - Added IPC handlers for exporting a single course (`export-course`) and a full semester (`export-semester`) to `.lectio.json` files, and for reading a `.lectio.json` file back (`import-file`).
 - Added native save/open file-dialog IPC handlers (`show-save-dialog`, `show-open-dialog`) scoped to the `.lectio.json` extension.
 - Exposed the new export/import and dialog methods on `window.planner` in the preload bridge.
+- Added Export and Import buttons to the semester selector (order: Edit → Export → Import → Delete).
+- Export semester writes the full semester (including tag definitions) to a `.lectio.json` file via a native save dialog.
+- Import semester reads a `.lectio.json` file and shows a confirmation modal to keep or reset reading/task statuses and, on an id clash, to replace the existing semester or save it as a new one.
+- Added drag-and-drop: dropping a `.lectio.json` file onto the window imports it as a semester or a course.
 
 ## v1.7.0
 
