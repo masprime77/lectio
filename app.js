@@ -290,9 +290,17 @@ function render() {
 function sortedCourses(courses) {
   const copy = [...courses];
   if (state.sortOrder === 'progress-asc')
-    return copy.sort((a, b) => courseProgress(a, state.semester) - courseProgress(b, state.semester));
+    return copy.sort(
+      (a, b) =>
+        courseProgress(a, state.semester, state.studyMode) -
+        courseProgress(b, state.semester, state.studyMode)
+    );
   if (state.sortOrder === 'progress-desc')
-    return copy.sort((a, b) => courseProgress(b, state.semester) - courseProgress(a, state.semester));
+    return copy.sort(
+      (a, b) =>
+        courseProgress(b, state.semester, state.studyMode) -
+        courseProgress(a, state.semester, state.studyMode)
+    );
   if (state.sortOrder === 'alpha-desc')
     return copy.sort((a, b) => b.name.localeCompare(a.name));
   // alpha-asc, week-asc and week-desc all use alphabetical (A → Z) order.
@@ -328,7 +336,7 @@ function renderDashboard() {
     bars = '<div class="week-empty">No courses yet.</div>';
   } else {
     sortedCourses(sem.courses).forEach((course) => {
-      const pct = courseProgress(course, sem);
+      const pct = courseProgress(course, sem, state.studyMode);
       let rowClass = 'progress-row';
       if (state.focusedCourseId) {
         rowClass += state.focusedCourseId === course.id
@@ -722,6 +730,31 @@ function renderItemList(items, type, course, week) {
         menu.appendChild(opt);
       });
     });
+
+    // In Study Mode, add a distinct "Studied" shortcut below Done. The studied
+    // tag still appears in the Done section above — this is an extra entry.
+    if (state.studyMode) {
+      const studiedId = type === 'reading' ? 'r-studied' : 't-studied';
+      const studiedTag = tags.find((t) => t.id === studiedId);
+      if (studiedTag) {
+        const sep = document.createElement('div');
+        sep.className = 'tag-menu-section-label tag-menu-studied-label';
+        sep.textContent = 'Studied';
+        menu.appendChild(sep);
+
+        const opt = document.createElement('button');
+        opt.className = 'tag-menu-option' + (item.status === studiedId ? ' active' : '');
+        opt.textContent = studiedTag.name;
+        opt.style.setProperty('--tag-color', studiedTag.color);
+        opt.addEventListener('click', (e) => {
+          e.stopPropagation();
+          item.status = studiedId;
+          persist();
+          render();
+        });
+        menu.appendChild(opt);
+      }
+    }
 
     trigger.addEventListener('click', (e) => {
       e.stopPropagation();

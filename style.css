@@ -494,6 +494,12 @@ body {
   margin-right: 0.5rem;
   vertical-align: middle;
 }
+.tag-menu-studied-label {
+  color: #22c55e;
+  border-top: 1px solid var(--border);
+  margin-top: 0.25rem;
+  padding-top: 0.5rem;
+}
 
 .icon-btn {
   border: none;
