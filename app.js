@@ -1109,92 +1109,6 @@ function setupModal() {
       }
     });
   });
-
-  // ── "Reading / Task" tab: quick-add inline in the New modal ──────────
-  let nsAddItemType = 'reading';
-
-  function setNsAddItemType(t) {
-    nsAddItemType = t;
-    document.getElementById('ns-add-item-type-reading').classList.toggle('active', t === 'reading');
-    document.getElementById('ns-add-item-type-task').classList.toggle('active', t === 'task');
-    document.getElementById('ns-add-item-due-row').style.display = t === 'task' ? 'block' : 'none';
-  }
-
-  document.getElementById('ns-add-item-type-reading').addEventListener('click', () => setNsAddItemType('reading'));
-  document.getElementById('ns-add-item-type-task').addEventListener('click', () => setNsAddItemType('task'));
-
-  // Populate course + week selects when the tab becomes visible.
-  document.querySelectorAll('.modal-tab').forEach((tab) => {
-    tab.addEventListener('click', () => {
-      if (tab.dataset.tab !== 'add-item') return;
-      // Populate courses
-      const courseSelect = document.getElementById('ns-add-item-course');
-      courseSelect.innerHTML = '';
-      if (state.semester) {
-        state.semester.courses.forEach((c) => {
-          const opt = document.createElement('option');
-          opt.value = c.id;
-          opt.textContent = c.name;
-          courseSelect.appendChild(opt);
-        });
-      }
-      // Populate weeks
-      const weekSelect = document.getElementById('ns-add-item-week');
-      weekSelect.innerHTML = '';
-      const total = state.semester ? state.semester.weeks : 15;
-      const cw = state.semester ? currentWeek(state.semester) : 0;
-      for (let w = 1; w <= total; w++) {
-        const opt = document.createElement('option');
-        opt.value = w;
-        opt.textContent = 'Week ' + w;
-        if (w === cw) opt.selected = true;
-        weekSelect.appendChild(opt);
-      }
-      // Reset form
-      document.getElementById('ns-add-item-title').value = '';
-      document.getElementById('ns-add-item-due').value = '';
-      document.getElementById('ns-add-item-error').classList.add('hidden');
-      setNsAddItemType('reading');
-    });
-  });
-
-  document.getElementById('ns-add-item-submit').addEventListener('click', () => {
-    const titleVal = document.getElementById('ns-add-item-title').value.trim();
-    const courseId = document.getElementById('ns-add-item-course').value;
-    const week = parseInt(document.getElementById('ns-add-item-week').value, 10);
-    const errorEl = document.getElementById('ns-add-item-error');
-
-    if (!titleVal || !courseId || !week) {
-      errorEl.textContent = 'Course, week, and title are required.';
-      errorEl.classList.remove('hidden');
-      return;
-    }
-    errorEl.classList.add('hidden');
-
-    const course = state.semester.courses.find((c) => c.id === courseId);
-    if (!course) return;
-
-    if (nsAddItemType === 'reading') {
-      course.readings.push({ id: uid('r'), week, title: titleVal, status: 'r-pending' });
-    } else {
-      course.tasks.push({
-        id: uid('t'),
-        week,
-        title: titleVal,
-        dueDate: document.getElementById('ns-add-item-due').value || '',
-        status: 't-pending',
-      });
-    }
-
-    persist();
-    render();
-
-    // Reset for the next add
-    document.getElementById('ns-add-item-title').value = '';
-    document.getElementById('ns-add-item-due').value = '';
-    document.getElementById('ns-add-item-title').focus();
-  });
-  // ── end "Reading / Task" tab ──────────────────────────────────────────
 }
 
 // The header "＋ New" button opens the semester-creation modal.
@@ -1217,7 +1131,7 @@ function closeModal() {
 // Open the modal in "create" mode (blank form, one empty course row).
 function openCreateModal() {
   state.editingId = null;
-  document.getElementById('modal-title').textContent = 'Create New Semester';
+  document.getElementById('modal-title').textContent = 'New';
   document.getElementById('modal-submit').textContent = 'Create';
   const form = document.getElementById('new-semester-form');
   form.reset();

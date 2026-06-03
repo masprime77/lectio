@@ -1,3 +1,8 @@
+## Unreleased
+
+- Removed the "Reading / Task" quick-add tab from the semester modal (the standalone "Add reading / task" modal is unaffected).
+- Renamed the semester modal title in create mode from "Create New Semester" to "New".
+
 ## v1.6.2
 
 _Released: 2026-06-03_
