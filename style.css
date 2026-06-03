@@ -147,6 +147,23 @@ body {
   top: 0;
   z-index: 10;
 }
+/* Window drag region: the whole header is draggable… */
+.header { -webkit-app-region: drag; }
+/* …except every interactive element inside it, which must opt out. */
+.header button,
+.header select,
+.header input,
+.header a,
+.header label,
+.header .logo,
+.header .app-logo,
+.header .save-status,
+.header .view-toggle,
+.header .collapse-toggle,
+.header .semester-actions,
+.header .theme-segmented {
+  -webkit-app-region: no-drag;
+}
 .header-inner {
   max-width: 100%;
   margin: 0 auto;
