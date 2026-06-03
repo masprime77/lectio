@@ -14,6 +14,7 @@ const state = {
   focusedCourseId: null, // null = normal All Courses layout; course id = focused mode
   sortOrder: restoreSort(), // course sort order — restored from last session
   studyMode: restoreStudyMode(), // Study Mode overlay — restored from last session
+  breakdownOpen: false, // progress breakdown panel visibility
 };
 
 // ---------------------------------------------------------------------------
@@ -316,6 +317,35 @@ function sortedCoursesForWeekView(courses) {
   return [...courses]; // preserve original order
 }
 
+// Returns { readings: {done, total}, tasks: {done, total} } for one course.
+// Mirrors the logic of courseProgress() but split by type.
+function courseBreakdown(course, sem, studyMode) {
+  const readings = (course && course.readings) || [];
+  const tasks    = (course && course.tasks)    || [];
+
+  let doneR, doneT;
+  if (studyMode) {
+    doneR = readings.filter((r) => r.status === 'r-studied').length;
+    doneT = tasks.filter((t)   => t.status === 't-studied').length;
+  } else {
+    const rTags    = getReadingTags(sem || {});
+    const tTags    = getTaskTags(sem    || {});
+    const rDoneIds = new Set(rTags.filter((t) => t.section === 'done').map((t) => t.id));
+    const tDoneIds = new Set(tTags.filter((t) => t.section === 'done').map((t) => t.id));
+    doneR = readings.filter(
+      (r) => rDoneIds.has(r.status) || (r.status === '__deleted__' && r._ghostSection === 'done')
+    ).length;
+    doneT = tasks.filter(
+      (t) => tDoneIds.has(t.status) || (t.status === '__deleted__' && t._ghostSection === 'done')
+    ).length;
+  }
+
+  return {
+    readings: { done: doneR, total: readings.length },
+    tasks:    { done: doneT, total: tasks.length    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Dashboard: per-course progress + current week indicator
 // (courseProgress comes from lib/planner-core.js)
@@ -325,7 +355,16 @@ function renderDashboard() {
   const root = document.getElementById('dashboard');
   const cw = currentWeek(sem);
 
-  const heading = `<h2>${sem.name}</h2>`;
+  const breakdownBtnLabel = state.breakdownOpen ? 'Hide Breakdown' : 'Breakdown';
+  const breakdownBtnActive = state.breakdownOpen ? ' breakdown-toggle--active' : '';
+  const heading = `
+    <div class="dashboard-header">
+      <h2>${escapeHtml(sem.name)}</h2>
+      <button class="breakdown-toggle${breakdownBtnActive}" id="breakdown-btn"
+              title="Show readings vs tasks progress" aria-expanded="${state.breakdownOpen}">
+        ${breakdownBtnLabel}
+      </button>
+    </div>`;
   const weekLine = cw
     ? `<div class="current-week">Current week: <strong>Week ${cw}</strong> of ${sem.weeks}</div>`
     : `<div class="current-week">Semester not currently in session (${sem.weeks} weeks total)</div>`;
@@ -356,6 +395,90 @@ function renderDashboard() {
   }
 
   root.innerHTML = heading + weekLine + bars;
+
+  // Render the breakdown panel if open.
+  if (state.breakdownOpen && sem.courses.length > 0) {
+    const panel = document.createElement('div');
+    panel.className = 'breakdown-panel';
+    panel.setAttribute('role', 'region');
+    panel.setAttribute('aria-label', 'Progress breakdown');
+
+    // Build table rows
+    let totalRDone = 0, totalRAll = 0, totalTDone = 0, totalTAll = 0;
+    let rows = '';
+    sortedCourses(sem.courses).forEach((course) => {
+      const bd = courseBreakdown(course, sem, state.studyMode);
+      totalRDone += bd.readings.done;
+      totalRAll  += bd.readings.total;
+      totalTDone += bd.tasks.done;
+      totalTAll  += bd.tasks.total;
+
+      const rPct = bd.readings.total > 0
+        ? Math.round((bd.readings.done / bd.readings.total) * 100) : 0;
+      const tPct = bd.tasks.total > 0
+        ? Math.round((bd.tasks.done   / bd.tasks.total)   * 100) : 0;
+
+      rows += `
+        <tr>
+          <td class="bd-name" style="color:${escapeHtml(course.color)}">${escapeHtml(course.name)}</td>
+          <td class="bd-cell">
+            <div class="bd-mini-bar-wrap">
+              <div class="bd-mini-bar" style="width:${rPct}%;background:${escapeHtml(course.color)}"></div>
+            </div>
+            <span class="bd-pct">${bd.readings.done}/${bd.readings.total}</span>
+          </td>
+          <td class="bd-cell">
+            <div class="bd-mini-bar-wrap">
+              <div class="bd-mini-bar" style="width:${tPct}%;background:${escapeHtml(course.color)}"></div>
+            </div>
+            <span class="bd-pct">${bd.tasks.done}/${bd.tasks.total}</span>
+          </td>
+        </tr>`;
+    });
+
+    // Summary row
+    const srPct = totalRAll > 0 ? Math.round((totalRDone / totalRAll) * 100) : 0;
+    const stPct = totalTAll > 0 ? Math.round((totalTDone / totalTAll) * 100) : 0;
+    const summaryRow = `
+      <tr class="bd-summary">
+        <td class="bd-name">Total</td>
+        <td class="bd-cell">
+          <div class="bd-mini-bar-wrap">
+            <div class="bd-mini-bar bd-mini-bar--summary" style="width:${srPct}%"></div>
+          </div>
+          <span class="bd-pct">${totalRDone}/${totalRAll} (${srPct}%)</span>
+        </td>
+        <td class="bd-cell">
+          <div class="bd-mini-bar-wrap">
+            <div class="bd-mini-bar bd-mini-bar--summary" style="width:${stPct}%"></div>
+          </div>
+          <span class="bd-pct">${totalTDone}/${totalTAll} (${stPct}%)</span>
+        </td>
+      </tr>`;
+
+    panel.innerHTML = `
+      <table class="breakdown-table" aria-label="Readings and tasks breakdown">
+        <thead>
+          <tr>
+            <th class="bd-th-course">Course</th>
+            <th class="bd-th-type">Readings</th>
+            <th class="bd-th-type">Tasks</th>
+          </tr>
+        </thead>
+        <tbody>${rows}${summaryRow}</tbody>
+      </table>`;
+
+    root.appendChild(panel);
+  }
+
+  // Wire up the breakdown toggle button.
+  const breakdownBtn = root.querySelector('#breakdown-btn');
+  if (breakdownBtn) {
+    breakdownBtn.addEventListener('click', () => {
+      state.breakdownOpen = !state.breakdownOpen;
+      renderDashboard();
+    });
+  }
 
   // Wire up clickable course names: toggle focused single-course mode.
   root.querySelectorAll('.progress-row').forEach((row) => {

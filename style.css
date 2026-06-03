@@ -414,6 +414,98 @@ body.electron-app .header-inner { padding-left: 80px; }
 }
 .progress-fill { height: 100%; border-radius: 5px; transition: width 0.3s; }
 
+/* Dashboard header row (title + breakdown button) */
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
+.dashboard-header h2 { margin: 0; }
+
+/* Breakdown toggle button */
+.breakdown-toggle {
+  font-size: 0.78rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.breakdown-toggle:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.breakdown-toggle--active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+/* Breakdown panel */
+.breakdown-panel {
+  margin-top: 0.75rem;
+  margin-bottom: 0.5rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.65rem;
+}
+.breakdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+.breakdown-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted);
+  padding-bottom: 0.3rem;
+}
+.bd-th-course { width: 35%; }
+.bd-th-type   { width: 32.5%; }
+.breakdown-table td { padding: 0.2rem 0; vertical-align: middle; }
+.bd-name {
+  font-size: 0.82rem;
+  padding-right: 0.5rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 0; /* forces ellipsis in table layout */
+}
+.bd-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding-right: 0.5rem;
+}
+.bd-mini-bar-wrap {
+  flex: 1;
+  height: 5px;
+  background: var(--track);
+  border-radius: 3px;
+  overflow: hidden;
+  min-width: 30px;
+}
+.bd-mini-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+.bd-mini-bar--summary { background: var(--primary); }
+.bd-pct {
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.bd-summary td {
+  border-top: 1px solid var(--border);
+  padding-top: 0.35rem;
+  font-weight: 600;
+}
+.bd-summary .bd-pct { color: var(--text); }
+
 /* Weeks */
 .week {
   background: var(--surface);
