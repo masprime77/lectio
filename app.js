@@ -2071,6 +2071,7 @@ function setupFeedback() {
     try {
       await submitFeedback(feedbackKind, title, body, feedbackVersion);
       // Show success state
+      submitBtn.textContent = 'Sent';
       document.getElementById('feedback-form-body').classList.add('hidden');
       document.getElementById('feedback-success').classList.remove('hidden');
     } catch (err) {
