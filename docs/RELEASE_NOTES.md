@@ -1,4 +1,5 @@
-## Unreleased
+## v1.6.0
+_Released: 2026-06-03_
 
 - Week sections inside each course column (All Courses view) are now collapsible via a chevron toggle; the current week is expanded by default and all others are collapsed, with each section's open/closed state persisted while navigating.
 - Added header controls to bulk expand all, collapse all, or expand only the current week; the buttons act on whichever layout is active (Weekly view or All Courses view).
