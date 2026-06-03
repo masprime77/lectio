@@ -170,8 +170,20 @@
         </div>
 
         <div class="modal-actions">
-          <button type="button" id="modal-cancel" class="btn">Cancel</button>
-          <button type="submit" id="modal-submit" class="btn btn-primary">Create</button>
+          <div class="modal-actions-left">
+            <button type="button" id="modal-export-btn" class="btn btn-small btn-icon-text hidden"
+                    title="Export this semester to a .lectio.json file">
+              <!-- icon injected by app.js -->
+            </button>
+            <button type="button" id="modal-import-btn" class="btn btn-small btn-icon-text hidden"
+                    title="Import a .lectio.json semester file">
+              <!-- icon injected by app.js -->
+            </button>
+          </div>
+          <div class="modal-actions-right">
+            <button type="button" id="modal-cancel" class="btn">Cancel</button>
+            <button type="submit" id="modal-submit" class="btn btn-primary">Create</button>
+          </div>
         </div>
       </form>
     </div>
