@@ -1,3 +1,7 @@
+## Unreleased
+
+- Added a Windows SmartScreen first-launch warning to the landing page, explaining that the installer is unsigned and describing the "More info → Run anyway" workaround.
+
 ## v1.6.0
 _Released: 2026-06-03_
 
