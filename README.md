@@ -25,59 +25,77 @@ can also browse the [releases page](https://github.com/masprime77/lectio/release
 or install via [Homebrew](#install-via-homebrew-tap).
 
 **[⬇ Download for Windows](https://github.com/masprime77/lectio/releases/latest)** —
-grab the `Lectio Setup <version>.exe` installer from the **latest** release. Run
-it and follow **Next → Next → Install** (see
+grab `Lectio-Setup.exe` from the latest release page. Run it and follow
+**Next → Next → Install** (see
 [First launch on Windows](#first-launch-on-windows-smartscreen) the first time).
+
+Or install on macOS via Homebrew:
+
+```bash
+brew tap masprime77/tap && brew install --cask lectio
+```
 
 ## Features
 
-- **Semester selector** — switch between all `.json` files in `semesters/`,
-  with labelled **Edit** and **Delete** controls attached to the selector
-  (delete asks for confirmation).
-- **Two layouts** — toggle between **Weekly view** and **All Courses**; the
-  choice is remembered in `localStorage`:
-  - *Weekly view* — weeks as collapsible sections (current week auto-expands),
-    with one card per course showing that week's readings and tasks.
-  - *All Courses* — one column per course laid out side by side. Each column
-    groups its readings and tasks under collapsible per-week dividers (current
-    week auto-expanded). Columns scroll independently and are a uniform 300 px
-    wide.
-- **Dashboard** — per-course progress bars and a current-week indicator. Click
-  a course name to enter **focus mode**: that course's column centres and
-  widens while the others are dimmed. Click again (or press Esc) to exit.
+- **Semester selector** — switch between all `.json` semesters with labelled
+  Edit and Delete controls; delete requires confirmation.
+- **Two layouts** — toggle between **Weekly view** and **All Courses**; choice
+  persists in `localStorage`:
+  - *Weekly view* — collapsible week sections (current week auto-expands);
+    one card per course showing that week's readings and tasks.
+  - *All Courses* — one column per course (uniform 300 px, independent scroll).
+    Each column groups readings and tasks under collapsible per-week dividers
+    (current week auto-expanded). Long course names truncated with a tooltip.
+- **Dashboard** — per-course progress bars and current-week indicator.
+  Click a course name to enter **focus mode** (column centres and widens,
+  others dim). Click again or press Esc to exit.
+  The **Breakdown** toggle opens an inline panel showing separate
+  readings and tasks mini-bars with done/total counts per course, plus a Total
+  summary row for the semester.
+- **Bulk collapse controls** — Expand all / Collapse all / Expand current week
+  buttons in the header act on whichever layout is active.
 - **Custom tag system** — each semester defines its own reading tags and task
-  tags organised into *Pending* and *Done* sections. Clicking a status badge
-  opens a dropdown to pick any tag. Tags that count as "done" contribute to
-  course progress; protected tags ("pending" / "studied") cannot be renamed or
-  deleted, but can be recolored.
-- **Study Mode** — a header toggle (persisted across restarts) that narrows
-  progress to items tagged "studied" only. A green "Studied" shortcut appears
-  in the status dropdown while Study Mode is on.
+  tags grouped into *Pending* and *Done* sections. Clicking a status badge opens
+  a dropdown to pick any tag. Done-section tags count toward progress. Protected
+  tags ("pending" / "studied") cannot be renamed or deleted but can be recolored.
+  Custom tags can be added, renamed, recolored, and dragged to reorder in the
+  Tags tab of the semester modal.
+- **Study Mode** — header toggle (persisted) that narrows progress to items
+  tagged "studied" only. A green "Studied" shortcut appears at the bottom of the
+  status dropdown while Study Mode is on.
 - **Sort control** — order courses by progress (↓/↑), alphabetically (A → Z /
-  Z → A), or by week (↑/↓); choice persists in `localStorage` and never
-  rewrites the JSON file.
-- **Inline editing** — click a title to rename, the `×` button to delete, and
-  use the add row at the bottom of each section to add new readings/tasks.
-- **＋ New button** — one button opens the semester modal. The modal has four
-  tabs: *Semester* (name, start date, weeks), *Courses* (add/edit courses with
-  colors), *Tags* (manage reading and task tags per semester), and
-  *Reading / Task* (quickly add a reading or task to any course and week of the
-  current semester without leaving the modal).
-- **Autosave & manual save** — every change autosaves after a 500 ms debounce,
-  with a header indicator (**Saving…** → **✓ Saved**). Save immediately with
+  Z → A), or by week (↑/↓). Persists in `localStorage`; never rewrites the JSON
+  file. Progress and alphabetical sorts apply to the dashboard and All Courses
+  view; week sorts also reorder the weeks themselves.
+- **Inline editing** — click a title to rename; `×` to delete; add rows at the
+  bottom of each section for new readings/tasks.
+- **Inline due-date editing** — tasks with a due date show a clickable
+  "due YYYY-MM-DD" badge that opens an inline date picker (commit on blur/Enter,
+  cancel on Escape, clear the field to remove the date). Tasks without one reveal
+  a "＋ date" affordance on row hover.
+- **＋ New button** — opens the semester modal, which has three tabs:
+  *Semester* (name, start date, number of weeks), *Courses* (add/edit/reorder
+  courses with accent colors), and *Tags* (manage reading and task tags).
+- **Autosave & manual save** — every change autosaves after a 500 ms debounce
+  with a header **Saving… → ✓ Saved** indicator. Save immediately with
   **⌘S / Ctrl+S** or **File → Save**. An **Unsaved changes** indicator and a
-  save-before-quit prompt protect your work.
-- **Session restore** — on launch the app reopens the **last active semester**
-  and the **last view** (falling back gracefully if that semester was deleted).
-- **Theme** — select **Light**, **Dark**, or **Auto** in Settings (⌘,); Auto
-  follows your system's `prefers-color-scheme` and updates live. Applied before
-  first paint to avoid any flash.
+  save-before-quit dialog protect your work.
+- **Session restore** — reopens the last active semester and view on launch;
+  falls back gracefully if the semester was deleted.
+- **Onboarding tour** — auto-launches on first run; replay any time via
+  Settings → Tutorial. Each step spotlights a real UI element with a cutout
+  and tooltip; supports Back / Next / Skip and keyboard navigation.
+- **Feedback** — send feedback directly from the app without leaving it or
+  needing a GitHub account.
+- **Theme** — select **Light**, **Dark**, or **Auto** in Settings (⌘,).
+  Auto follows `prefers-color-scheme` and updates live; applied before first
+  paint to avoid any flash.
 - **Typography** — [Inter](https://fonts.google.com/specimen/Inter) for body
   text and [Outfit](https://fonts.google.com/specimen/Outfit) for headings and
   course names, loaded from Google Fonts.
-- **Auto-updates** — the packaged app checks GitHub Releases on launch and
-  downloads new versions in the background, showing a dismissible banner with a
-  one-click **Restart to update**.
+- **Auto-updates** — checks GitHub Releases on launch and downloads updates in
+  the background; shows a dismissible banner with a one-click **Restart to
+  update** (macOS via `latest-mac.yml`, Windows via `latest.yml`).
 
 ## Development
 
@@ -191,7 +209,9 @@ hook notarizes automatically.
 Replace `assets/icon.png` (1024×1024) with your artwork, then rebuild the `.icns`:
 
 ```bash
-npm run icon   # assets/icon.png → assets/icon.icns (via sips + iconutil)
+npm run icon       # assets/icon.png → assets/icon.icns (macOS: sips + iconutil)
+npm run icon:win   # assets/icon.png → assets/icon.ico (cross-platform, Node 20+)
+npm run icons      # rebuild both icon.icns and icon.ico
 ```
 
 Commit both files and ship the new icon in the next release. Full details (the
