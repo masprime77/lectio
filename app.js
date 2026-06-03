@@ -9,6 +9,7 @@ const state = {
   openWeeks: new Set(), // weeks currently expanded
   openCourseWeeks: {}, // "courseId-week" -> true when that course-view week is expanded
   editingId: null,    // semester id being edited in the modal (null = create mode)
+  editingSemester: null, // semester object the modal's Tags tab edits (live or draft)
   view: restoreView(), // 'week' | 'course' — restored from last session
   focusedCourseId: null, // null = normal All Courses layout; course id = focused mode
   sortOrder: restoreSort(), // course sort order — restored from last session
@@ -1041,6 +1042,27 @@ function setupModal() {
     e.preventDefault();
     submitModal();
   });
+
+  // Tab switching between Semester / Courses / Tags panels.
+  document.querySelectorAll('.modal-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.modal-tab').forEach((t) => t.classList.remove('active'));
+      document.querySelectorAll('.modal-tab-panel').forEach((p) => p.classList.add('hidden'));
+      tab.classList.add('active');
+      document
+        .querySelector(`.modal-tab-panel[data-panel="${tab.dataset.tab}"]`)
+        .classList.remove('hidden');
+      if (tab.dataset.tab === 'tags' && state.editingSemester) {
+        renderTagsEditor(state.editingSemester);
+      }
+    });
+  });
+}
+
+// Reset the modal to its first (Semester) tab — used whenever it opens.
+function resetModalToFirstTab() {
+  document.querySelectorAll('.modal-tab').forEach((t, i) => t.classList.toggle('active', i === 0));
+  document.querySelectorAll('.modal-tab-panel').forEach((p, i) => p.classList.toggle('hidden', i !== 0));
 }
 
 function closeModal() {
@@ -1057,6 +1079,15 @@ function openCreateModal() {
   document.getElementById('ns-weeks').value = 15;
   document.getElementById('ns-courses').innerHTML = '';
   addCourseField();
+  // Draft tag sets (independent clones of the defaults) the Tags tab edits;
+  // they become the new semester's tags on create.
+  state.editingSemester = {
+    readingTags: JSON.parse(JSON.stringify(getReadingTags({}))),
+    taskTags: JSON.parse(JSON.stringify(getTaskTags({}))),
+    courses: [],
+  };
+  renderTagsEditor(state.editingSemester);
+  resetModalToFirstTab();
   document.getElementById('modal-overlay').classList.remove('hidden');
 }
 
@@ -1088,6 +1119,10 @@ async function openEditModal(id) {
   courses.innerHTML = '';
   if (sem.courses.length) sem.courses.forEach((c) => addCourseField(c));
   else addCourseField();
+  // The Tags tab edits this semester object live (persisted on each change).
+  state.editingSemester = sem;
+  renderTagsEditor(sem);
+  resetModalToFirstTab();
   document.getElementById('modal-overlay').classList.remove('hidden');
 }
 
@@ -1153,7 +1188,15 @@ async function submitModal() {
       else courses.push({ id: uid('course'), name: cname, color, readings: [], tasks: [] });
     });
 
-    const semester = { id: state.editingId, name, startDate, weeks, courses };
+    const semester = {
+      id: state.editingId,
+      name,
+      startDate,
+      weeks,
+      courses,
+      readingTags: getReadingTags(base),
+      taskTags: getTaskTags(base),
+    };
     await api.save(state.editingId, semester);
     closeModal();
     await populateSelector();
@@ -1181,11 +1224,168 @@ async function submitModal() {
   let n = 2;
   while (ids.has(id)) id = `${slugify(name)}-${n++}`;
 
-  const semester = { id, name, startDate, weeks, courses };
+  const draft = state.editingSemester || {};
+  const semester = {
+    id,
+    name,
+    startDate,
+    weeks,
+    courses,
+    readingTags: getReadingTags(draft),
+    taskTags: getTaskTags(draft),
+  };
   await api.save(id, semester);
   closeModal();
   await populateSelector();
   await loadSemester(id);
+}
+
+// ---------------------------------------------------------------------------
+// Tags tab: per-semester reading/task tag management (add, rename, recolor,
+// delete, reorder). Protected tags (pending/studied) lock their name, deletion
+// and position. Edits mutate the semester object and persist immediately.
+// ---------------------------------------------------------------------------
+function renderTagsEditor(semester) {
+  ['reading', 'task'].forEach((type) => {
+    const tags = type === 'reading' ? getReadingTags(semester) : getTaskTags(semester);
+    ['pending', 'done'].forEach((section) => {
+      const listId = type + '-tags-' + section + '-list';
+      const list = document.getElementById(listId);
+      if (!list) return;
+      list.innerHTML = '';
+      tags
+        .filter((t) => t.section === section)
+        .forEach((tag) => list.appendChild(buildTagRow(semester, type, tag)));
+      setupTagDragDrop(list, semester, type);
+    });
+  });
+  wireAddTagButtons(semester);
+}
+
+function buildTagRow(semester, type, tag) {
+  const li = document.createElement('li');
+  li.className = 'tag-row';
+  li.dataset.tagId = tag.id;
+
+  const isProtected = isProtectedTag(tag.id);
+
+  // Drag handle — disabled (non-draggable) for protected tags.
+  const handle = document.createElement('span');
+  handle.className = 'tag-drag-handle' + (isProtected ? ' tag-drag-handle--locked' : '');
+  handle.innerHTML = '⠿';
+  handle.title = isProtected ? 'Protected tag — cannot be reordered' : 'Drag to reorder';
+
+  // Color picker.
+  const colorPicker = document.createElement('input');
+  colorPicker.type = 'color';
+  colorPicker.value = tag.color;
+  colorPicker.addEventListener('change', () => {
+    editTag(semester, type, tag.id, { color: colorPicker.value });
+    persist();
+  });
+
+  // Name input — disabled for protected tags.
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.value = tag.name;
+  nameInput.className = 'tag-name-input';
+  if (isProtected) {
+    nameInput.disabled = true;
+    nameInput.title = 'This tag cannot be renamed';
+  } else {
+    nameInput.addEventListener('blur', () => {
+      const v = nameInput.value.trim();
+      if (v) editTag(semester, type, tag.id, { name: v });
+      persist();
+    });
+  }
+
+  // Delete button — disabled for protected tags.
+  const delBtn = document.createElement('button');
+  delBtn.type = 'button';
+  delBtn.className = 'icon-btn';
+  delBtn.innerHTML = icon('x');
+  delBtn.title = isProtected ? 'Protected tag — cannot be deleted' : 'Delete tag';
+  delBtn.disabled = isProtected;
+  if (isProtected) {
+    delBtn.style.opacity = '0.3';
+  } else {
+    delBtn.addEventListener('click', () => {
+      deleteTag(semester, type, tag.id);
+      persist();
+      renderTagsEditor(semester);
+    });
+  }
+
+  li.appendChild(handle);
+  li.appendChild(colorPicker);
+  li.appendChild(nameInput);
+  li.appendChild(delBtn);
+  return li;
+}
+
+function setupTagDragDrop(list, semester, type) {
+  let dragSrc = null;
+
+  list.addEventListener('dragstart', (e) => {
+    const li = e.target.closest('li');
+    if (!li || isProtectedTag(li.dataset.tagId)) {
+      e.preventDefault();
+      return;
+    }
+    dragSrc = li;
+    dragSrc.classList.add('dragging');
+  });
+
+  list.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    const target = e.target.closest('li');
+    if (!target || target === dragSrc) return;
+    // Cannot drop onto or past a protected tag.
+    if (isProtectedTag(target.dataset.tagId)) return;
+    const rect = target.getBoundingClientRect();
+    if (e.clientY < rect.top + rect.height / 2) list.insertBefore(dragSrc, target);
+    else list.insertBefore(dragSrc, target.nextSibling);
+  });
+
+  list.addEventListener('dragend', () => {
+    if (dragSrc) dragSrc.classList.remove('dragging');
+    dragSrc = null;
+    // Collect ordered ids from ALL lists for this type, then reorder.
+    const allLists = document.querySelectorAll('[id^="' + type + '-tags-"][id$="-list"]');
+    const orderedIds = [...allLists].flatMap((l) =>
+      [...l.querySelectorAll('li')].map((li) => li.dataset.tagId)
+    );
+    reorderTags(semester, type, orderedIds);
+    persist();
+  });
+
+  // Only non-protected rows are draggable.
+  list.querySelectorAll('li').forEach((li) => {
+    li.draggable = !isProtectedTag(li.dataset.tagId);
+  });
+}
+
+function wireAddTagButtons(semester) {
+  [
+    { btnId: 'add-reading-pending-tag', type: 'reading', section: 'pending' },
+    { btnId: 'add-reading-done-tag', type: 'reading', section: 'done' },
+    { btnId: 'add-task-pending-tag', type: 'task', section: 'pending' },
+    { btnId: 'add-task-done-tag', type: 'task', section: 'done' },
+  ].forEach(({ btnId, type, section }) => {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    // Clone to drop any previous listener bound to a stale semester object.
+    btn.replaceWith(btn.cloneNode(true));
+    document.getElementById(btnId).addEventListener('click', () => {
+      const name = prompt('Tag name:');
+      if (!name || !name.trim()) return;
+      const color = section === 'pending' ? '#f97316' : '#3b82f6';
+      addTag(semester, type, { name: name.trim(), color, section });
+      persist();
+      renderTagsEditor(semester);
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------

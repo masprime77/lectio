@@ -710,6 +710,67 @@ body {
   margin-top: 1.25rem;
 }
 
+/* Modal tabs */
+.modal-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.5rem;
+}
+.modal-tab {
+  background: none;
+  border: none;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.modal-tab.active {
+  background: var(--primary);
+  color: var(--on-accent);
+}
+
+/* Tags editor */
+.tags-editor-section { margin-bottom: 1.25rem; }
+.tags-editor-section h3 { font-size: 0.9rem; margin-bottom: 0.5rem; }
+.tags-section-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin: 0.5rem 0 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.tags-sortable-list { list-style: none; padding: 0; margin: 0 0 0.5rem; }
+.tag-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+  border-radius: 4px;
+}
+.tag-row.dragging { opacity: 0.4; }
+.tag-drag-handle {
+  cursor: grab;
+  color: var(--muted);
+  font-size: 1rem;
+}
+.tag-drag-handle--locked {
+  cursor: not-allowed;
+  opacity: 0.3;
+}
+.tag-name-input {
+  flex: 1;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  background: var(--surface);
+  color: var(--text);
+}
+.tag-name-input:disabled { opacity: 0.55; cursor: not-allowed; }
+
 /* Settings modal */
 .settings-modal { max-width: 360px; }
 .settings-header {

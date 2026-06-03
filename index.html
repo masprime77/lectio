@@ -82,27 +82,74 @@
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <h2 id="modal-title">Create New Semester</h2>
       <form id="new-semester-form">
-        <label>
-          Semester name
-          <input type="text" id="ns-name" placeholder="Winter Semester 2025" required />
-        </label>
-        <label>
-          Start date
-          <input type="date" id="ns-start" required />
-        </label>
-        <label>
-          Number of weeks
-          <input type="number" id="ns-weeks" min="1" max="30" value="15" required />
-        </label>
-
-        <div class="ns-courses-header">
-          <span>Courses</span>
-          <button type="button" id="ns-add-course" class="btn btn-small btn-icon-text">
-            <svg class="ti" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
-            Add course
-          </button>
+        <div class="modal-tabs">
+          <button type="button" class="modal-tab active" data-tab="semester">Semester</button>
+          <button type="button" class="modal-tab" data-tab="courses">Courses</button>
+          <button type="button" class="modal-tab" data-tab="tags">Tags</button>
         </div>
-        <div id="ns-courses" class="ns-courses"></div>
+
+        <!-- Tab: Semester -->
+        <div class="modal-tab-panel" data-panel="semester">
+          <label>
+            Semester name
+            <input type="text" id="ns-name" placeholder="Winter Semester 2025" required />
+          </label>
+          <label>
+            Start date
+            <input type="date" id="ns-start" required />
+          </label>
+          <label>
+            Number of weeks
+            <input type="number" id="ns-weeks" min="1" max="30" value="15" required />
+          </label>
+        </div>
+
+        <!-- Tab: Courses -->
+        <div class="modal-tab-panel hidden" data-panel="courses">
+          <div class="ns-courses-header">
+            <span>Courses</span>
+            <button type="button" id="ns-add-course" class="btn btn-small btn-icon-text">
+              <svg class="ti" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+              Add course
+            </button>
+          </div>
+          <div id="ns-courses" class="ns-courses"></div>
+        </div>
+
+        <!-- Tab: Tags -->
+        <div class="modal-tab-panel hidden" data-panel="tags">
+          <div class="tags-editor">
+
+            <div class="tags-editor-section">
+              <h3>Reading tags</h3>
+              <div>
+                <p class="tags-section-label">Pending (don't count toward progress)</p>
+                <ul id="reading-tags-pending-list" class="tags-sortable-list"></ul>
+                <button type="button" id="add-reading-pending-tag" class="btn btn-small">+ Add tag</button>
+              </div>
+              <div>
+                <p class="tags-section-label">Done (count toward progress)</p>
+                <ul id="reading-tags-done-list" class="tags-sortable-list"></ul>
+                <button type="button" id="add-reading-done-tag" class="btn btn-small">+ Add tag</button>
+              </div>
+            </div>
+
+            <div class="tags-editor-section">
+              <h3>Task tags</h3>
+              <div>
+                <p class="tags-section-label">Pending</p>
+                <ul id="task-tags-pending-list" class="tags-sortable-list"></ul>
+                <button type="button" id="add-task-pending-tag" class="btn btn-small">+ Add tag</button>
+              </div>
+              <div>
+                <p class="tags-section-label">Done</p>
+                <ul id="task-tags-done-list" class="tags-sortable-list"></ul>
+                <button type="button" id="add-task-done-tag" class="btn btn-small">+ Add tag</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
 
         <div class="modal-actions">
           <button type="button" id="modal-cancel" class="btn">Cancel</button>
