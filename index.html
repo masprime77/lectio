@@ -228,23 +228,30 @@
         <button id="feedback-close" class="icon-btn" aria-label="Close feedback"></button>
       </div>
 
-      <div class="feedback-type-toggle">
-        <button type="button" id="feedback-type-bug" class="btn feedback-type-btn active">🐛 Bug report</button>
-        <button type="button" id="feedback-type-feature" class="btn feedback-type-btn">💡 Feature request</button>
+      <div id="feedback-form-body">
+        <div class="feedback-type-toggle">
+          <button type="button" id="feedback-type-bug" class="btn feedback-type-btn active">🐛 Bug report</button>
+          <button type="button" id="feedback-type-feature" class="btn feedback-type-btn">💡 Feature request</button>
+        </div>
+
+        <label for="feedback-input-title">Title
+          <input type="text" id="feedback-input-title" placeholder="Short title…" />
+        </label>
+        <label for="feedback-input-body">Description
+          <textarea id="feedback-input-body" rows="5" placeholder="Describe the bug or feature in detail…"></textarea>
+        </label>
+
+        <span id="feedback-error" class="hidden">Title and description are required.</span>
       </div>
 
-      <label for="feedback-input-title">Title
-        <input type="text" id="feedback-input-title" placeholder="Short title…" />
-      </label>
-      <label for="feedback-input-body">Description
-        <textarea id="feedback-input-body" rows="5" placeholder="Describe the bug or feature in detail…"></textarea>
-      </label>
-
-      <span id="feedback-error" class="hidden">Title and description are required.</span>
+      <div id="feedback-success" class="hidden feedback-success">
+        <span>✅</span>
+        <p>Feedback sent — thank you!</p>
+      </div>
 
       <div class="feedback-actions">
         <button type="button" id="feedback-cancel" class="btn">Cancel</button>
-        <button type="button" id="feedback-submit" class="btn btn-primary">Open in GitHub →</button>
+        <button type="button" id="feedback-submit" class="btn btn-primary">Send</button>
       </div>
 
       <p class="feedback-footer">Lectio <span id="feedback-version">—</span></p>

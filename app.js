@@ -2002,28 +2002,25 @@ async function openSettingsModal() {
 
 // ---------------------------------------------------------------------------
 // Feedback: the user fills in a title + description inside the app, then we
-// open a pre-filled GitHub new-issue page in the default browser via the
-// window.externalLinks bridge (main restricts to github.com) — they only need
-// to click "Submit new issue" there. The repo's issue templates live in
-// .github/ISSUE_TEMPLATE. The current app version is appended to the body.
+// POST it directly to a Vercel serverless endpoint (which files a GitHub issue
+// on our behalf) — the user never leaves the app and needs no GitHub account.
+// The current app version is sent along so issues are tagged with a build.
 // ---------------------------------------------------------------------------
-const FEEDBACK_TEMPLATES = {
-  bug: { template: 'bug_report.md', labels: 'bug' },
-  feature: { template: 'feature_request.md', labels: 'enhancement' },
-};
+const FEEDBACK_ENDPOINT = 'https://lectio-opal.vercel.app/api/feedback';
 
 let feedbackKind = 'bug';
 let feedbackVersion = '';
 
-function openFeedbackLink(kind, title, body) {
-  const cfg = FEEDBACK_TEMPLATES[kind];
-  if (!cfg || !window.externalLinks) return;
-  const fullBody = `${body}\n\n---\n_Lectio v${feedbackVersion}_`;
-  const url =
-    `https://github.com/masprime77/lectio/issues/new?template=${cfg.template}` +
-    `&labels=${cfg.labels}&title=${encodeURIComponent(title)}&body=${encodeURIComponent(fullBody)}`;
-  window.externalLinks.openExternal(url);
-  closeFeedbackModal();
+async function submitFeedback(kind, title, body, version) {
+  const res = await fetch(FEEDBACK_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: kind, title, body, version }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Unknown error');
+  return data; // { ok: true, url: '...' }
 }
 
 function setFeedbackKind(kind) {
@@ -2054,16 +2051,35 @@ function setupFeedback() {
 
   document.getElementById('feedback-cancel').addEventListener('click', closeFeedbackModal);
 
-  document.getElementById('feedback-submit').addEventListener('click', () => {
+  document.getElementById('feedback-submit').addEventListener('click', async () => {
     const title = document.getElementById('feedback-input-title').value.trim();
     const body = document.getElementById('feedback-input-body').value.trim();
     const error = document.getElementById('feedback-error');
+
     if (!title || !body) {
       error.classList.remove('hidden');
       return;
     }
     error.classList.add('hidden');
-    openFeedbackLink(feedbackKind, title, body);
+
+    const submitBtn = document.getElementById('feedback-submit');
+    const cancelBtn = document.getElementById('feedback-cancel');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending…';
+    cancelBtn.disabled = true;
+
+    try {
+      await submitFeedback(feedbackKind, title, body, feedbackVersion);
+      // Show success state
+      document.getElementById('feedback-form-body').classList.add('hidden');
+      document.getElementById('feedback-success').classList.remove('hidden');
+    } catch (err) {
+      error.textContent = 'Could not send feedback. Please try again.';
+      error.classList.remove('hidden');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Send';
+      cancelBtn.disabled = false;
+    }
   });
 }
 
@@ -2072,6 +2088,13 @@ function closeFeedbackModal() {
   document.getElementById('feedback-input-title').value = '';
   document.getElementById('feedback-input-body').value = '';
   document.getElementById('feedback-error').classList.add('hidden');
+  document.getElementById('feedback-error').textContent = 'Title and description are required.';
+  document.getElementById('feedback-form-body').classList.remove('hidden');
+  document.getElementById('feedback-success').classList.add('hidden');
+  const submitBtn = document.getElementById('feedback-submit');
+  submitBtn.disabled = false;
+  submitBtn.textContent = 'Send';
+  document.getElementById('feedback-cancel').disabled = false;
   setFeedbackKind('bug');
 }
 
