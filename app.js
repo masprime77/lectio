@@ -13,6 +13,7 @@ const state = {
   view: restoreView(), // 'week' | 'course' — restored from last session
   focusedCourseId: null, // null = normal All Courses layout; course id = focused mode
   sortOrder: restoreSort(), // course sort order — restored from last session
+  studyMode: restoreStudyMode(), // Study Mode overlay — restored from last session
 };
 
 // ---------------------------------------------------------------------------
@@ -50,6 +51,11 @@ function restoreSort() {
     'week-asc', 'week-desc',
   ];
   return valid.includes(v) ? v : 'progress-desc';
+}
+
+// Restore the saved Study Mode toggle, defaulting to off.
+function restoreStudyMode() {
+  return readPref('studyMode') === 'true';
 }
 
 // ---------------------------------------------------------------------------
@@ -889,6 +895,7 @@ async function init() {
 
   setupViewToggle();
   setupSort();
+  setupStudyMode();
   setupTheme();
   setupModal();
   setupUpdater();
@@ -990,6 +997,29 @@ function setupSort() {
   sel.addEventListener('change', () => {
     state.sortOrder = sel.value;
     writePref('lastSortOrder', state.sortOrder);
+    if (state.semester) {
+      renderDashboard();
+      renderPlanner();
+    }
+  });
+}
+
+// Study Mode toggle: a pure display/calculation overlay (no data changes),
+// persisted to localStorage so it survives restarts.
+function setupStudyMode() {
+  const btn = document.getElementById('study-mode-btn');
+
+  function updateBtn() {
+    btn.textContent = 'Study Mode: ' + (state.studyMode ? 'On' : 'Off');
+    btn.classList.toggle('study-mode-on', state.studyMode);
+  }
+
+  updateBtn();
+
+  btn.addEventListener('click', () => {
+    state.studyMode = !state.studyMode;
+    writePref('studyMode', String(state.studyMode));
+    updateBtn();
     if (state.semester) {
       renderDashboard();
       renderPlanner();
