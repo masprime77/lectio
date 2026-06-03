@@ -157,6 +157,9 @@ body {
   gap: 1rem;
   flex-wrap: wrap;
 }
+/* Reserve space for macOS traffic-light buttons (hiddenInset title bar).
+   Applied via a body class set from app.js (Electron only). */
+body.electron-app .header-inner { padding-left: 80px; }
 /* Headings & course names use Outfit */
 .logo,
 .dashboard h2,

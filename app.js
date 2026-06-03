@@ -885,6 +885,8 @@ function addRow(type, course, week) {
 // Init
 // ---------------------------------------------------------------------------
 async function init() {
+  document.body.classList.add('electron-app');
+
   // Icon buttons in the header
   document.getElementById('edit-semester-btn').innerHTML = icon('pencil');
   document.getElementById('delete-semester-btn').innerHTML = icon('trash');
