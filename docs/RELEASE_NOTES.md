@@ -10,10 +10,9 @@
 - Added Edit, Export, Import, and Delete icon buttons to each course-column header in Course view.
 - Export course writes a single course (without tags) to a `.lectio.json` file via a native save dialog.
 - Import course adds a course from a `.lectio.json` file into the current semester with freshly generated ids.
-- Added Export and Import buttons to the semester edit modal footer (shown only in edit mode), so a semester can be exported or imported without first closing the modal.
-- The header **New** button now opens an inline popover with "New semester" and "Import from file…" options, so a semester can be imported directly from the New button.
-- Added an "Import semester…" button to the New modal's Semester tab (create mode only) that runs the existing import-semester flow without leaving the modal.
-- Added an "Import course…" button to the New/Edit modal's Courses tab; in edit mode it imports a course into the live semester and refreshes the course rows, and in create mode it hints to create the semester first.
+- The header **New** button now opens the create-semester modal directly (no popover).
+- The New/Edit modal footer has tab-aware Import/Export buttons: on the Semester tab, Import brings in a full semester and Export (edit mode only) writes the current one; on the Courses tab, Import adds a course to the semester being built or edited; the Tags tab shows neither, since tags can't be imported/exported yet.
+- Importing a course from the Courses tab works in both create mode (adds a draft course row, kept with its readings/tasks on save) and edit mode (adds it to the live semester and refreshes the course list).
 
 ## v1.7.0
 
