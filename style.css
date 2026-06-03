@@ -424,6 +424,18 @@ body {
   text-transform: capitalize;
 }
 
+/* Study Mode toggle */
+.study-mode-btn {
+  border-color: var(--border);
+  color: var(--muted);
+  transition: background 0.15s, color 0.15s;
+}
+.study-mode-btn.study-mode-on {
+  background: var(--primary);
+  color: var(--on-accent);
+  border-color: var(--primary);
+}
+
 /* Tag dropdown */
 .tag-dropdown-wrapper { position: relative; display: inline-block; }
 .tag-trigger {
