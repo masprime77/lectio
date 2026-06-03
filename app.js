@@ -7,8 +7,13 @@ const state = {
   semesterId: null,   // current semester file id (filename without .json)
   semester: null,     // loaded semester object
   openWeeks: new Set(), // weeks currently expanded
+  openCourseWeeks: {}, // "courseId-week" -> true when that course-view week is expanded
   editingId: null,    // semester id being edited in the modal (null = create mode)
+  editingSemester: null, // semester object the modal's Tags tab edits (live or draft)
   view: restoreView(), // 'week' | 'course' — restored from last session
+  focusedCourseId: null, // null = normal All Courses layout; course id = focused mode
+  sortOrder: restoreSort(), // course sort order — restored from last session
+  studyMode: restoreStudyMode(), // Study Mode overlay — restored from last session
 };
 
 // ---------------------------------------------------------------------------
@@ -35,6 +40,22 @@ function writePref(key, value) {
 function restoreView() {
   const v = readPref('lastActiveView');
   return v === 'week' || v === 'course' ? v : 'week';
+}
+
+// Restore the saved course sort order, defaulting to "progress-desc".
+function restoreSort() {
+  const v = readPref('lastSortOrder');
+  const valid = [
+    'progress-desc', 'progress-asc',
+    'alpha-asc', 'alpha-desc',
+    'week-asc', 'week-desc',
+  ];
+  return valid.includes(v) ? v : 'progress-desc';
+}
+
+// Restore the saved Study Mode toggle, defaulting to off.
+function restoreStudyMode() {
+  return readPref('studyMode') === 'true';
 }
 
 // ---------------------------------------------------------------------------
@@ -94,6 +115,10 @@ function setupSave() {
       e.preventDefault();
       saveNow();
     }
+    // Esc exits focused single-course mode (when not in a modal/input).
+    if (e.key === 'Escape' && state.focusedCourseId && !isTypingTarget(e.target)) {
+      clearCourseFocus();
+    }
   });
   if (window.saver) {
     window.saver.onMenuSave(() => saveNow());
@@ -152,13 +177,19 @@ async function flushSave() {
 }
 
 // Shared pure logic, loaded from lib/planner-core.js before this script.
-const { READING_CYCLE, TASK_CYCLE, nextStatus, courseProgress, uid } = window.PlannerCore;
+const {
+  getReadingTags, getTaskTags,
+  isProtectedTag, addTag, deleteTag, editTag, reorderTags,
+  courseProgress, uid,
+} = window.PlannerCore;
 
 // ---------------------------------------------------------------------------
 // Tabler icons (inline SVG — no external dependency, works offline)
 // ---------------------------------------------------------------------------
 const ICONS = {
   'chevron-right': '<path d="M9 6l6 6l-6 6" />',
+  'chevrons-down': '<path d="M7 7l5 5l5 -5" /><path d="M7 13l5 5l5 -5" />',
+  'chevrons-up': '<path d="M7 11l5 -5l5 5" /><path d="M7 17l5 -5l5 5" />',
   x: '<path d="M18 6l-12 12" /><path d="M6 6l12 12" />',
   pencil:
     '<path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" /><path d="M13.5 6.5l4 4" />',
@@ -233,6 +264,7 @@ async function loadSemester(id) {
   state.semesterId = id;
   state.semester = await api.load(id);
   state.openWeeks = new Set();
+  state.focusedCourseId = null; // focus never persists across semester switches
   const cw = currentWeek(state.semester);
   if (cw) state.openWeeks.add(cw); // auto-expand current week
   document.getElementById('semester-select').value = id;
@@ -247,6 +279,41 @@ async function loadSemester(id) {
 function render() {
   renderDashboard();
   renderPlanner();
+}
+
+// Return a sorted copy of `courses` per state.sortOrder. Pure: never mutates
+// the input array (callers pass sem.courses, which must stay in its on-disk
+// order). Progress sorts use courseProgress. Week sorts do NOT reorder courses
+// — they only reorder the weeks themselves (handled in the render functions),
+// so the course/column order falls back to alphabetical (A → Z) for them.
+function sortedCourses(courses) {
+  const copy = [...courses];
+  if (state.sortOrder === 'progress-asc')
+    return copy.sort(
+      (a, b) =>
+        courseProgress(a, state.semester, state.studyMode) -
+        courseProgress(b, state.semester, state.studyMode)
+    );
+  if (state.sortOrder === 'progress-desc')
+    return copy.sort(
+      (a, b) =>
+        courseProgress(b, state.semester, state.studyMode) -
+        courseProgress(a, state.semester, state.studyMode)
+    );
+  if (state.sortOrder === 'alpha-desc')
+    return copy.sort((a, b) => b.name.localeCompare(a.name));
+  // alpha-asc, week-asc and week-desc all use alphabetical (A → Z) order.
+  return copy.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// Course order for the Weekly view. Only week-based sorts reorder courses
+// here; progress and alpha sorts apply to the dashboard/columns only, so the
+// Weekly view keeps the original on-disk course order for them.
+function sortedCoursesForWeekView(courses) {
+  if (state.sortOrder === 'week-asc' || state.sortOrder === 'week-desc') {
+    return sortedCourses(courses);
+  }
+  return [...courses]; // preserve original order
 }
 
 // ---------------------------------------------------------------------------
@@ -267,12 +334,18 @@ function renderDashboard() {
   if (sem.courses.length === 0) {
     bars = '<div class="week-empty">No courses yet.</div>';
   } else {
-    sem.courses.forEach((course) => {
-      const pct = courseProgress(course);
+    sortedCourses(sem.courses).forEach((course) => {
+      const pct = courseProgress(course, sem, state.studyMode);
+      let rowClass = 'progress-row';
+      if (state.focusedCourseId) {
+        rowClass += state.focusedCourseId === course.id
+          ? ' progress-row--active'
+          : ' progress-row--dimmed';
+      }
       bars += `
-        <div class="progress-row">
+        <div class="${rowClass}" data-course-id="${escapeHtml(course.id)}">
           <div class="progress-label">
-            <span>${escapeHtml(course.name)}</span>
+            <span class="progress-course-name">${escapeHtml(course.name)}</span>
             <span>${pct}%</span>
           </div>
           <div class="progress-bar">
@@ -283,8 +356,29 @@ function renderDashboard() {
   }
 
   root.innerHTML = heading + weekLine + bars;
+
+  // Wire up clickable course names: toggle focused single-course mode.
+  root.querySelectorAll('.progress-row').forEach((row) => {
+    const nameEl = row.querySelector('.progress-course-name');
+    if (!nameEl) return;
+    nameEl.addEventListener('click', () => {
+      const id = row.getAttribute('data-course-id');
+      state.focusedCourseId = state.focusedCourseId === id ? null : id;
+      renderDashboard();
+      renderPlanner();
+    });
+  });
+
   // Always offer a persistent way to add a course, empty or not.
   root.appendChild(addCourseButton('dashboard-add-course'));
+}
+
+// True when the event target is a field the user is typing into, so global
+// shortcuts (e.g. Esc to exit focus) don't hijack in-progress edits.
+function isTypingTarget(el) {
+  if (!el) return false;
+  const tag = el.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
 }
 
 function escapeHtml(s) {
@@ -322,7 +416,11 @@ function renderWeekView() {
   root.innerHTML = '';
   const cw = currentWeek(sem);
 
-  for (let week = 1; week <= sem.weeks; week++) {
+  // Week display order: ascending by default, descending for week-desc.
+  let weekNumbers = Array.from({ length: sem.weeks }, (_, i) => i + 1);
+  if (state.sortOrder === 'week-desc') weekNumbers = weekNumbers.reverse();
+
+  weekNumbers.forEach((week) => {
     const isOpen = state.openWeeks.has(week);
     const start = weekStart(sem.startDate, week);
     const end = weekStart(sem.startDate, week);
@@ -352,19 +450,55 @@ function renderWeekView() {
       body.appendChild(empty);
       body.appendChild(addCourseButton());
     } else {
-      sem.courses.forEach((course) => {
+      sortedCoursesForWeekView(sem.courses).forEach((course) => {
         body.appendChild(renderCourseCard(course, week));
       });
     }
 
     weekEl.appendChild(body);
     root.appendChild(weekEl);
-  }
+  });
 }
 
 function toggleWeek(week) {
   if (state.openWeeks.has(week)) state.openWeeks.delete(week);
   else state.openWeeks.add(week);
+  renderPlanner();
+}
+
+// ---------------------------------------------------------------------------
+// Bulk expand/collapse for the active view's week sections.
+// Operates on state.openWeeks (Weekly view) or state.openCourseWeeks
+// (All Courses view) depending on which layout is showing.
+// ---------------------------------------------------------------------------
+function setAllWeeksOpen(mode) {
+  const sem = state.semester;
+  if (!sem) return;
+  const cw = currentWeek(sem);
+
+  if (state.view === 'course') {
+    sem.courses.forEach((course) => {
+      for (let w = 1; w <= sem.weeks; w++) {
+        const open = mode === 'all' || (mode === 'current' && w === cw);
+        state.openCourseWeeks[course.id + '-' + w] = open;
+      }
+    });
+  } else {
+    state.openWeeks = new Set();
+    if (mode === 'all') {
+      for (let w = 1; w <= sem.weeks; w++) state.openWeeks.add(w);
+    } else if (mode === 'current' && cw) {
+      state.openWeeks.add(cw);
+    }
+  }
+  renderPlanner();
+}
+
+// Exit focused single-course mode and return to the full All Courses layout.
+function clearCourseFocus() {
+  if (!state.focusedCourseId) return;
+  state.focusedCourseId = null;
+  renderDashboard();
   renderPlanner();
 }
 
@@ -379,27 +513,49 @@ function renderCourseView() {
   const board = document.createElement('div');
   board.className = 'course-board';
 
-  sem.courses.forEach((course) => {
+  // Focused mode: isolate the selected course in a single centred column.
+  const focused = state.focusedCourseId
+    ? sem.courses.some((c) => c.id === state.focusedCourseId)
+    : false;
+  const sorted = sortedCourses(sem.courses);
+  const courses = focused
+    ? sorted.filter((c) => c.id === state.focusedCourseId)
+    : sorted;
+  if (focused) {
+    board.style.justifyContent = 'center';
+    board.classList.add('course-board--focused');
+    // Clicking the empty space around the column exits focused mode.
+    board.addEventListener('click', (e) => {
+      if (e.target === board) clearCourseFocus();
+    });
+  }
+
+  courses.forEach((course) => {
     const col = document.createElement('div');
-    col.className = 'course-column';
+    col.className = focused ? 'course-column--focused' : 'course-column';
     col.style.borderTopColor = course.color;
 
     const header = document.createElement('div');
     header.className = 'course-column-header';
     header.textContent = course.name;
+    header.title = course.name;
     header.style.color = course.color;
     col.appendChild(header);
 
     const body = document.createElement('div');
     body.className = 'course-column-body';
 
-    // Weeks (in order) that have any reading or task for this course.
+    // Week display order: ascending by default, descending for week-desc.
+    let weekNumbers = Array.from({ length: sem.weeks }, (_, i) => i + 1);
+    if (state.sortOrder === 'week-desc') weekNumbers = weekNumbers.reverse();
+
+    // Weeks (in display order) that have any reading or task for this course.
     const weeks = [];
-    for (let w = 1; w <= sem.weeks; w++) {
+    weekNumbers.forEach((w) => {
       const readings = course.readings.filter((r) => r.week === w);
       const tasks = course.tasks.filter((t) => t.week === w);
       if (readings.length || tasks.length) weeks.push({ w, readings, tasks });
-    }
+    });
 
     if (weeks.length === 0) {
       const empty = document.createElement('div');
@@ -409,12 +565,35 @@ function renderCourseView() {
       body.appendChild(addControls(course, currentWeek(sem) || 1));
     } else {
       weeks.forEach(({ w, readings, tasks }) => {
-        body.appendChild(weekDivider(sem, w));
-        body.appendChild(sectionTitle('Readings'));
-        body.appendChild(renderItemList(readings, 'reading', course, w));
-        body.appendChild(sectionTitle('Tasks'));
-        body.appendChild(renderItemList(tasks, 'task', course, w));
-        body.appendChild(addControls(course, w));
+        const key = course.id + '-' + w;
+        const isOpen = key in state.openCourseWeeks
+          ? state.openCourseWeeks[key]
+          : w === currentWeek(sem);
+        state.openCourseWeeks[key] = isOpen;
+
+        const start = weekStart(sem.startDate, w);
+        const end = weekStart(sem.startDate, w);
+        end.setDate(end.getDate() + 6);
+        const weekHeader = document.createElement('div');
+        weekHeader.className = 'course-week-header' + (isOpen ? ' open' : '');
+        weekHeader.innerHTML = `<span class="course-week-chevron">${icon('chevron-right')}</span>
+          <span class="week-divider-label">Week ${w}</span>
+          <span class="week-divider-dates">${formatDate(start)} – ${formatDate(end)}</span>`;
+        weekHeader.addEventListener('click', () => {
+          state.openCourseWeeks[key] = !state.openCourseWeeks[key];
+          renderCourseView();
+        });
+
+        const weekBody = document.createElement('div');
+        weekBody.className = 'course-week-body' + (isOpen ? ' open' : '');
+        weekBody.appendChild(sectionTitle('Readings'));
+        weekBody.appendChild(renderItemList(readings, 'reading', course, w));
+        weekBody.appendChild(sectionTitle('Tasks'));
+        weekBody.appendChild(renderItemList(tasks, 'task', course, w));
+        weekBody.appendChild(addControls(course, w));
+
+        body.appendChild(weekHeader);
+        body.appendChild(weekBody);
       });
     }
 
@@ -422,8 +601,8 @@ function renderCourseView() {
     board.appendChild(col);
   });
 
-  // Persistent "+ Add course" column at the end of the row.
-  board.appendChild(addCourseColumn());
+  // Persistent "+ Add course" column at the end of the row (not in focused mode).
+  if (!focused) board.appendChild(addCourseColumn());
 
   root.appendChild(board);
 }
@@ -509,17 +688,84 @@ function renderItemList(items, type, course, week) {
       li.appendChild(due);
     }
 
-    const badge = document.createElement('button');
-    badge.className = 'badge ' + item.status.replace(/\s+/g, '');
-    badge.textContent = item.status;
-    badge.title = 'Click to change status';
-    badge.addEventListener('click', () => {
-      const cycle = type === 'reading' ? READING_CYCLE : TASK_CYCLE;
-      item.status = nextStatus(cycle, item.status);
-      persist();
-      render();
+    const wrapper = document.createElement('div');
+    wrapper.className = 'tag-dropdown-wrapper';
+
+    // The trigger button shows the current tag's name and color.
+    const trigger = document.createElement('button');
+    trigger.className = 'badge tag-trigger';
+    const tags = type === 'reading'
+      ? getReadingTags(state.semester)
+      : getTaskTags(state.semester);
+    const currentTag = tags.find((t) => t.id === item.status)
+      || { name: '-', color: '#999', section: 'pending' }; // ghost fallback
+    trigger.textContent = currentTag.name;
+    trigger.style.setProperty('--tag-color', currentTag.color);
+    trigger.title = 'Click to change status';
+
+    // The dropdown menu (hidden by default).
+    const menu = document.createElement('div');
+    menu.className = 'tag-menu hidden';
+
+    // Build two sections: Pending and Done.
+    ['pending', 'done'].forEach((section) => {
+      const sectionTags = tags.filter((t) => t.section === section);
+      if (sectionTags.length === 0) return;
+      const label = document.createElement('div');
+      label.className = 'tag-menu-section-label';
+      label.textContent = section === 'pending' ? 'Pending' : 'Done';
+      menu.appendChild(label);
+      sectionTags.forEach((tag) => {
+        const opt = document.createElement('button');
+        opt.className = 'tag-menu-option' + (tag.id === item.status ? ' active' : '');
+        opt.textContent = tag.name;
+        opt.style.setProperty('--tag-color', tag.color);
+        opt.addEventListener('click', (e) => {
+          e.stopPropagation();
+          item.status = tag.id;
+          persist();
+          render();
+        });
+        menu.appendChild(opt);
+      });
     });
-    li.appendChild(badge);
+
+    // In Study Mode, add a distinct "Studied" shortcut below Done. The studied
+    // tag still appears in the Done section above — this is an extra entry.
+    if (state.studyMode) {
+      const studiedId = type === 'reading' ? 'r-studied' : 't-studied';
+      const studiedTag = tags.find((t) => t.id === studiedId);
+      if (studiedTag) {
+        const sep = document.createElement('div');
+        sep.className = 'tag-menu-section-label tag-menu-studied-label';
+        sep.textContent = 'Studied';
+        menu.appendChild(sep);
+
+        const opt = document.createElement('button');
+        opt.className = 'tag-menu-option' + (item.status === studiedId ? ' active' : '');
+        opt.textContent = studiedTag.name;
+        opt.style.setProperty('--tag-color', studiedTag.color);
+        opt.addEventListener('click', (e) => {
+          e.stopPropagation();
+          item.status = studiedId;
+          persist();
+          render();
+        });
+        menu.appendChild(opt);
+      }
+    }
+
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = !menu.classList.contains('hidden');
+      // Close all other open menus first.
+      document.querySelectorAll('.tag-menu').forEach((m) => m.classList.add('hidden'));
+      if (!isOpen) menu.classList.remove('hidden');
+    });
+
+    wrapper.appendChild(trigger);
+    wrapper.appendChild(menu);
+    li.appendChild(wrapper);
 
     const del = document.createElement('button');
     del.className = 'icon-btn';
@@ -609,14 +855,14 @@ function addRow(type, course, week) {
     const v = title.value.trim();
     if (!v) return;
     if (type === 'reading') {
-      course.readings.push({ id: uid('r'), week, title: v, status: 'pending' });
+      course.readings.push({ id: uid('r'), week, title: v, status: 'r-pending' });
     } else {
       course.tasks.push({
         id: uid('t'),
         week,
         title: v,
         dueDate: due.value || '',
-        status: 'not done',
+        status: 't-pending',
       });
     }
     persist();
@@ -638,9 +884,22 @@ function addRow(type, course, week) {
 // Init
 // ---------------------------------------------------------------------------
 async function init() {
+  document.body.classList.add('electron-app');
+
   // Icon buttons in the header
-  document.getElementById('edit-semester-btn').innerHTML = icon('pencil');
-  document.getElementById('delete-semester-btn').innerHTML = icon('trash');
+  document.getElementById('edit-semester-btn').innerHTML = icon('pencil') + '<span style="font-size:0.75rem;margin-left:0.25rem;">Edit</span>';
+  document.getElementById('delete-semester-btn').innerHTML = icon('trash') + '<span style="font-size:0.75rem;margin-left:0.25rem;">Delete</span>';
+
+  // Bulk expand/collapse controls (apply to whichever view is active)
+  const expandAllBtn = document.getElementById('expand-all-btn');
+  const collapseAllBtn = document.getElementById('collapse-all-btn');
+  const expandCurrentBtn = document.getElementById('expand-current-btn');
+  expandAllBtn.innerHTML = icon('chevrons-down');
+  collapseAllBtn.innerHTML = icon('chevrons-up');
+  expandCurrentBtn.innerHTML = icon('calendar');
+  expandAllBtn.addEventListener('click', () => setAllWeeksOpen('all'));
+  collapseAllBtn.addEventListener('click', () => setAllWeeksOpen('none'));
+  expandCurrentBtn.addEventListener('click', () => setAllWeeksOpen('current'));
 
   const list = await populateSelector();
   if (list.length) {
@@ -663,13 +922,22 @@ async function init() {
     if (state.semesterId) deleteSemester(state.semesterId);
   });
 
+  // Close any open status dropdown when clicking outside of it.
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.tag-menu').forEach((m) => m.classList.add('hidden'));
+  });
+
   setupViewToggle();
+  setupSort();
+  setupStudyMode();
   setupTheme();
   setupModal();
+  setupNewBtn();
   setupUpdater();
   setupSave();
   setupSettings();
   setupFeedback();
+  setupAddItem();
 }
 
 // ---------------------------------------------------------------------------
@@ -706,35 +974,24 @@ function setupUpdater() {
 // Theme: Light -> Dark -> Auto, persisted in localStorage
 // ---------------------------------------------------------------------------
 const THEME_MODES = ['light', 'dark', 'auto'];
-const THEME_META = {
-  light: { icon: 'sun', label: 'Light' },
-  dark: { icon: 'moon', label: 'Dark' },
-  auto: { icon: 'device-desktop', label: 'Auto' },
-};
 
 function applyTheme(mode) {
   // Auto = no attribute, so the prefers-color-scheme media query takes over.
   if (mode === 'auto') document.documentElement.removeAttribute('data-theme');
   else document.documentElement.setAttribute('data-theme', mode);
   localStorage.setItem('theme', mode);
-
-  const meta = THEME_META[mode];
-  const btn = document.getElementById('theme-toggle');
-  btn.querySelector('.theme-icon').innerHTML = icon(meta.icon);
-  btn.querySelector('.theme-label').textContent = meta.label;
-  btn.title = `Theme: ${meta.label} (click to change)`;
+  // Sync the segmented control if it exists (modal may not be open yet).
+  document.querySelectorAll('.theme-seg-btn').forEach((b) => {
+    b.classList.toggle('active', b.dataset.themeVal === mode);
+  });
 }
 
 function setupTheme() {
+  // Theme selection is handled inside setupSettings() / openSettingsModal().
   let mode = localStorage.getItem('theme');
-  if (!THEME_MODES.includes(mode)) mode = 'auto'; // default on first load
+  if (!THEME_MODES.includes(mode)) mode = 'auto';
   applyTheme(mode);
-
-  document.getElementById('theme-toggle').addEventListener('click', () => {
-    const current = localStorage.getItem('theme') || 'auto';
-    const next = THEME_MODES[(THEME_MODES.indexOf(current) + 1) % THEME_MODES.length];
-    applyTheme(next);
-  });
+  // Note: the click listener is on the segmented control in the Settings modal.
 }
 
 // View toggle (Week / Course), persisted to localStorage.
@@ -753,6 +1010,44 @@ function setupViewToggle() {
 function updateViewToggle() {
   document.querySelectorAll('.view-btn').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.view === state.view);
+  });
+  document.getElementById('sort-select').value = state.sortOrder;
+}
+
+// Course sort control (Progress / Alpha / Week), persisted to localStorage.
+function setupSort() {
+  const sel = document.getElementById('sort-select');
+  sel.value = state.sortOrder;
+  sel.addEventListener('change', () => {
+    state.sortOrder = sel.value;
+    writePref('lastSortOrder', state.sortOrder);
+    if (state.semester) {
+      renderDashboard();
+      renderPlanner();
+    }
+  });
+}
+
+// Study Mode toggle: a pure display/calculation overlay (no data changes),
+// persisted to localStorage so it survives restarts.
+function setupStudyMode() {
+  const btn = document.getElementById('study-mode-btn');
+
+  function updateBtn() {
+    btn.textContent = 'Study Mode: ' + (state.studyMode ? 'On' : 'Off');
+    btn.classList.toggle('study-mode-on', state.studyMode);
+  }
+
+  updateBtn();
+
+  btn.addEventListener('click', () => {
+    state.studyMode = !state.studyMode;
+    writePref('studyMode', String(state.studyMode));
+    updateBtn();
+    if (state.semester) {
+      renderDashboard();
+      renderPlanner();
+    }
   });
 }
 
@@ -790,7 +1085,6 @@ const DEFAULT_COLORS = ['#4A90D9', '#E2725B', '#7E57C2', '#5CB85C', '#F0AD4E', '
 
 function setupModal() {
   const overlay = document.getElementById('modal-overlay');
-  document.getElementById('new-semester-btn').addEventListener('click', openCreateModal);
   document.getElementById('modal-cancel').addEventListener('click', closeModal);
   document.getElementById('ns-add-course').addEventListener('click', () => addCourseField());
   overlay.addEventListener('click', (e) => {
@@ -800,6 +1094,120 @@ function setupModal() {
     e.preventDefault();
     submitModal();
   });
+
+  // Tab switching between Semester / Courses / Tags panels.
+  document.querySelectorAll('.modal-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.modal-tab').forEach((t) => t.classList.remove('active'));
+      document.querySelectorAll('.modal-tab-panel').forEach((p) => p.classList.add('hidden'));
+      tab.classList.add('active');
+      document
+        .querySelector(`.modal-tab-panel[data-panel="${tab.dataset.tab}"]`)
+        .classList.remove('hidden');
+      if (tab.dataset.tab === 'tags' && state.editingSemester) {
+        renderTagsEditor(state.editingSemester);
+      }
+    });
+  });
+
+  // ── "Reading / Task" tab: quick-add inline in the New modal ──────────
+  let nsAddItemType = 'reading';
+
+  function setNsAddItemType(t) {
+    nsAddItemType = t;
+    document.getElementById('ns-add-item-type-reading').classList.toggle('active', t === 'reading');
+    document.getElementById('ns-add-item-type-task').classList.toggle('active', t === 'task');
+    document.getElementById('ns-add-item-due-row').style.display = t === 'task' ? 'block' : 'none';
+  }
+
+  document.getElementById('ns-add-item-type-reading').addEventListener('click', () => setNsAddItemType('reading'));
+  document.getElementById('ns-add-item-type-task').addEventListener('click', () => setNsAddItemType('task'));
+
+  // Populate course + week selects when the tab becomes visible.
+  document.querySelectorAll('.modal-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      if (tab.dataset.tab !== 'add-item') return;
+      // Populate courses
+      const courseSelect = document.getElementById('ns-add-item-course');
+      courseSelect.innerHTML = '';
+      if (state.semester) {
+        state.semester.courses.forEach((c) => {
+          const opt = document.createElement('option');
+          opt.value = c.id;
+          opt.textContent = c.name;
+          courseSelect.appendChild(opt);
+        });
+      }
+      // Populate weeks
+      const weekSelect = document.getElementById('ns-add-item-week');
+      weekSelect.innerHTML = '';
+      const total = state.semester ? state.semester.weeks : 15;
+      const cw = state.semester ? currentWeek(state.semester) : 0;
+      for (let w = 1; w <= total; w++) {
+        const opt = document.createElement('option');
+        opt.value = w;
+        opt.textContent = 'Week ' + w;
+        if (w === cw) opt.selected = true;
+        weekSelect.appendChild(opt);
+      }
+      // Reset form
+      document.getElementById('ns-add-item-title').value = '';
+      document.getElementById('ns-add-item-due').value = '';
+      document.getElementById('ns-add-item-error').classList.add('hidden');
+      setNsAddItemType('reading');
+    });
+  });
+
+  document.getElementById('ns-add-item-submit').addEventListener('click', () => {
+    const titleVal = document.getElementById('ns-add-item-title').value.trim();
+    const courseId = document.getElementById('ns-add-item-course').value;
+    const week = parseInt(document.getElementById('ns-add-item-week').value, 10);
+    const errorEl = document.getElementById('ns-add-item-error');
+
+    if (!titleVal || !courseId || !week) {
+      errorEl.textContent = 'Course, week, and title are required.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+    errorEl.classList.add('hidden');
+
+    const course = state.semester.courses.find((c) => c.id === courseId);
+    if (!course) return;
+
+    if (nsAddItemType === 'reading') {
+      course.readings.push({ id: uid('r'), week, title: titleVal, status: 'r-pending' });
+    } else {
+      course.tasks.push({
+        id: uid('t'),
+        week,
+        title: titleVal,
+        dueDate: document.getElementById('ns-add-item-due').value || '',
+        status: 't-pending',
+      });
+    }
+
+    persist();
+    render();
+
+    // Reset for the next add
+    document.getElementById('ns-add-item-title').value = '';
+    document.getElementById('ns-add-item-due').value = '';
+    document.getElementById('ns-add-item-title').focus();
+  });
+  // ── end "Reading / Task" tab ──────────────────────────────────────────
+}
+
+// The header "＋ New" button opens the semester-creation modal.
+function setupNewBtn() {
+  const btn = document.getElementById('new-btn');
+  btn.innerHTML = icon('plus') + '<span>New</span>';
+  btn.addEventListener('click', openCreateModal);
+}
+
+// Reset the modal to its first (Semester) tab — used whenever it opens.
+function resetModalToFirstTab() {
+  document.querySelectorAll('.modal-tab').forEach((t, i) => t.classList.toggle('active', i === 0));
+  document.querySelectorAll('.modal-tab-panel').forEach((p, i) => p.classList.toggle('hidden', i !== 0));
 }
 
 function closeModal() {
@@ -816,6 +1224,15 @@ function openCreateModal() {
   document.getElementById('ns-weeks').value = 15;
   document.getElementById('ns-courses').innerHTML = '';
   addCourseField();
+  // Draft tag sets (independent clones of the defaults) the Tags tab edits;
+  // they become the new semester's tags on create.
+  state.editingSemester = {
+    readingTags: JSON.parse(JSON.stringify(getReadingTags({}))),
+    taskTags: JSON.parse(JSON.stringify(getTaskTags({}))),
+    courses: [],
+  };
+  renderTagsEditor(state.editingSemester);
+  resetModalToFirstTab();
   document.getElementById('modal-overlay').classList.remove('hidden');
 }
 
@@ -847,6 +1264,10 @@ async function openEditModal(id) {
   courses.innerHTML = '';
   if (sem.courses.length) sem.courses.forEach((c) => addCourseField(c));
   else addCourseField();
+  // The Tags tab edits this semester object live (persisted on each change).
+  state.editingSemester = sem;
+  renderTagsEditor(sem);
+  resetModalToFirstTab();
   document.getElementById('modal-overlay').classList.remove('hidden');
 }
 
@@ -912,7 +1333,15 @@ async function submitModal() {
       else courses.push({ id: uid('course'), name: cname, color, readings: [], tasks: [] });
     });
 
-    const semester = { id: state.editingId, name, startDate, weeks, courses };
+    const semester = {
+      id: state.editingId,
+      name,
+      startDate,
+      weeks,
+      courses,
+      readingTags: getReadingTags(base),
+      taskTags: getTaskTags(base),
+    };
     await api.save(state.editingId, semester);
     closeModal();
     await populateSelector();
@@ -940,11 +1369,168 @@ async function submitModal() {
   let n = 2;
   while (ids.has(id)) id = `${slugify(name)}-${n++}`;
 
-  const semester = { id, name, startDate, weeks, courses };
+  const draft = state.editingSemester || {};
+  const semester = {
+    id,
+    name,
+    startDate,
+    weeks,
+    courses,
+    readingTags: getReadingTags(draft),
+    taskTags: getTaskTags(draft),
+  };
   await api.save(id, semester);
   closeModal();
   await populateSelector();
   await loadSemester(id);
+}
+
+// ---------------------------------------------------------------------------
+// Tags tab: per-semester reading/task tag management (add, rename, recolor,
+// delete, reorder). Protected tags (pending/studied) lock their name, deletion
+// and position. Edits mutate the semester object and persist immediately.
+// ---------------------------------------------------------------------------
+function renderTagsEditor(semester) {
+  ['reading', 'task'].forEach((type) => {
+    const tags = type === 'reading' ? getReadingTags(semester) : getTaskTags(semester);
+    ['pending', 'done'].forEach((section) => {
+      const listId = type + '-tags-' + section + '-list';
+      const list = document.getElementById(listId);
+      if (!list) return;
+      list.innerHTML = '';
+      tags
+        .filter((t) => t.section === section)
+        .forEach((tag) => list.appendChild(buildTagRow(semester, type, tag)));
+      setupTagDragDrop(list, semester, type);
+    });
+  });
+  wireAddTagButtons(semester);
+}
+
+function buildTagRow(semester, type, tag) {
+  const li = document.createElement('li');
+  li.className = 'tag-row';
+  li.dataset.tagId = tag.id;
+
+  const isProtected = isProtectedTag(tag.id);
+
+  // Drag handle — disabled (non-draggable) for protected tags.
+  const handle = document.createElement('span');
+  handle.className = 'tag-drag-handle' + (isProtected ? ' tag-drag-handle--locked' : '');
+  handle.innerHTML = '⠿';
+  handle.title = isProtected ? 'Protected tag — cannot be reordered' : 'Drag to reorder';
+
+  // Color picker.
+  const colorPicker = document.createElement('input');
+  colorPicker.type = 'color';
+  colorPicker.value = tag.color;
+  colorPicker.addEventListener('change', () => {
+    editTag(semester, type, tag.id, { color: colorPicker.value });
+    persist();
+  });
+
+  // Name input — disabled for protected tags.
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.value = tag.name;
+  nameInput.className = 'tag-name-input';
+  if (isProtected) {
+    nameInput.disabled = true;
+    nameInput.title = 'This tag cannot be renamed';
+  } else {
+    nameInput.addEventListener('blur', () => {
+      const v = nameInput.value.trim();
+      if (v) editTag(semester, type, tag.id, { name: v });
+      persist();
+    });
+  }
+
+  // Delete button — disabled for protected tags.
+  const delBtn = document.createElement('button');
+  delBtn.type = 'button';
+  delBtn.className = 'icon-btn';
+  delBtn.innerHTML = icon('x');
+  delBtn.title = isProtected ? 'Protected tag — cannot be deleted' : 'Delete tag';
+  delBtn.disabled = isProtected;
+  if (isProtected) {
+    delBtn.style.opacity = '0.3';
+  } else {
+    delBtn.addEventListener('click', () => {
+      deleteTag(semester, type, tag.id);
+      persist();
+      renderTagsEditor(semester);
+    });
+  }
+
+  li.appendChild(handle);
+  li.appendChild(colorPicker);
+  li.appendChild(nameInput);
+  li.appendChild(delBtn);
+  return li;
+}
+
+function setupTagDragDrop(list, semester, type) {
+  let dragSrc = null;
+
+  list.addEventListener('dragstart', (e) => {
+    const li = e.target.closest('li');
+    if (!li || isProtectedTag(li.dataset.tagId)) {
+      e.preventDefault();
+      return;
+    }
+    dragSrc = li;
+    dragSrc.classList.add('dragging');
+  });
+
+  list.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    const target = e.target.closest('li');
+    if (!target || target === dragSrc) return;
+    // Cannot drop onto or past a protected tag.
+    if (isProtectedTag(target.dataset.tagId)) return;
+    const rect = target.getBoundingClientRect();
+    if (e.clientY < rect.top + rect.height / 2) list.insertBefore(dragSrc, target);
+    else list.insertBefore(dragSrc, target.nextSibling);
+  });
+
+  list.addEventListener('dragend', () => {
+    if (dragSrc) dragSrc.classList.remove('dragging');
+    dragSrc = null;
+    // Collect ordered ids from ALL lists for this type, then reorder.
+    const allLists = document.querySelectorAll('[id^="' + type + '-tags-"][id$="-list"]');
+    const orderedIds = [...allLists].flatMap((l) =>
+      [...l.querySelectorAll('li')].map((li) => li.dataset.tagId)
+    );
+    reorderTags(semester, type, orderedIds);
+    persist();
+  });
+
+  // Only non-protected rows are draggable.
+  list.querySelectorAll('li').forEach((li) => {
+    li.draggable = !isProtectedTag(li.dataset.tagId);
+  });
+}
+
+function wireAddTagButtons(semester) {
+  [
+    { btnId: 'add-reading-pending-tag', type: 'reading', section: 'pending' },
+    { btnId: 'add-reading-done-tag', type: 'reading', section: 'done' },
+    { btnId: 'add-task-pending-tag', type: 'task', section: 'pending' },
+    { btnId: 'add-task-done-tag', type: 'task', section: 'done' },
+  ].forEach(({ btnId, type, section }) => {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    // Clone to drop any previous listener bound to a stale semester object.
+    btn.replaceWith(btn.cloneNode(true));
+    document.getElementById(btnId).addEventListener('click', () => {
+      const name = prompt('Tag name:');
+      if (!name || !name.trim()) return;
+      const color = section === 'pending' ? '#f97316' : '#3b82f6';
+      addTag(semester, type, { name: name.trim(), color, section });
+      persist();
+      renderTagsEditor(semester);
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -966,6 +1552,13 @@ function setupSettings() {
   // Autosave preference lives in localStorage.
   document.getElementById('set-autosave').addEventListener('change', (e) => {
     writePref('autosave', e.target.checked ? 'true' : 'false');
+  });
+
+  // Theme segmented control (Light / Dark / Auto).
+  document.querySelectorAll('.theme-seg-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      applyTheme(btn.dataset.themeVal);
+    });
   });
 
   // Auto-update preference lives in settings.json (read by main on launch).
@@ -1002,6 +1595,12 @@ async function openSettingsModal() {
     autoUpdate = s.autoUpdate !== false;
   }
   document.getElementById('set-autoupdate').checked = autoUpdate;
+
+  // Sync theme segmented control
+  const currentTheme = localStorage.getItem('theme') || 'auto';
+  document.querySelectorAll('.theme-seg-btn').forEach((b) => {
+    b.classList.toggle('active', b.dataset.themeVal === currentTheme);
+  });
 
   let version = '';
   if (window.appInfo) {
@@ -1105,6 +1704,103 @@ async function openFeedbackModal() {
     : '—';
 
   document.getElementById('feedback-overlay').classList.remove('hidden');
+}
+
+// ---------------------------------------------------------------------------
+// Global "Add reading / task" modal: add an item to any course/week of the
+// current semester without going through a specific course column or week card.
+// ---------------------------------------------------------------------------
+// Selected type in the global add modal; module-scoped so openAddItemModal can
+// reset it in lockstep with the toggle buttons' visual state.
+let addItemType = 'reading';
+
+function setAddItemType(t) {
+  addItemType = t;
+  document.getElementById('add-item-type-reading').classList.toggle('active', t === 'reading');
+  document.getElementById('add-item-type-task').classList.toggle('active', t === 'task');
+  document.getElementById('add-item-due-row').style.display = t === 'task' ? 'block' : 'none';
+}
+
+function setupAddItem() {
+  document.getElementById('add-item-close').addEventListener('click', closeAddItemModal);
+  document.getElementById('add-item-cancel').addEventListener('click', closeAddItemModal);
+  document.getElementById('add-item-overlay').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('add-item-overlay')) closeAddItemModal();
+  });
+
+  // Type toggle (Reading / Task) — Task reveals the due-date field.
+  document.getElementById('add-item-type-reading').addEventListener('click', () => setAddItemType('reading'));
+  document.getElementById('add-item-type-task').addEventListener('click', () => setAddItemType('task'));
+
+  document.getElementById('add-item-submit').addEventListener('click', () => {
+    const titleVal = document.getElementById('add-item-title-input').value.trim();
+    const courseId = document.getElementById('add-item-course').value;
+    const week = parseInt(document.getElementById('add-item-week').value, 10);
+    const errorEl = document.getElementById('add-item-error');
+
+    if (!titleVal || !courseId) {
+      errorEl.textContent = 'Title and course are required.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+    errorEl.classList.add('hidden');
+
+    const course = state.semester.courses.find((c) => c.id === courseId);
+    if (!course) return;
+
+    if (addItemType === 'reading') {
+      course.readings.push({ id: uid('r'), week, title: titleVal, status: 'r-pending' });
+    } else {
+      course.tasks.push({
+        id: uid('t'),
+        week,
+        title: titleVal,
+        dueDate: document.getElementById('add-item-due').value || '',
+        status: 't-pending',
+      });
+    }
+
+    persist();
+    closeAddItemModal();
+    renderDashboard();
+    renderPlanner();
+  });
+}
+
+function openAddItemModal() {
+  const sem = state.semester;
+  if (!sem) return;
+
+  // Populate course select.
+  const courseSelect = document.getElementById('add-item-course');
+  courseSelect.innerHTML = sem.courses
+    .map((c) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`)
+    .join('');
+
+  // Populate week select, defaulting to the current week.
+  const weekSelect = document.getElementById('add-item-week');
+  weekSelect.innerHTML = '';
+  for (let w = 1; w <= sem.weeks; w++) {
+    const opt = document.createElement('option');
+    opt.value = w;
+    opt.textContent = 'Week ' + w;
+    weekSelect.appendChild(opt);
+  }
+  const cw = currentWeek(sem);
+  weekSelect.value = cw || 1;
+
+  // Reset the form back to its default (Reading) state.
+  document.getElementById('add-item-title-input').value = '';
+  document.getElementById('add-item-due').value = '';
+  document.getElementById('add-item-error').classList.add('hidden');
+  setAddItemType('reading');
+
+  document.getElementById('add-item-overlay').classList.remove('hidden');
+  document.getElementById('add-item-title-input').focus();
+}
+
+function closeAddItemModal() {
+  document.getElementById('add-item-overlay').classList.add('hidden');
 }
 
 init();

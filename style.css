@@ -157,6 +157,9 @@ body {
   gap: 1rem;
   flex-wrap: wrap;
 }
+/* Reserve space for macOS traffic-light buttons (hiddenInset title bar).
+   Applied via a body class set from app.js (Electron only). */
+body.electron-app .header-inner { padding-left: 80px; }
 /* Headings & course names use Outfit */
 .logo,
 .dashboard h2,
@@ -168,6 +171,13 @@ body {
 }
 
 .logo { font-size: 1.2rem; margin: 0; }
+.app-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  flex-shrink: 0;
+  display: block;
+}
 .header-left { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
 
 /* Save status indicator */
@@ -203,7 +213,51 @@ body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .header-controls { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+
+/* Uniform height for all header controls */
+.header-controls .btn,
+.header-controls .view-btn,
+.header-controls .collapse-btn,
+.header-controls .semester-select,
+.header-controls #sort-select,
+.header-controls .semester-action-btn,
+.header-controls .study-mode-btn {
+  height: 32px;
+  box-sizing: border-box;
+  padding-top: 0;
+  padding-bottom: 0;
+  display: inline-flex;
+  align-items: center;
+}
 .selector-group { display: flex; gap: 0.25rem; align-items: center; }
+
+/* Semester action buttons: paired pill that visually attaches to the select */
+.semester-actions {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.semester-action-btn {
+  border: none;
+  background: var(--surface);
+  color: var(--muted);
+  padding: 0.45rem 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: background 0.15s, color 0.15s;
+  height: 100%;
+}
+.semester-action-btn + .semester-action-btn { border-left: 1px solid var(--border); }
+.semester-action-btn:hover { background: var(--hover); color: var(--text); }
+.semester-action-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.semester-action-btn:disabled:hover { background: var(--surface); color: var(--muted); }
+.semester-action-delete:hover { background: var(--danger-bg); color: var(--danger); }
+.semester-action-btn .ti { width: 15px; height: 15px; }
+
 .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .icon-btn:disabled:hover { background: none; }
 
@@ -214,6 +268,16 @@ body {
   background: var(--surface);
   font-size: 0.9rem;
   color: var(--text);
+}
+
+#sort-select {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 0.85rem;
+  color: var(--text);
+  cursor: pointer;
 }
 
 /* Buttons */
@@ -230,7 +294,7 @@ body {
 .btn:hover { background: var(--hover); }
 .btn-primary { background: var(--primary); color: var(--on-accent); border-color: var(--primary); }
 .btn-primary:hover { background: var(--primary-hover); }
-.btn-small { padding: 0.25rem 0.55rem; font-size: 0.8rem; }
+.btn-small { padding: 0 0.55rem; font-size: 0.8rem; }
 .btn-icon-text {
   display: inline-flex;
   align-items: center;
@@ -264,6 +328,24 @@ body {
 .view-btn + .view-btn { border-left: 1px solid var(--border); }
 .view-btn:hover { background: var(--hover); }
 .view-btn.active { background: var(--primary); color: var(--on-accent); }
+.collapse-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.collapse-btn {
+  border: none;
+  background: var(--surface);
+  color: var(--muted);
+  padding: 0.45rem 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+.collapse-btn + .collapse-btn { border-left: 1px solid var(--border); }
+.collapse-btn:hover { background: var(--hover); color: var(--text); }
+.collapse-btn .ti { width: 16px; height: 16px; }
 .btn-danger { color: var(--danger); border: none; background: none; }
 .btn-danger:hover { background: var(--danger-bg); }
 
@@ -287,6 +369,20 @@ body {
 }
 .current-week strong { color: var(--primary); }
 .progress-row { margin-bottom: 0.7rem; }
+/* Progress bar: dimmed / active states */
+.progress-course-name {
+  cursor: pointer;
+}
+.progress-course-name:hover {
+  text-decoration: underline;
+}
+.progress-row--dimmed {
+  opacity: 0.35;
+  transition: opacity 0.2s;
+}
+.progress-row--active .progress-course-name {
+  font-weight: 700;
+}
 .progress-label {
   display: flex;
   justify-content: space-between;
@@ -381,13 +477,83 @@ body {
   border: none;
   text-transform: capitalize;
 }
-.badge.pending { background: var(--st-pending); }
-.badge.seen { background: var(--st-seen); }
-.badge.summarized { background: var(--st-summarized); }
-.badge.studied { background: var(--st-studied); }
-.badge.not.done, .badge.notdone { background: var(--st-notdone); }
-.badge.done { background: var(--st-done); }
-.badge.reviewed { background: var(--st-reviewed); }
+
+/* Study Mode toggle */
+.study-mode-btn {
+  border-color: var(--border);
+  color: var(--muted);
+  transition: background 0.15s, color 0.15s;
+}
+.study-mode-btn.study-mode-on {
+  background: var(--primary);
+  color: var(--on-accent);
+  border-color: var(--primary);
+}
+
+/* Tag dropdown */
+.tag-dropdown-wrapper { position: relative; display: inline-block; }
+.tag-trigger {
+  background: var(--tag-color, var(--border));
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+.tag-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 100;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  min-width: 140px;
+  padding: 0.3rem 0;
+}
+.tag-menu.hidden { display: none; }
+.tag-menu-section-label {
+  font-size: 0.7rem;
+  color: var(--muted);
+  padding: 0.35rem 0.75rem 0.15rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.tag-menu-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+.tag-menu-option:hover { background: var(--hover); }
+.tag-menu-option.active {
+  color: var(--tag-color, var(--primary));
+  font-weight: 700;
+}
+.tag-menu-option::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tag-color, transparent);
+  margin-right: 0.5rem;
+  vertical-align: middle;
+}
+.tag-menu-studied-label {
+  color: #22c55e;
+  border-top: 1px solid var(--border);
+  margin-top: 0.25rem;
+  padding-top: 0.5rem;
+}
 
 .icon-btn {
   border: none;
@@ -438,8 +604,26 @@ body {
   padding-bottom: 0.5rem;
 }
 .course-column {
-  flex: 1 1 300px;
+  flex: 0 0 300px;
+  width: 300px;
   max-width: 480px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--primary);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  max-height: 75vh;
+}
+/* Focused single-course column */
+.course-board--focused {
+  cursor: pointer; /* empty space is clickable to exit focus */
+}
+.course-column--focused {
+  cursor: default;
+  flex: 0 0 460px;
+  max-width: 460px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-top: 4px solid var(--primary);
@@ -466,6 +650,10 @@ body {
   border-bottom: 1px solid var(--border);
   background: var(--surface);
   border-radius: var(--radius) var(--radius) 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 .course-column-body {
   padding: 0 0.9rem 0.9rem;
@@ -483,6 +671,43 @@ body {
 .week-divider-label { font-weight: 600; font-size: 0.85rem; }
 .week-divider-dates { font-size: 0.75rem; color: var(--muted); }
 .week-divider.current .week-divider-label { color: var(--primary); }
+
+/* Collapsible week sections inside course columns */
+.course-week-header {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+.course-week-header:first-child {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 0;
+}
+.course-week-header:hover {
+  background: var(--hover);
+  border-radius: 4px;
+}
+.course-week-chevron {
+  transition: transform 0.2s;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+}
+.course-week-chevron .ti { width: 14px; height: 14px; }
+.course-week-header.open .course-week-chevron {
+  transform: rotate(90deg);
+}
+.course-week-body {
+  display: none;
+}
+.course-week-body.open {
+  display: block;
+}
 
 /* Modal */
 .modal-overlay {
@@ -557,6 +782,67 @@ body {
   margin-top: 1.25rem;
 }
 
+/* Modal tabs */
+.modal-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.5rem;
+}
+.modal-tab {
+  background: none;
+  border: none;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.modal-tab.active {
+  background: var(--primary);
+  color: var(--on-accent);
+}
+
+/* Tags editor */
+.tags-editor-section { margin-bottom: 1.25rem; }
+.tags-editor-section h3 { font-size: 0.9rem; margin-bottom: 0.5rem; }
+.tags-section-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin: 0.5rem 0 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.tags-sortable-list { list-style: none; padding: 0; margin: 0 0 0.5rem; }
+.tag-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+  border-radius: 4px;
+}
+.tag-row.dragging { opacity: 0.4; }
+.tag-drag-handle {
+  cursor: grab;
+  color: var(--muted);
+  font-size: 1rem;
+}
+.tag-drag-handle--locked {
+  cursor: not-allowed;
+  opacity: 0.3;
+}
+.tag-name-input {
+  flex: 1;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  background: var(--surface);
+  color: var(--text);
+}
+.tag-name-input:disabled { opacity: 0.55; cursor: not-allowed; }
+
 /* Settings modal */
 .settings-modal { max-width: 360px; }
 .settings-header {
@@ -618,6 +904,26 @@ body {
   font-size: 0.8rem;
 }
 
+/* Theme segmented control (Settings modal) */
+.theme-segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.theme-seg-btn {
+  border: none;
+  background: var(--surface);
+  color: var(--muted);
+  padding: 0.3rem 0.7rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.theme-seg-btn + .theme-seg-btn { border-left: 1px solid var(--border); }
+.theme-seg-btn:hover { background: var(--hover); color: var(--text); }
+.theme-seg-btn.active { background: var(--primary); color: var(--on-accent); }
+
 /* Toggle switch */
 .switch { position: relative; display: inline-block; width: 40px; height: 22px; flex-shrink: 0; }
 .switch input { opacity: 0; width: 0; height: 0; }
@@ -644,6 +950,17 @@ body {
 .switch input:checked + .slider { background: var(--primary); }
 .switch input:checked + .slider::before { transform: translateX(18px); }
 .switch input:focus-visible + .slider { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.add-item-type-toggle {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.add-item-type-btn.active {
+  background: var(--primary);
+  color: var(--on-accent);
+  border-color: var(--primary);
+}
 
 @media (max-width: 600px) {
   .header-inner { flex-direction: column; align-items: stretch; }

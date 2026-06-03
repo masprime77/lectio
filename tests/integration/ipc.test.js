@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { registerIpcHandlers } from '../../lib/ipc-handlers.js';
+import core from '../../lib/planner-core.js';
 
 // Minimal mock of Electron's ipcMain: records handlers and lets us invoke them
 // the way the renderer would (ipcRenderer.invoke → ipcMain.handle).
@@ -46,10 +47,37 @@ describe('IPC handlers', () => {
     await expect(ipc.invoke('list-semesters')).resolves.toEqual([]);
   });
 
-  it('save-semester followed by get-semester returns the same data', async () => {
+  it('save-semester followed by get-semester returns the data with tags migrated in', async () => {
     await ipc.invoke('save-semester', 'x', sample);
-    await expect(ipc.invoke('get-semester', 'x')).resolves.toEqual(sample);
+    // get-semester migrates legacy data on load, adding the default tag sets.
+    await expect(ipc.invoke('get-semester', 'x')).resolves.toEqual({
+      ...sample,
+      readingTags: core.DEFAULT_READING_TAGS,
+      taskTags: core.DEFAULT_TASK_TAGS,
+    });
     await expect(ipc.invoke('list-semesters')).resolves.toEqual([{ id: 'x', name: 'X' }]);
+  });
+
+  it('get-semester migrates legacy reading/task statuses to tag ids', async () => {
+    const legacy = {
+      id: 'y',
+      name: 'Y',
+      startDate: '2025-01-06',
+      weeks: 4,
+      courses: [
+        {
+          id: 'c1',
+          name: 'C1',
+          color: '#000',
+          readings: [{ id: 'r1', week: 1, title: 'R', status: 'summarized' }],
+          tasks: [{ id: 't1', week: 1, title: 'T', status: 'not done' }],
+        },
+      ],
+    };
+    await ipc.invoke('save-semester', 'y', legacy);
+    const loaded = await ipc.invoke('get-semester', 'y');
+    expect(loaded.courses[0].readings[0].status).toBe('r-summarized');
+    expect(loaded.courses[0].tasks[0].status).toBe('t-pending');
   });
 
   it('delete-semester followed by get-semester throws a not-found error', async () => {
