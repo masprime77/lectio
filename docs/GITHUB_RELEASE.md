@@ -1,17 +1,26 @@
 ---
-## What's new in v1.6.2
+## What's new in v1.7.0
 
-This is a patch release that fixes two regressions introduced by the v1.6.0 header redesign.
+This release sharpens the planner and onboarding experience. You can now break down each course's progress into separate readings/tasks bars, edit a task's due date inline, and get walked through the app by an interactive tour on first run. The semester modal is leaner, and sending feedback no longer leaves the app.
 
-### Header logo now appears
-The small rounded logo next to the "Lectio" wordmark was missing in the packaged app because `assets/icon.png` was not included in the electron-builder bundle. It is now bundled correctly and renders in both development and the distributed app.
+### Planner
+- Added a "Breakdown" toggle button to the dashboard header that opens an inline panel splitting each course's progress into separate readings and tasks mini-bars with done/total counts, plus a "Total" summary row for the whole semester; the panel respects the current sort order and Study Mode, and the existing progress bars are unchanged.
+- Added inline editing of a task's due date directly in the planner: tasks with a date show a clickable "due YYYY-MM-DD" that opens an inline date picker (committing on blur/Enter, cancelling on Escape, clearing the field removes the date), and tasks without one reveal a "＋ date" affordance on row hover to set one.
 
-### Window is draggable again
-Hiding the native title bar with `hiddenInset` left no drag region — every pixel of the header belonged to a button or select, making the window impossible to move. The header is now a native drag region, with interactive controls explicitly opted out so clicks still work normally.
+### Semester modal
+- Removed the "Reading / Task" quick-add tab from the semester modal (the standalone "Add reading / task" modal is unaffected).
+- Renamed the semester modal title in create mode from "Create New Semester" to "New".
+
+### Onboarding & feedback
+- Added an interactive onboarding tour that auto-launches on first run and can be replayed any time from Settings → Start tour: each step spotlights a real UI element with a cutout, shows a titled tooltip, and supports Back/Next/Skip plus keyboard navigation (arrows, Enter, Escape). Steps live in a single `TUTORIAL_STEPS` array so new features only need an entry there (see `docs/TUTORIAL_STEPS.md`).
+- Replaced the feedback flow's GitHub redirect with a direct submission to the Vercel `/api/feedback` endpoint, so feedback is sent without leaving the app or needing a GitHub account; the submit button now shows a "Sending…" state, then an in-modal success confirmation, with inline error recovery on failure.
+
 ---
 **Full changelog:** [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md)
 
-**macOS:** download `Lectio-arm64.dmg` below → drag to Applications.**Windows:** download `Lectio-Setup.exe` below → Next → Next → Install.**Homebrew:** `brew tap masprime77/tap && brew install --cask lectio`
+**macOS:** download `Lectio-arm64.dmg` below → drag to Applications.
+**Windows:** download `Lectio-Setup.exe` below → Next → Next → Install.
+**Homebrew:** `brew tap masprime77/tap && brew install --cask lectio`
 
 > First launch on macOS: right-click → Open (Gatekeeper), or run `xattr -cr /Applications/Lectio.app` in Terminal.
 > First launch on Windows: click **More info → Run anyway** (SmartScreen).
@@ -25,12 +34,12 @@ After merging the PR into main:
 
   git checkout main
   git pull origin main
-  git tag v1.6.1
-  git push origin v1.6.1
+  git tag v1.7.0
+  git push origin v1.7.0
 
 The release.yml workflow will then run CI and, if it passes, build and
 publish the macOS (.dmg + .zip + latest-mac.yml) and Windows (.exe + .zip +
-latest.yml) assets to a new GitHub Release for the v1.6.1 tag. Once the
+latest.yml) assets to a new GitHub Release for the v1.7.0 tag. Once the
 draft release appears in GitHub, paste the content of docs/GITHUB_RELEASE.md
 into the description field and publish it to make the download links live.
 

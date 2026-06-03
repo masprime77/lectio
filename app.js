@@ -14,6 +14,9 @@ const state = {
   focusedCourseId: null, // null = normal All Courses layout; course id = focused mode
   sortOrder: restoreSort(), // course sort order — restored from last session
   studyMode: restoreStudyMode(), // Study Mode overlay — restored from last session
+  breakdownOpen: false, // progress breakdown panel visibility
+  tutorialStep: 0,   // current step index (0-based)
+  tutorialActive: false, // whether the overlay is visible
 };
 
 // ---------------------------------------------------------------------------
@@ -56,6 +59,11 @@ function restoreSort() {
 // Restore the saved Study Mode toggle, defaulting to off.
 function restoreStudyMode() {
   return readPref('studyMode') === 'true';
+}
+
+// Whether the user has already seen (finished/skipped) the tutorial.
+function hasTutorialBeenSeen() {
+  return readPref('tutorialSeen') === 'true';
 }
 
 // ---------------------------------------------------------------------------
@@ -215,6 +223,8 @@ const ICONS = {
     '<path d="M9 9v-1a3 3 0 0 1 6 0v1" /><path d="M8 9h8a6 6 0 0 1 1 3v3a5 5 0 0 1 -10 0v-3a6 6 0 0 1 1 -3" /><path d="M3 13l4 0" /><path d="M17 13l4 0" /><path d="M12 20l0 -6" /><path d="M4 19l3.35 -2" /><path d="M20 19l-3.35 -2" /><path d="M4 7l3.75 2.4" /><path d="M20 7l-3.75 2.4" />',
   bulb:
     '<path d="M3 12h1m8 -9v1m8 8h1m-15.4 -6.4l.7 .7m12.1 -.7l-.7 .7" /><path d="M9 16a5 5 0 1 1 6 0a3.5 3.5 0 0 0 -1 3a2 2 0 0 1 -4 0a3.5 3.5 0 0 0 -1 -3" /><path d="M9.7 17l4.6 0" />',
+  school:
+    '<path d="M22 9l-10 -4l-10 4l10 4l10 -4v6" /><path d="M6 10.6v5.4a6 6 0 0 0 12 0v-5.4" />',
 };
 
 function icon(name) {
@@ -316,6 +326,35 @@ function sortedCoursesForWeekView(courses) {
   return [...courses]; // preserve original order
 }
 
+// Returns { readings: {done, total}, tasks: {done, total} } for one course.
+// Mirrors the logic of courseProgress() but split by type.
+function courseBreakdown(course, sem, studyMode) {
+  const readings = (course && course.readings) || [];
+  const tasks    = (course && course.tasks)    || [];
+
+  let doneR, doneT;
+  if (studyMode) {
+    doneR = readings.filter((r) => r.status === 'r-studied').length;
+    doneT = tasks.filter((t)   => t.status === 't-studied').length;
+  } else {
+    const rTags    = getReadingTags(sem || {});
+    const tTags    = getTaskTags(sem    || {});
+    const rDoneIds = new Set(rTags.filter((t) => t.section === 'done').map((t) => t.id));
+    const tDoneIds = new Set(tTags.filter((t) => t.section === 'done').map((t) => t.id));
+    doneR = readings.filter(
+      (r) => rDoneIds.has(r.status) || (r.status === '__deleted__' && r._ghostSection === 'done')
+    ).length;
+    doneT = tasks.filter(
+      (t) => tDoneIds.has(t.status) || (t.status === '__deleted__' && t._ghostSection === 'done')
+    ).length;
+  }
+
+  return {
+    readings: { done: doneR, total: readings.length },
+    tasks:    { done: doneT, total: tasks.length    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Dashboard: per-course progress + current week indicator
 // (courseProgress comes from lib/planner-core.js)
@@ -325,7 +364,16 @@ function renderDashboard() {
   const root = document.getElementById('dashboard');
   const cw = currentWeek(sem);
 
-  const heading = `<h2>${sem.name}</h2>`;
+  const breakdownBtnLabel = state.breakdownOpen ? 'Hide Breakdown' : 'Breakdown';
+  const breakdownBtnActive = state.breakdownOpen ? ' breakdown-toggle--active' : '';
+  const heading = `
+    <div class="dashboard-header">
+      <h2>${escapeHtml(sem.name)}</h2>
+      <button class="breakdown-toggle${breakdownBtnActive}" id="breakdown-btn"
+              title="Show readings vs tasks progress" aria-expanded="${state.breakdownOpen}">
+        ${breakdownBtnLabel}
+      </button>
+    </div>`;
   const weekLine = cw
     ? `<div class="current-week">Current week: <strong>Week ${cw}</strong> of ${sem.weeks}</div>`
     : `<div class="current-week">Semester not currently in session (${sem.weeks} weeks total)</div>`;
@@ -356,6 +404,98 @@ function renderDashboard() {
   }
 
   root.innerHTML = heading + weekLine + bars;
+
+  // Render the breakdown panel if open.
+  if (state.breakdownOpen && sem.courses.length > 0) {
+    const panel = document.createElement('div');
+    panel.className = 'breakdown-panel';
+    panel.setAttribute('role', 'region');
+    panel.setAttribute('aria-label', 'Progress breakdown');
+
+    // Build table rows
+    let totalRDone = 0, totalRAll = 0, totalTDone = 0, totalTAll = 0;
+    let rows = '';
+    sortedCourses(sem.courses).forEach((course) => {
+      const bd = courseBreakdown(course, sem, state.studyMode);
+      totalRDone += bd.readings.done;
+      totalRAll  += bd.readings.total;
+      totalTDone += bd.tasks.done;
+      totalTAll  += bd.tasks.total;
+
+      const rPct = bd.readings.total > 0
+        ? Math.round((bd.readings.done / bd.readings.total) * 100) : 0;
+      const tPct = bd.tasks.total > 0
+        ? Math.round((bd.tasks.done   / bd.tasks.total)   * 100) : 0;
+
+      rows += `
+        <tr>
+          <td class="bd-name" style="color:${escapeHtml(course.color)}">${escapeHtml(course.name)}</td>
+          <td class="bd-cell">
+            <div class="bd-cell-inner">
+              <div class="bd-mini-bar-wrap">
+                <div class="bd-mini-bar" style="width:${rPct}%;background:${escapeHtml(course.color)}"></div>
+              </div>
+              <span class="bd-pct">${bd.readings.done}/${bd.readings.total}</span>
+            </div>
+          </td>
+          <td class="bd-cell">
+            <div class="bd-cell-inner">
+              <div class="bd-mini-bar-wrap">
+                <div class="bd-mini-bar" style="width:${tPct}%;background:${escapeHtml(course.color)}"></div>
+              </div>
+              <span class="bd-pct">${bd.tasks.done}/${bd.tasks.total}</span>
+            </div>
+          </td>
+        </tr>`;
+    });
+
+    // Summary row
+    const srPct = totalRAll > 0 ? Math.round((totalRDone / totalRAll) * 100) : 0;
+    const stPct = totalTAll > 0 ? Math.round((totalTDone / totalTAll) * 100) : 0;
+    const summaryRow = `
+      <tr class="bd-summary">
+        <td class="bd-name">Total</td>
+        <td class="bd-cell">
+          <div class="bd-cell-inner">
+            <div class="bd-mini-bar-wrap">
+              <div class="bd-mini-bar bd-mini-bar--summary" style="width:${srPct}%"></div>
+            </div>
+            <span class="bd-pct">${totalRDone}/${totalRAll} (${srPct}%)</span>
+          </div>
+        </td>
+        <td class="bd-cell">
+          <div class="bd-cell-inner">
+            <div class="bd-mini-bar-wrap">
+              <div class="bd-mini-bar bd-mini-bar--summary" style="width:${stPct}%"></div>
+            </div>
+            <span class="bd-pct">${totalTDone}/${totalTAll} (${stPct}%)</span>
+          </div>
+        </td>
+      </tr>`;
+
+    panel.innerHTML = `
+      <table class="breakdown-table" aria-label="Readings and tasks breakdown">
+        <thead>
+          <tr>
+            <th class="bd-th-course">Course</th>
+            <th class="bd-th-type">Readings</th>
+            <th class="bd-th-type">Tasks</th>
+          </tr>
+        </thead>
+        <tbody>${rows}${summaryRow}</tbody>
+      </table>`;
+
+    root.appendChild(panel);
+  }
+
+  // Wire up the breakdown toggle button.
+  const breakdownBtn = root.querySelector('#breakdown-btn');
+  if (breakdownBtn) {
+    breakdownBtn.addEventListener('click', () => {
+      state.breakdownOpen = !state.breakdownOpen;
+      renderDashboard();
+    });
+  }
 
   // Wire up clickable course names: toggle focused single-course mode.
   root.querySelectorAll('.progress-row').forEach((row) => {
@@ -681,11 +821,25 @@ function renderItemList(items, type, course, week) {
     titleSpan.addEventListener('click', () => editItemTitle(titleSpan, item));
     li.appendChild(titleSpan);
 
-    if (type === 'task' && item.dueDate) {
-      const due = document.createElement('span');
-      due.className = 'item-due';
-      due.textContent = 'due ' + item.dueDate;
-      li.appendChild(due);
+    if (type === 'task') {
+      if (item.dueDate) {
+        // Existing due date — clickable to edit.
+        const due = document.createElement('span');
+        due.className = 'item-due';
+        due.textContent = 'due ' + item.dueDate;
+        due.title = 'Click to edit due date';
+        due.style.cursor = 'pointer';
+        due.addEventListener('click', () => editItemDueDate(due, item));
+        li.appendChild(due);
+      } else {
+        // No due date — show a hover affordance to add one.
+        const addDue = document.createElement('span');
+        addDue.className = 'item-add-due';
+        addDue.textContent = '＋ date';
+        addDue.title = 'Add due date';
+        addDue.addEventListener('click', () => editItemDueDate(addDue, item));
+        li.appendChild(addDue);
+      }
     }
 
     const wrapper = document.createElement('div');
@@ -807,6 +961,38 @@ function editItemTitle(span, item) {
   input.select();
 }
 
+// Replace the due-date span (or add-due affordance) with an inline
+// date input. originalSpan is the element to swap back on Escape.
+function editItemDueDate(originalSpan, item) {
+  const input = document.createElement('input');
+  input.type = 'date';
+  input.value = item.dueDate || '';
+  input.className = 'item-due item-due-input';
+
+  const commit = () => {
+    const v = input.value.trim();
+    item.dueDate = v || '';
+    persist();
+    render();
+  };
+  const cancel = () => {
+    input.replaceWith(originalSpan);
+  };
+
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') input.blur();
+    if (e.key === 'Escape') {
+      // Remove the blur listener so it does not fire after replaceWith.
+      input.removeEventListener('blur', commit);
+      cancel();
+    }
+  });
+
+  originalSpan.replaceWith(input);
+  input.focus();
+}
+
 // Low-weight "+ Reading" / "+ Task" buttons (Course view). Clicking one reveals
 // the existing add-input for that type, focused — so the add UI stays out of the
 // way until needed but nothing is redesigned. Used at the bottom of each week
@@ -883,6 +1069,272 @@ function addRow(type, course, week) {
 // ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Tutorial steps
+// To add a step for a new feature: append an object to this array.
+// Fields: id (string), title (string), description (string),
+//         targetSelector (CSS selector | null), setup (async fn | null).
+// Steps run in order; setup() is awaited before the overlay is shown.
+// ---------------------------------------------------------------------------
+const TUTORIAL_STEPS = [
+  {
+    id: 'welcome',
+    title: 'Welcome to Lectio',
+    description:
+      'Lectio helps you plan your university semester: courses, weekly readings, and tasks — all in one place. This quick tour will show you around. Click Next to begin.',
+    targetSelector: null,
+    setup: null,
+  },
+  {
+    id: 'example-semester',
+    title: 'Your semester',
+    description:
+      'This is the semester selector. Lectio comes with an example semester so you can explore right away. You can create your own with the "New" button.',
+    targetSelector: '#semester-select',
+    setup: async () => {
+      // Ensure the example semester (id "ss2025") is loaded, if it exists.
+      // If the user already has a different semester active, do nothing.
+      const list = await api.list();
+      const example = list.find((s) => s.id === 'ss2025');
+      if (example && state.semesterId !== 'ss2025') {
+        await loadSemester('ss2025');
+      }
+    },
+  },
+  {
+    id: 'dashboard',
+    title: 'Progress dashboard',
+    description:
+      'The dashboard shows each course with a progress bar. The percentage reflects how many readings and tasks are marked done. Click a course name to focus on it.',
+    targetSelector: '#dashboard',
+    setup: null,
+  },
+  {
+    id: 'views',
+    title: 'Two views',
+    description:
+      'Switch between Weekly view (readings and tasks grouped by week) and All Courses view (a column per course). Use the buttons in the header.',
+    targetSelector: '.view-toggle',
+    setup: null,
+  },
+  {
+    id: 'item-status',
+    title: 'Reading and task tags',
+    description:
+      'Click any reading or task badge to open its tag menu and pick a tag. Default reading tags are Pending, Seen, Summarized, and Studied; tasks use Pending, Done, and Studied. Tags in the "done" group count toward progress, and you can add, rename, recolor, or reorder your own.',
+    targetSelector: '#planner',
+    setup: null,
+  },
+  {
+    id: 'sort',
+    title: 'Sort courses',
+    description:
+      'Use the sort dropdown to reorder courses by progress, alphabetically, or by the week with the most pending work.',
+    targetSelector: '#sort-select',
+    setup: null,
+  },
+  {
+    id: 'study-mode',
+    title: 'Study Mode',
+    description:
+      'Study Mode recalculates progress counting only items tagged "Studied" — useful during revision week. Toggle it on and off any time.',
+    targetSelector: '#study-mode-btn',
+    setup: null,
+  },
+  {
+    id: 'new-semester',
+    title: 'Create your own semester',
+    description:
+      'Ready to start planning? Click "New" to create a semester: give it a name, a start date, a number of weeks, and add your courses. You can always edit it later.',
+    targetSelector: '#new-btn',
+    setup: null,
+  },
+  {
+    id: 'done',
+    title: "You're all set",
+    description:
+      'That\'s everything you need to know. You can replay this tour any time from Settings → Tutorial. Good luck with your semester!',
+    targetSelector: null,
+    setup: null,
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Tutorial engine
+// ---------------------------------------------------------------------------
+
+function isTutorialElementVisible(selector) {
+  if (!selector) return true;
+  const el = document.querySelector(selector);
+  return !!el;
+}
+
+// Position the tooltip relative to the spotlight target.
+// Returns { top, left } in px, clamped to viewport with 12px margin.
+function tutorialTooltipPosition(targetEl) {
+  const PAD = 12; // gap between spotlight edge and tooltip
+  const MARGIN = 12; // minimum distance from viewport edge
+  const tooltip = document.getElementById('tutorial-tooltip');
+  if (!tooltip || !targetEl) {
+    // Centered
+    return {
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+    };
+  }
+  const tRect = targetEl.getBoundingClientRect();
+  const tipRect = tooltip.getBoundingClientRect();
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  // Prefer placing below; fall back to above; then right; then centered.
+  let top, left;
+  if (tRect.bottom + PAD + tipRect.height + MARGIN < vh) {
+    top = tRect.bottom + PAD;
+    left = tRect.left;
+  } else if (tRect.top - PAD - tipRect.height - MARGIN > 0) {
+    top = tRect.top - PAD - tipRect.height;
+    left = tRect.left;
+  } else if (tRect.right + PAD + tipRect.width + MARGIN < vw) {
+    top = tRect.top;
+    left = tRect.right + PAD;
+  } else {
+    top = vh / 2 - tipRect.height / 2;
+    left = vw / 2 - tipRect.width / 2;
+  }
+
+  // Clamp to viewport
+  left = Math.max(MARGIN, Math.min(left, vw - tipRect.width - MARGIN));
+  top  = Math.max(MARGIN, Math.min(top,  vh - tipRect.height - MARGIN));
+
+  return { top: top + 'px', left: left + 'px', transform: 'none' };
+}
+
+// Update the spotlight cutout on the overlay SVG.
+// Uses a <clipPath> approach: the overlay is a full-screen div with a hole.
+function updateSpotlight(targetEl) {
+  const overlay = document.getElementById('tutorial-overlay');
+  const spotlight = document.getElementById('tutorial-spotlight');
+  if (!spotlight) return;
+
+  if (!targetEl) {
+    spotlight.style.display = 'none';
+    return;
+  }
+
+  const rect = targetEl.getBoundingClientRect();
+  const RADIUS = 6; // px, rounded corners on spotlight
+  const PAD = 6;    // extra padding around target
+  const x = rect.left - PAD;
+  const y = rect.top  - PAD;
+  const w = rect.width  + PAD * 2;
+  const h = rect.height + PAD * 2;
+
+  spotlight.style.display = 'block';
+  spotlight.style.left   = x + 'px';
+  spotlight.style.top    = y + 'px';
+  spotlight.style.width  = w + 'px';
+  spotlight.style.height = h + 'px';
+  spotlight.style.borderRadius = RADIUS + 'px';
+}
+
+async function showTutorialStep(index) {
+  const step = TUTORIAL_STEPS[index];
+  if (!step) return;
+
+  // Run setup before showing UI.
+  if (step.setup) await step.setup();
+
+  const overlay   = document.getElementById('tutorial-overlay');
+  const tooltip   = document.getElementById('tutorial-tooltip');
+  const titleEl   = document.getElementById('tutorial-title');
+  const descEl    = document.getElementById('tutorial-desc');
+  const prevBtn   = document.getElementById('tutorial-prev');
+  const nextBtn   = document.getElementById('tutorial-next');
+  const skipBtn   = document.getElementById('tutorial-skip');
+  const counter   = document.getElementById('tutorial-counter');
+
+  titleEl.textContent = step.title;
+  descEl.textContent  = step.description;
+
+  const total = TUTORIAL_STEPS.length;
+  counter.textContent = `${index + 1} / ${total}`;
+
+  prevBtn.disabled = (index === 0);
+  const isLast = (index === total - 1);
+  nextBtn.textContent = isLast ? 'Finish' : 'Next';
+
+  // Spotlight
+  const targetEl = step.targetSelector
+    ? document.querySelector(step.targetSelector)
+    : null;
+  updateSpotlight(targetEl);
+
+  // Show overlay (must happen before we measure tooltip for positioning).
+  overlay.classList.remove('hidden');
+  tooltip.style.transform = 'none';
+
+  // Position tooltip after a frame so the browser has laid it out.
+  requestAnimationFrame(() => {
+    const pos = tutorialTooltipPosition(targetEl);
+    tooltip.style.top       = pos.top;
+    tooltip.style.left      = pos.left;
+    tooltip.style.transform = pos.transform;
+  });
+}
+
+function closeTutorial(markSeen = true) {
+  document.getElementById('tutorial-overlay').classList.add('hidden');
+  state.tutorialActive = false;
+  if (markSeen) writePref('tutorialSeen', 'true');
+}
+
+async function startTutorial() {
+  state.tutorialActive = true;
+  state.tutorialStep   = 0;
+  await showTutorialStep(0);
+}
+
+function setupTutorial() {
+  const overlay = document.getElementById('tutorial-overlay');
+  const prevBtn = document.getElementById('tutorial-prev');
+  const nextBtn = document.getElementById('tutorial-next');
+  const skipBtn = document.getElementById('tutorial-skip');
+
+  prevBtn.addEventListener('click', async () => {
+    if (state.tutorialStep > 0) {
+      state.tutorialStep--;
+      await showTutorialStep(state.tutorialStep);
+    }
+  });
+
+  nextBtn.addEventListener('click', async () => {
+    const isLast = state.tutorialStep === TUTORIAL_STEPS.length - 1;
+    if (isLast) {
+      closeTutorial(true);
+    } else {
+      state.tutorialStep++;
+      await showTutorialStep(state.tutorialStep);
+    }
+  });
+
+  skipBtn.addEventListener('click', () => closeTutorial(true));
+
+  // Keyboard navigation: Right/Enter = next, Left = prev, Escape = skip.
+  document.addEventListener('keydown', (e) => {
+    if (!state.tutorialActive) return;
+    if (e.key === 'Escape') { closeTutorial(true); return; }
+    if (e.key === 'ArrowRight' || e.key === 'Enter') {
+      // Prevent Enter from also triggering a focused button.
+      if (e.key === 'Enter' && document.activeElement &&
+          document.activeElement !== document.body) return;
+      nextBtn.click();
+    }
+    if (e.key === 'ArrowLeft') prevBtn.click();
+  });
+}
+
 async function init() {
   document.body.classList.add('electron-app');
 
@@ -938,6 +1390,13 @@ async function init() {
   setupSettings();
   setupFeedback();
   setupAddItem();
+  setupTutorial();
+
+  // Auto-launch on first run (no tutorial seen and at least one semester exists).
+  if (!hasTutorialBeenSeen()) {
+    // Small delay so the UI is fully rendered before the overlay appears.
+    setTimeout(() => startTutorial(), 300);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1109,92 +1568,6 @@ function setupModal() {
       }
     });
   });
-
-  // ── "Reading / Task" tab: quick-add inline in the New modal ──────────
-  let nsAddItemType = 'reading';
-
-  function setNsAddItemType(t) {
-    nsAddItemType = t;
-    document.getElementById('ns-add-item-type-reading').classList.toggle('active', t === 'reading');
-    document.getElementById('ns-add-item-type-task').classList.toggle('active', t === 'task');
-    document.getElementById('ns-add-item-due-row').style.display = t === 'task' ? 'block' : 'none';
-  }
-
-  document.getElementById('ns-add-item-type-reading').addEventListener('click', () => setNsAddItemType('reading'));
-  document.getElementById('ns-add-item-type-task').addEventListener('click', () => setNsAddItemType('task'));
-
-  // Populate course + week selects when the tab becomes visible.
-  document.querySelectorAll('.modal-tab').forEach((tab) => {
-    tab.addEventListener('click', () => {
-      if (tab.dataset.tab !== 'add-item') return;
-      // Populate courses
-      const courseSelect = document.getElementById('ns-add-item-course');
-      courseSelect.innerHTML = '';
-      if (state.semester) {
-        state.semester.courses.forEach((c) => {
-          const opt = document.createElement('option');
-          opt.value = c.id;
-          opt.textContent = c.name;
-          courseSelect.appendChild(opt);
-        });
-      }
-      // Populate weeks
-      const weekSelect = document.getElementById('ns-add-item-week');
-      weekSelect.innerHTML = '';
-      const total = state.semester ? state.semester.weeks : 15;
-      const cw = state.semester ? currentWeek(state.semester) : 0;
-      for (let w = 1; w <= total; w++) {
-        const opt = document.createElement('option');
-        opt.value = w;
-        opt.textContent = 'Week ' + w;
-        if (w === cw) opt.selected = true;
-        weekSelect.appendChild(opt);
-      }
-      // Reset form
-      document.getElementById('ns-add-item-title').value = '';
-      document.getElementById('ns-add-item-due').value = '';
-      document.getElementById('ns-add-item-error').classList.add('hidden');
-      setNsAddItemType('reading');
-    });
-  });
-
-  document.getElementById('ns-add-item-submit').addEventListener('click', () => {
-    const titleVal = document.getElementById('ns-add-item-title').value.trim();
-    const courseId = document.getElementById('ns-add-item-course').value;
-    const week = parseInt(document.getElementById('ns-add-item-week').value, 10);
-    const errorEl = document.getElementById('ns-add-item-error');
-
-    if (!titleVal || !courseId || !week) {
-      errorEl.textContent = 'Course, week, and title are required.';
-      errorEl.classList.remove('hidden');
-      return;
-    }
-    errorEl.classList.add('hidden');
-
-    const course = state.semester.courses.find((c) => c.id === courseId);
-    if (!course) return;
-
-    if (nsAddItemType === 'reading') {
-      course.readings.push({ id: uid('r'), week, title: titleVal, status: 'r-pending' });
-    } else {
-      course.tasks.push({
-        id: uid('t'),
-        week,
-        title: titleVal,
-        dueDate: document.getElementById('ns-add-item-due').value || '',
-        status: 't-pending',
-      });
-    }
-
-    persist();
-    render();
-
-    // Reset for the next add
-    document.getElementById('ns-add-item-title').value = '';
-    document.getElementById('ns-add-item-due').value = '';
-    document.getElementById('ns-add-item-title').focus();
-  });
-  // ── end "Reading / Task" tab ──────────────────────────────────────────
 }
 
 // The header "＋ New" button opens the semester-creation modal.
@@ -1217,7 +1590,7 @@ function closeModal() {
 // Open the modal in "create" mode (blank form, one empty course row).
 function openCreateModal() {
   state.editingId = null;
-  document.getElementById('modal-title').textContent = 'Create New Semester';
+  document.getElementById('modal-title').textContent = 'New';
   document.getElementById('modal-submit').textContent = 'Create';
   const form = document.getElementById('new-semester-form');
   form.reset();
@@ -1612,33 +1985,42 @@ async function openSettingsModal() {
   }
   document.getElementById('set-version').textContent = version || '—';
 
+  // Tutorial button: closes settings and starts the tour.
+  const tutorialBtn = document.getElementById('set-tutorial-btn');
+  if (tutorialBtn) {
+    // Re-attach listener each open to avoid duplicates (remove old first).
+    const fresh = tutorialBtn.cloneNode(true);
+    tutorialBtn.replaceWith(fresh);
+    fresh.addEventListener('click', () => {
+      closeSettingsModal();
+      startTutorial();
+    });
+  }
+
   document.getElementById('settings-overlay').classList.remove('hidden');
 }
 
 // ---------------------------------------------------------------------------
 // Feedback: the user fills in a title + description inside the app, then we
-// open a pre-filled GitHub new-issue page in the default browser via the
-// window.externalLinks bridge (main restricts to github.com) — they only need
-// to click "Submit new issue" there. The repo's issue templates live in
-// .github/ISSUE_TEMPLATE. The current app version is appended to the body.
+// POST it directly to a Vercel serverless endpoint (which files a GitHub issue
+// on our behalf) — the user never leaves the app and needs no GitHub account.
+// The current app version is sent along so issues are tagged with a build.
 // ---------------------------------------------------------------------------
-const FEEDBACK_TEMPLATES = {
-  bug: { template: 'bug_report.md', labels: 'bug' },
-  feature: { template: 'feature_request.md', labels: 'enhancement' },
-};
+const FEEDBACK_ENDPOINT = 'https://lectio-opal.vercel.app/api/feedback';
 
 let feedbackKind = 'bug';
 let feedbackVersion = '';
 
-function openFeedbackLink(kind, title, body) {
-  const cfg = FEEDBACK_TEMPLATES[kind];
-  if (!cfg || !window.externalLinks) return;
-  const fullBody = `${body}\n\n---\n_Lectio v${feedbackVersion}_`;
-  const url =
-    `https://github.com/masprime77/lectio/issues/new?template=${cfg.template}` +
-    `&labels=${cfg.labels}&title=${encodeURIComponent(title)}&body=${encodeURIComponent(fullBody)}`;
-  window.externalLinks.openExternal(url);
-  closeFeedbackModal();
+async function submitFeedback(kind, title, body, version) {
+  const res = await fetch(FEEDBACK_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: kind, title, body, version }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Unknown error');
+  return data; // { ok: true, url: '...' }
 }
 
 function setFeedbackKind(kind) {
@@ -1669,16 +2051,37 @@ function setupFeedback() {
 
   document.getElementById('feedback-cancel').addEventListener('click', closeFeedbackModal);
 
-  document.getElementById('feedback-submit').addEventListener('click', () => {
+  document.getElementById('feedback-submit').addEventListener('click', async () => {
     const title = document.getElementById('feedback-input-title').value.trim();
     const body = document.getElementById('feedback-input-body').value.trim();
     const error = document.getElementById('feedback-error');
+
     if (!title || !body) {
       error.classList.remove('hidden');
       return;
     }
     error.classList.add('hidden');
-    openFeedbackLink(feedbackKind, title, body);
+
+    const submitBtn = document.getElementById('feedback-submit');
+    const cancelBtn = document.getElementById('feedback-cancel');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending…';
+    cancelBtn.disabled = true;
+
+    try {
+      await submitFeedback(feedbackKind, title, body, feedbackVersion);
+      // Show success state: hide the form and the action buttons, leaving only
+      // the X close button.
+      document.getElementById('feedback-form-body').classList.add('hidden');
+      document.getElementById('feedback-actions').classList.add('hidden');
+      document.getElementById('feedback-success').classList.remove('hidden');
+    } catch (err) {
+      error.textContent = 'Could not send feedback. Please try again.';
+      error.classList.remove('hidden');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Send';
+      cancelBtn.disabled = false;
+    }
   });
 }
 
@@ -1687,6 +2090,14 @@ function closeFeedbackModal() {
   document.getElementById('feedback-input-title').value = '';
   document.getElementById('feedback-input-body').value = '';
   document.getElementById('feedback-error').classList.add('hidden');
+  document.getElementById('feedback-error').textContent = 'Title and description are required.';
+  document.getElementById('feedback-form-body').classList.remove('hidden');
+  document.getElementById('feedback-actions').classList.remove('hidden');
+  document.getElementById('feedback-success').classList.add('hidden');
+  const submitBtn = document.getElementById('feedback-submit');
+  submitBtn.disabled = false;
+  submitBtn.textContent = 'Send';
+  document.getElementById('feedback-cancel').disabled = false;
   setFeedbackKind('bug');
 }
 
