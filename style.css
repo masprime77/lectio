@@ -481,7 +481,38 @@ body.electron-app .header-inner { padding-left: 80px; }
 }
 .item:last-child { border-bottom: none; }
 .item-title { flex: 1; font-size: 0.9rem; }
-.item-due { font-size: 0.75rem; color: var(--muted); }
+/* Due date on tasks */
+.item-due {
+  font-size: 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.item-due:hover { color: var(--text); text-decoration: underline; }
+
+/* Inline date input (replaces the span while editing) */
+.item-due-input {
+  font-size: 0.75rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--primary);
+  border-radius: 4px;
+  padding: 0.05rem 0.3rem;
+  outline: none;
+  width: 7.5rem;
+}
+
+/* "＋ date" affordance — hidden at rest, visible on row hover */
+.item-add-due {
+  font-size: 0.72rem;
+  color: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.1s;
+  user-select: none;
+}
+.item:hover .item-add-due { color: var(--muted); }
+.item-add-due:hover { color: var(--primary) !important; }
 
 /* Status badges */
 .badge {

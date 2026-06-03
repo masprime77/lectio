@@ -681,11 +681,25 @@ function renderItemList(items, type, course, week) {
     titleSpan.addEventListener('click', () => editItemTitle(titleSpan, item));
     li.appendChild(titleSpan);
 
-    if (type === 'task' && item.dueDate) {
-      const due = document.createElement('span');
-      due.className = 'item-due';
-      due.textContent = 'due ' + item.dueDate;
-      li.appendChild(due);
+    if (type === 'task') {
+      if (item.dueDate) {
+        // Existing due date — clickable to edit.
+        const due = document.createElement('span');
+        due.className = 'item-due';
+        due.textContent = 'due ' + item.dueDate;
+        due.title = 'Click to edit due date';
+        due.style.cursor = 'pointer';
+        due.addEventListener('click', () => editItemDueDate(due, item));
+        li.appendChild(due);
+      } else {
+        // No due date — show a hover affordance to add one.
+        const addDue = document.createElement('span');
+        addDue.className = 'item-add-due';
+        addDue.textContent = '＋ date';
+        addDue.title = 'Add due date';
+        addDue.addEventListener('click', () => editItemDueDate(addDue, item));
+        li.appendChild(addDue);
+      }
     }
 
     const wrapper = document.createElement('div');
@@ -805,6 +819,38 @@ function editItemTitle(span, item) {
   span.replaceWith(input);
   input.focus();
   input.select();
+}
+
+// Replace the due-date span (or add-due affordance) with an inline
+// date input. originalSpan is the element to swap back on Escape.
+function editItemDueDate(originalSpan, item) {
+  const input = document.createElement('input');
+  input.type = 'date';
+  input.value = item.dueDate || '';
+  input.className = 'item-due item-due-input';
+
+  const commit = () => {
+    const v = input.value.trim();
+    item.dueDate = v || '';
+    persist();
+    render();
+  };
+  const cancel = () => {
+    input.replaceWith(originalSpan);
+  };
+
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') input.blur();
+    if (e.key === 'Escape') {
+      // Remove the blur listener so it does not fire after replaceWith.
+      input.removeEventListener('blur', commit);
+      cancel();
+    }
+  });
+
+  originalSpan.replaceWith(input);
+  input.focus();
 }
 
 // Low-weight "+ Reading" / "+ Task" buttons (Course view). Clicking one reveals
