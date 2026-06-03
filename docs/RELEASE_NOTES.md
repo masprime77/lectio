@@ -19,3 +19,5 @@
 - The status badge on each reading/task is now a dropdown: clicking it opens a menu of the semester's tags grouped into Pending and Done sections, and picking one assigns that tag to the item.
 - The semester editor is now organised into three tabs — Semester, Courses, and Tags — and always opens on the Semester tab.
 - The new Tags tab manages each semester's reading and task tags: add a tag to a section, recolor any tag, rename or delete custom tags, and drag to reorder them. Protected tags ("pending"/"studied") keep a locked name, disabled delete, and a fixed position, but can still be recolored.
+- Added a Study Mode toggle in the header (persisted across restarts). While on, course progress counts only items tagged "studied" — items with other Done tags no longer contribute — and the button is highlighted; turning it off restores the normal progress calculation.
+- While Study Mode is on, the status dropdown gains a distinct green "Studied" shortcut at the bottom for quickly marking an item studied (the studied tag still appears under Done as well).
