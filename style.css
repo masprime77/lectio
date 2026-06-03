@@ -1190,3 +1190,30 @@ body.electron-app .header-inner { padding-left: 80px; }
   display: flex;
   gap: 0.4rem;
 }
+
+/* Import-semester confirmation modal */
+.import-sem-info {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin: 0 0 1rem;
+}
+.import-sem-fieldset {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.9rem;
+}
+.import-sem-fieldset legend {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0 0.35rem;
+  color: var(--muted);
+}
+.import-sem-radio {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  margin-top: 0.4rem;
+  cursor: pointer;
+}

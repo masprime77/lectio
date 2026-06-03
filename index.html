@@ -38,6 +38,8 @@
           <select id="semester-select" class="semester-select" aria-label="Select semester"></select>
           <div class="semester-actions">
             <button id="edit-semester-btn" class="semester-action-btn" title="Edit semester" aria-label="Edit semester"></button>
+            <button id="export-semester-btn" class="semester-action-btn" title="Export semester" aria-label="Export semester"></button>
+            <button id="import-semester-btn" class="semester-action-btn" title="Import semester" aria-label="Import semester"></button>
             <button id="delete-semester-btn" class="semester-action-btn semester-action-delete" title="Delete semester" aria-label="Delete semester"></button>
           </div>
         </div>
@@ -306,6 +308,39 @@
       <div class="modal-actions">
         <button type="button" id="add-item-cancel" class="btn">Cancel</button>
         <button type="button" id="add-item-submit" class="btn btn-primary">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="import-sem-overlay" class="modal-overlay hidden">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="import-sem-title">
+      <h2 id="import-sem-title">Import Semester</h2>
+      <p id="import-sem-info" class="import-sem-info"></p>
+      <fieldset class="import-sem-fieldset">
+        <legend>Reading &amp; task statuses</legend>
+        <label class="import-sem-radio">
+          <input type="radio" name="import-sem-status" value="keep" checked />
+          Keep statuses from file
+        </label>
+        <label class="import-sem-radio">
+          <input type="radio" name="import-sem-status" value="reset" />
+          Reset all to default (pending / not done)
+        </label>
+      </fieldset>
+      <fieldset class="import-sem-fieldset" id="import-sem-conflict-section">
+        <legend>Conflict: a semester with this id already exists</legend>
+        <label class="import-sem-radio">
+          <input type="radio" name="import-sem-conflict" value="replace" checked />
+          Replace existing semester
+        </label>
+        <label class="import-sem-radio">
+          <input type="radio" name="import-sem-conflict" value="new" />
+          Save as a new semester (new id)
+        </label>
+      </fieldset>
+      <div class="modal-actions">
+        <button id="import-sem-cancel" class="btn">Cancel</button>
+        <button id="import-sem-confirm" class="btn btn-primary">Import</button>
       </div>
     </div>
   </div>
