@@ -422,16 +422,20 @@ function renderDashboard() {
         <tr>
           <td class="bd-name" style="color:${escapeHtml(course.color)}">${escapeHtml(course.name)}</td>
           <td class="bd-cell">
-            <div class="bd-mini-bar-wrap">
-              <div class="bd-mini-bar" style="width:${rPct}%;background:${escapeHtml(course.color)}"></div>
+            <div class="bd-cell-inner">
+              <div class="bd-mini-bar-wrap">
+                <div class="bd-mini-bar" style="width:${rPct}%;background:${escapeHtml(course.color)}"></div>
+              </div>
+              <span class="bd-pct">${bd.readings.done}/${bd.readings.total}</span>
             </div>
-            <span class="bd-pct">${bd.readings.done}/${bd.readings.total}</span>
           </td>
           <td class="bd-cell">
-            <div class="bd-mini-bar-wrap">
-              <div class="bd-mini-bar" style="width:${tPct}%;background:${escapeHtml(course.color)}"></div>
+            <div class="bd-cell-inner">
+              <div class="bd-mini-bar-wrap">
+                <div class="bd-mini-bar" style="width:${tPct}%;background:${escapeHtml(course.color)}"></div>
+              </div>
+              <span class="bd-pct">${bd.tasks.done}/${bd.tasks.total}</span>
             </div>
-            <span class="bd-pct">${bd.tasks.done}/${bd.tasks.total}</span>
           </td>
         </tr>`;
     });
@@ -443,16 +447,20 @@ function renderDashboard() {
       <tr class="bd-summary">
         <td class="bd-name">Total</td>
         <td class="bd-cell">
-          <div class="bd-mini-bar-wrap">
-            <div class="bd-mini-bar bd-mini-bar--summary" style="width:${srPct}%"></div>
+          <div class="bd-cell-inner">
+            <div class="bd-mini-bar-wrap">
+              <div class="bd-mini-bar bd-mini-bar--summary" style="width:${srPct}%"></div>
+            </div>
+            <span class="bd-pct">${totalRDone}/${totalRAll} (${srPct}%)</span>
           </div>
-          <span class="bd-pct">${totalRDone}/${totalRAll} (${srPct}%)</span>
         </td>
         <td class="bd-cell">
-          <div class="bd-mini-bar-wrap">
-            <div class="bd-mini-bar bd-mini-bar--summary" style="width:${stPct}%"></div>
+          <div class="bd-cell-inner">
+            <div class="bd-mini-bar-wrap">
+              <div class="bd-mini-bar bd-mini-bar--summary" style="width:${stPct}%"></div>
+            </div>
+            <span class="bd-pct">${totalTDone}/${totalTAll} (${stPct}%)</span>
           </div>
-          <span class="bd-pct">${totalTDone}/${totalTAll} (${stPct}%)</span>
         </td>
       </tr>`;
 

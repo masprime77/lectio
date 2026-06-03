@@ -474,11 +474,11 @@ body.electron-app .header-inner { padding-left: 80px; }
   text-overflow: ellipsis;
   max-width: 0; /* forces ellipsis in table layout */
 }
-.bd-cell {
+.bd-cell { padding-right: 0.5rem; }
+.bd-cell-inner {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  padding-right: 0.5rem;
 }
 .bd-mini-bar-wrap {
   flex: 1;
