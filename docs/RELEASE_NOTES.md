@@ -1,3 +1,9 @@
+## v1.8.4
+
+_Released: 2026-06-04_
+
+- Test release that ships no functional changes. Its purpose is to verify the v1.8.3 macOS auto-update fix end-to-end against a real newer release: updating from v1.8.3 should now surface the update dialog, download via the progress bar, and reliably relaunch into v1.8.4 on macOS (and continue to work on Windows).
+
 ## v1.8.3
 
 _Released: 2026-06-04_
