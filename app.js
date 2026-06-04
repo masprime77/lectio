@@ -1567,12 +1567,15 @@ function setupUpdater() {
     if (e.target === overlay) closeUpdateDialog();
   });
 
-  actionBtn.addEventListener('click', () => {
+  actionBtn.addEventListener('click', async () => {
     if (downloadComplete) {
       // Download already finished — install and relaunch.
       actionBtn.disabled = true;
       laterBtn.disabled = true;
       actionBtn.textContent = 'Restarting…';
+      // Flush pending edits first: restart-and-update bypasses the
+      // unsaved-changes prompt so the app can quit and swap cleanly.
+      await saveNow();
       window.updater.restartAndUpdate();
     } else {
       // Start download manually (only reached when autoDownload is false).
