@@ -128,11 +128,18 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
 
 ## Gotchas
 
-- **Signing:** builds are **ad-hoc signed** (free path) via `build/afterPack.js`,
-  not notarized. Downloaded copies are Gatekeeper-quarantined → first launch needs
-  right-click → Open or `xattr -dr com.apple.quarantine`. The cask's `postflight`
-  does this automatically. Setting `APPLE_TEAM_ID` (+ certs) switches to real
-  Developer ID signing + notarization (`build/afterSign.js`).
+- **Signing:** on the free path `build/afterPack.js` signs the bundle — with a
+  **persistent self-signed cert** when the CI secrets `MAC_CSC_P12_BASE64` /
+  `MAC_CSC_PASSWORD` are set (release workflow imports them → `MAC_SIGN_IDENTITY`),
+  otherwise **ad-hoc**. Neither is notarized, so downloaded copies are
+  Gatekeeper-quarantined → first launch needs right-click → Open or
+  `xattr -dr com.apple.quarantine` (the cask's `postflight` does this). The
+  self-signed cert gives a **stable designated requirement** so Squirrel.Mac
+  **auto-update works** between two self-signed builds — ad-hoc cannot
+  auto-update (its requirement is pinned to each build's hash). See
+  [`docs/MACOS_SIGNING.md`](docs/MACOS_SIGNING.md). Setting `APPLE_TEAM_ID`
+  (+ certs) switches to real Developer ID signing + notarization
+  (`build/afterSign.js`).
 - **iCloud:** building inside an iCloud-synced folder (e.g. `~/Documents`) can
   re-add xattrs that break local `codesign`; `afterPack` handles this gracefully
   (local copies aren't quarantined, so it's harmless). CI runs in a clean checkout.

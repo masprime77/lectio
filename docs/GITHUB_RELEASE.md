@@ -1,10 +1,14 @@
 ---
-## What's new in v1.8.6
+## What's new in v1.8.7
 
-A test release with no functional changes. It exists purely as a newer version to update **into** from v1.8.5, so the diagnostics added in v1.8.5 (the `electron-log` updater logger and the inline "Update failed: …" error in the dialog) can capture the exact reason the macOS install/relaunch fails.
+This release fixes macOS auto-update properly. The v1.8.5 diagnostics confirmed the cause: with ad-hoc signing, macOS (Squirrel.Mac) rejected every update because each build had a different code-signing requirement, so **Install & Relaunch** silently did nothing. Builds are now signed with a stable, persistent self-signed certificate, which lets macOS install and relaunch updates correctly.
+
+### Fixes
+- macOS auto-update now installs and relaunches between releases. Builds carry a stable code-signing identity, so the new version satisfies the running app's signature requirement instead of being rejected.
 
 ### Notes
-- No features or fixes ship here. If you're on **v1.8.5**, updating to v1.8.6 and pressing **Install & Relaunch** will, on macOS, surface the real error in the dialog and write the full detail to `~/Library/Logs/Lectio/main.log`.
+- This is **not** Apple notarization, so the first-launch Gatekeeper prompt still applies on a fresh download (right-click → Open, or use the Homebrew cask which clears it automatically).
+- **Updating into this build from an older copy still needs a one-time manual reinstall** (download the `.dmg` and drag to Applications). Every release *after* this one updates automatically.
 
 ---
 **Full changelog:** [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md)
@@ -21,16 +25,24 @@ A test release with no functional changes. It exists purely as a newer version t
 <!--
 AFTER THE PR IS MERGED — what to run
 
+PREREQUISITE (one time, before tagging): generate the self-signed signing
+cert and add the repo secrets, or the macOS build falls back to ad-hoc and
+auto-update still won't work:
+
+  scripts/gen-macos-signing-cert.sh
+  # then add MAC_CSC_P12_BASE64 and MAC_CSC_PASSWORD as GitHub repo secrets
+  # (see docs/MACOS_SIGNING.md)
+
 After merging the PR into main:
 
   git checkout main
   git pull origin main
-  git tag v1.8.6
-  git push origin v1.8.6
+  git tag v1.8.7
+  git push origin v1.8.7
 
 The release.yml workflow will then run CI and, if it passes, build and
 publish the macOS (.dmg + .zip + latest-mac.yml) and Windows (.exe + .zip +
-latest.yml) assets to a new GitHub Release for the v1.8.6 tag. Once the
+latest.yml) assets to a new GitHub Release for the v1.8.7 tag. Once the
 draft release appears in GitHub, paste the content of docs/GITHUB_RELEASE.md
 into the description field and publish it to make the download links live.
 

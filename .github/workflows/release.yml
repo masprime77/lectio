@@ -31,12 +31,50 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      # Import the persistent self-signed code-signing certificate (if the repo
+      # secrets are set) into a temporary keychain, then expose the identity to
+      # afterPack via MAC_SIGN_IDENTITY. This gives every release a STABLE
+      # signing identity, which is what lets Squirrel.Mac auto-update between
+      # builds. Without the secret this step is skipped and the build falls back
+      # to ad-hoc signing. See docs/MACOS_SIGNING.md.
+      - name: Import self-signed signing certificate
+        env:
+          MAC_CSC_P12_BASE64: ${{ secrets.MAC_CSC_P12_BASE64 }}
+          MAC_CSC_PASSWORD: ${{ secrets.MAC_CSC_PASSWORD }}
+        if: ${{ env.MAC_CSC_P12_BASE64 != '' }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN=build.keychain
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 18)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -t 3600 -u "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          echo "$MAC_CSC_P12_BASE64" | base64 --decode > /tmp/lectio-cert.p12
+          security import /tmp/lectio-cert.p12 -k "$KEYCHAIN" -P "$MAC_CSC_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          rm -f /tmp/lectio-cert.p12
+          # Put our keychain at the front of the search list (keeping the
+          # existing ones) so codesign in afterPack can find the identity.
+          security list-keychains -d user -s "$KEYCHAIN" \
+            $(security list-keychains -d user | sed -e 's/[" ]//g' | tr '\n' ' ')
+          security default-keychain -s "$KEYCHAIN"
+          # The cert is self-signed (untrusted), so `find-identity -v` (valid +
+          # trusted only) hides it. List without -v and pull the 40-char SHA-1;
+          # codesign signs fine with an untrusted identity we own the key for.
+          IDENTITY="$(security find-identity -p codesigning "$KEYCHAIN" | grep -oE '[0-9A-F]{40}' | head -1)"
+          if [ -z "$IDENTITY" ]; then
+            echo "::error::No code-signing identity found in the imported keychain"; exit 1
+          fi
+          echo "MAC_SIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+          echo "Imported self-signed code-signing identity: $IDENTITY"
+
       - name: Build & publish (.dmg + .zip + latest-mac.yml)
         env:
           # GitHub token so electron-builder can publish release assets,
           # including the latest-mac.yml metadata electron-updater reads.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Unsigned build in CI; remove to enable code signing with certs.
+          # Don't let electron-builder hunt for an Apple identity; afterPack
+          # signs the bundle itself (with MAC_SIGN_IDENTITY when set, else ad-hoc).
           CSC_IDENTITY_AUTO_DISCOVERY: false
         run: npm run build:mac -- --publish always
 
