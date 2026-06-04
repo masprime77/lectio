@@ -1,3 +1,10 @@
+## v1.8.3
+
+_Released: 2026-06-04_
+
+- Fixed the macOS auto-update never relaunching or applying: `quitAndInstall` closes all windows and calls `app.quit()`, but the unsaved-changes `before-quit` handler could `preventDefault()` and cancel that quit, so Squirrel never swapped the app. The `restart-and-update` handler now allows that quit through, and the renderer flushes pending edits before triggering it.
+- Set `autoInstallOnAppQuit = true` as a safety net: a downloaded update now also installs on the next normal quit, so closing and reopening the app picks up the new version even if the explicit relaunch path fails.
+
 ## v1.8.2
 
 _Released: 2026-06-04_
