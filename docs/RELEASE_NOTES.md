@@ -1,3 +1,9 @@
+## v1.8.2
+
+_Released: 2026-06-04_
+
+- Test release that ships no functional changes; its purpose is to validate the v1.8.1 update flow end-to-end (the `update-available` dialog, the GitHub Release notes panel, the download progress bar, and the reliable relaunch on macOS and Windows) against a real newer release.
+
 ## v1.8.1
 
 _Released: 2026-06-04_
