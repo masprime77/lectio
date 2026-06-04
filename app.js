@@ -1617,6 +1617,16 @@ function setupUpdater() {
   window.updater.onUpdateDownloaded(() => {
     onDownloadComplete();
   });
+
+  window.updater.onError((message) => {
+    // A failed download/install/relaunch must not look like a dead button:
+    // show the reason and re-enable the controls so the user can retry or close.
+    progressArea.classList.remove('hidden');
+    progressLabel.textContent = `Update failed: ${message}`;
+    actionBtn.textContent = downloadComplete ? 'Install & Relaunch' : 'Download & Install';
+    actionBtn.disabled = false;
+    laterBtn.disabled = false;
+  });
 }
 
 // ---------------------------------------------------------------------------
