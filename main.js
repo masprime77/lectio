@@ -121,7 +121,10 @@ function buildAppMenu() {
 function setupAutoUpdater(enabled) {
   // Suppress autoUpdater's built-in notification; we handle the UI ourselves.
   autoUpdater.autoDownload = enabled; // download automatically only when enabled
-  autoUpdater.autoInstallOnAppQuit = false;
+  // Safety net: if the explicit quitAndInstall relaunch ever fails to swap the
+  // app, a downloaded update still installs the next time the app quits, so a
+  // plain close + reopen picks up the new version.
+  autoUpdater.autoInstallOnAppQuit = true;
 
   autoUpdater.on('update-available', (info) => {
     // Pass version string to renderer so it can fetch release notes.
@@ -152,6 +155,12 @@ function setupAutoUpdater(enabled) {
   // isSilent=true  → skip the NSIS re-install wizard on Windows.
   // isForceRunAfter=true → relaunch immediately after install on both platforms.
   ipcMain.handle('restart-and-update', () => {
+    // quitAndInstall closes all windows and calls app.quit(). Our before-quit
+    // handler would otherwise preventDefault() on unsaved changes and cancel
+    // that quit — on macOS that means Squirrel never swaps the app, so it
+    // neither relaunches nor applies the update. Allow this quit through; the
+    // renderer flushes pending edits before invoking this handler.
+    allowQuit = true;
     autoUpdater.quitAndInstall(/* isSilent */ true, /* isForceRunAfter */ true);
   });
 

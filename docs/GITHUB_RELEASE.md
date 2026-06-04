@@ -1,10 +1,11 @@
 ---
-## What's new in v1.8.2
+## What's new in v1.8.3
 
-A test release with no functional changes. It exists to validate the new update flow introduced in v1.8.2 — running on a real, newer release so the **update-available** dialog, the release-notes panel, the download progress bar, and the post-install relaunch can all be verified end-to-end on macOS and Windows.
+This release fixes the macOS auto-update introduced in v1.8.1/v1.8.2, where clicking **Install & Relaunch** would not restart into the new version — and a plain close + reopen wouldn't apply the update either. Windows was unaffected.
 
-### Notes
-- No features or fixes ship here; if you're already on v1.8.2, updating to v1.8.2 should surface the new update dialog, download via the progress bar, and relaunch cleanly.
+### Fixes
+- macOS updates now install and relaunch reliably. `quitAndInstall` works by closing all windows and quitting the app; the unsaved-changes prompt could cancel that quit, so Squirrel never swapped the app. The update path now lets the quit through and flushes any pending edits first, so nothing is lost.
+- Added a safety net: a downloaded update also installs on the next normal quit, so closing and reopening the app picks up the new version even if the immediate relaunch ever fails.
 
 ---
 **Full changelog:** [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md)
@@ -25,12 +26,12 @@ After merging the PR into main:
 
   git checkout main
   git pull origin main
-  git tag v1.8.2
-  git push origin v1.8.2
+  git tag v1.8.3
+  git push origin v1.8.3
 
 The release.yml workflow will then run CI and, if it passes, build and
 publish the macOS (.dmg + .zip + latest-mac.yml) and Windows (.exe + .zip +
-latest.yml) assets to a new GitHub Release for the v1.8.2 tag. Once the
+latest.yml) assets to a new GitHub Release for the v1.8.3 tag. Once the
 draft release appears in GitHub, paste the content of docs/GITHUB_RELEASE.md
 into the description field and publish it to make the download links live.
 
