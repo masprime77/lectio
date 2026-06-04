@@ -1,3 +1,11 @@
+## v1.8.7
+
+_Released: 2026-06-04_
+
+- Fixed macOS auto-update for real. Diagnostics in v1.8.5 confirmed Squirrel.Mac rejected every update because ad-hoc signing gives each build a different designated requirement (`code failed to satisfy specified code requirement(s)`). Builds are now signed with a **persistent self-signed code-signing certificate**, which produces a stable designated requirement (`identifier "com.masprime77.lectio" and certificate leaf = H"…"`), so macOS auto-update installs and relaunches correctly between self-signed builds.
+- Added `build/afterPack.js` self-signed signing (env `MAC_SIGN_IDENTITY`, falling back to ad-hoc), a CI keychain-import step in the release workflow (driven by the `MAC_CSC_P12_BASE64` / `MAC_CSC_PASSWORD` secrets), the `scripts/gen-macos-signing-cert.sh` certificate generator, and `docs/MACOS_SIGNING.md`.
+- Note: this is not Apple notarization, so the first-launch Gatekeeper prompt remains (handled by the cask / right-click → Open). Updating *into* this first signed build from an older ad-hoc copy still requires a one-time manual reinstall; auto-update works for every release after it.
+
 ## v1.8.6
 
 _Released: 2026-06-04_

@@ -18,5 +18,8 @@ semesters/dev-test-semester.json
 *.p12
 *.pfx
 *.keystore
+*.crt
 credentials.*
 config/secrets.*
+# Output of scripts/gen-macos-signing-cert.sh (self-signed cert material)
+macos-signing/
