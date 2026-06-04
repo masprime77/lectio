@@ -1,3 +1,10 @@
+## v1.8.5
+
+_Released: 2026-06-04_
+
+- Diagnostic release for the macOS auto-update failure. Added `electron-log` as the `autoUpdater` logger, so the underlying Squirrel.Mac / ShipIt errors are written to `~/Library/Logs/Lectio/main.log` (macOS) / `%APPDATA%\Lectio\logs\main.log` (Windows).
+- The update dialog now surfaces auto-update errors inline ("Update failed: …") and re-enables its buttons, instead of leaving a dead "Install & Relaunch" button when an install/relaunch fails.
+
 ## v1.8.4
 
 _Released: 2026-06-04_
