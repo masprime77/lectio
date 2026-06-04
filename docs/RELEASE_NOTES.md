@@ -1,3 +1,9 @@
+## v1.8.8
+
+_Released: 2026-06-04_
+
+- Test release with no functional changes. It exists as a newer self-signed build to update *into* from v1.8.7, verifying end-to-end that macOS auto-update now installs and relaunches (both v1.8.7 and v1.8.8 share the same self-signed certificate, so they have the same designated requirement).
+
 ## v1.8.7
 
 _Released: 2026-06-04_
