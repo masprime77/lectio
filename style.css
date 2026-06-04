@@ -94,42 +94,81 @@
 
 .hidden { display: none !important; }
 
-/* Auto-update banner */
-.update-banner {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 200;
+/* Update dialog */
+.update-dialog {
+  max-width: 480px;
+  width: 100%;
+  padding: 1.75rem;
+}
+.update-dialog-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.update-dialog-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.update-dialog-version {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.update-notes-area {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin-bottom: 1.25rem;
+  background: var(--bg);
+}
+.update-notes-loading,
+.update-notes-error {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.update-notes-error { color: var(--danger); }
+.update-notes-content {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-base);
+}
+.update-progress-area {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.5rem 1rem;
+  margin-bottom: 1.25rem;
+}
+.update-progress-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--track);
+  overflow: hidden;
+}
+.update-progress-bar {
+  height: 100%;
+  border-radius: 3px;
   background: var(--primary);
-  color: var(--on-accent);
-  font-size: 0.88rem;
-  box-shadow: var(--shadow);
+  transition: width 0.2s ease;
 }
-.update-banner-text { flex: 1; }
-.update-banner .btn {
-  background: var(--on-accent);
-  color: var(--primary);
-  border-color: var(--on-accent);
+.update-progress-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  min-width: 2.5rem;
+  text-align: right;
 }
-.update-banner .btn:hover { background: rgba(255, 255, 255, 0.85); }
-.update-dismiss {
-  border: none;
-  background: none;
-  color: var(--on-accent);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  padding: 0.15rem;
-  border-radius: 4px;
-  opacity: 0.85;
+.update-dialog .modal-actions {
+  gap: 0.75rem;
 }
-.update-dismiss:hover { opacity: 1; background: rgba(255, 255, 255, 0.18); }
-.update-dismiss .ti { width: 18px; height: 18px; }
 
 body {
   margin: 0;

@@ -1476,29 +1476,143 @@ async function init() {
 // Auto-update banner (driven by the window.updater bridge)
 // ---------------------------------------------------------------------------
 function setupUpdater() {
-  const banner = document.getElementById('update-banner');
-  const text = document.getElementById('update-banner-text');
-  const restartBtn = document.getElementById('update-restart-btn');
-  const dismissBtn = document.getElementById('update-dismiss-btn');
+  const overlay    = document.getElementById('update-overlay');
+  const versionEl  = document.getElementById('update-dialog-version');
+  const notesLoading = document.getElementById('update-notes-loading');
+  const notesContent = document.getElementById('update-notes-content');
+  const notesError   = document.getElementById('update-notes-error');
+  const progressArea = document.getElementById('update-progress-area');
+  const progressBar  = document.getElementById('update-progress-bar');
+  const progressLabel = document.getElementById('update-progress-label');
+  const laterBtn     = document.getElementById('update-later-btn');
+  const actionBtn    = document.getElementById('update-action-btn');
 
-  dismissBtn.innerHTML = icon('x');
-  dismissBtn.addEventListener('click', () => banner.classList.add('hidden'));
-
-  // The bridge is absent outside Electron (e.g. tests) — fail safe.
+  // The bridge is absent outside Electron (e.g. tests / browser preview).
   if (!window.updater) return;
 
-  restartBtn.addEventListener('click', () => window.updater.restartAndUpdate());
+  // ── State ────────────────────────────────────────────────────────────────
+  // Tracks whether the download has completed so "Later" knows the update
+  // will be applied on next manual restart anyway.
+  let downloadComplete = false;
 
-  window.updater.onUpdateAvailable(() => {
-    text.textContent = 'A new version is available, downloading…';
-    restartBtn.classList.add('hidden');
-    banner.classList.remove('hidden');
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  function openUpdateDialog(version) {
+    // Reset to initial state.
+    downloadComplete = false;
+    versionEl.textContent = version ? `v${version}` : '';
+    notesLoading.classList.remove('hidden');
+    notesContent.classList.add('hidden');
+    notesError.classList.add('hidden');
+    progressArea.classList.add('hidden');
+    progressBar.style.width = '0%';
+    progressLabel.textContent = '0%';
+    actionBtn.textContent = 'Download & Install';
+    actionBtn.disabled = false;
+    laterBtn.disabled = false;
+    overlay.classList.remove('hidden');
+
+    // Fetch release notes from the GitHub API.
+    if (version) {
+      fetch(`https://api.github.com/repos/masprime77/lectio/releases/tags/v${version}`)
+        .then((r) => {
+          if (!r.ok) throw new Error('not ok');
+          return r.json();
+        })
+        .then((data) => {
+          const body = (data.body || '').trim();
+          notesLoading.classList.add('hidden');
+          if (body) {
+            notesContent.textContent = body;
+            notesContent.classList.remove('hidden');
+          } else {
+            notesError.textContent = 'No release notes provided.';
+            notesError.classList.remove('hidden');
+          }
+        })
+        .catch(() => {
+          notesLoading.classList.add('hidden');
+          notesError.classList.remove('hidden');
+        });
+    } else {
+      notesLoading.classList.add('hidden');
+      notesError.classList.remove('hidden');
+    }
+  }
+
+  function closeUpdateDialog() {
+    overlay.classList.add('hidden');
+  }
+
+  function showProgressBar() {
+    progressArea.classList.remove('hidden');
+    actionBtn.textContent = 'Downloading…';
+    actionBtn.disabled = true;
+    laterBtn.disabled = true;
+  }
+
+  function onDownloadComplete() {
+    downloadComplete = true;
+    progressBar.style.width = '100%';
+    progressLabel.textContent = '100%';
+    actionBtn.textContent = 'Install & Relaunch';
+    actionBtn.disabled = false;
+    laterBtn.disabled = false;
+  }
+
+  // ── Event listeners ──────────────────────────────────────────────────────
+  laterBtn.addEventListener('click', closeUpdateDialog);
+
+  // Close on backdrop click (same pattern as all other modals in this app).
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeUpdateDialog();
+  });
+
+  actionBtn.addEventListener('click', () => {
+    if (downloadComplete) {
+      // Download already finished — install and relaunch.
+      actionBtn.disabled = true;
+      laterBtn.disabled = true;
+      actionBtn.textContent = 'Restarting…';
+      window.updater.restartAndUpdate();
+    } else {
+      // Start download manually (only reached when autoDownload is false).
+      showProgressBar();
+      window.updater.startDownload();
+    }
+  });
+
+  // ── Bridge listeners ─────────────────────────────────────────────────────
+
+  // update-available fires for both auto-download ON and OFF paths.
+  // version is the new version string passed from main.js.
+  window.updater.onUpdateAvailable((version) => {
+    openUpdateDialog(version);
+    // When autoDownload is ON, the download is already running in the
+    // background at this point — show the progress bar immediately so the
+    // user sees that something is happening.
+    // When autoDownload is OFF, the progress bar stays hidden until the user
+    // clicks "Download & Install".
+    // We cannot know from the renderer which mode is active, so we rely on
+    // the settings value already loaded by setupSettings(). Read it from the
+    // toggle directly.
+    const autoUpdateEnabled = document.getElementById('set-autoupdate')
+      ? document.getElementById('set-autoupdate').checked
+      : true; // safe default if settings haven't loaded yet
+    if (autoUpdateEnabled) {
+      showProgressBar();
+    }
+  });
+
+  window.updater.onDownloadProgress((percent) => {
+    // Ensure the progress area is visible (could arrive before onUpdateAvailable
+    // finishes rendering in rare edge cases).
+    if (progressArea.classList.contains('hidden')) showProgressBar();
+    progressBar.style.width = `${percent}%`;
+    progressLabel.textContent = `${percent}%`;
   });
 
   window.updater.onUpdateDownloaded(() => {
-    text.textContent = 'Update downloaded and ready.';
-    restartBtn.classList.remove('hidden');
-    banner.classList.remove('hidden');
+    onDownloadComplete();
   });
 }
 
