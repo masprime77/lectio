@@ -1,3 +1,9 @@
+## v1.8.6
+
+_Released: 2026-06-04_
+
+- Test release with no functional changes. It exists as a newer version to update *into* from v1.8.5, so the v1.8.5 diagnostics (electron-log + inline error surfacing) can capture the exact reason the macOS install/relaunch fails.
+
 ## v1.8.5
 
 _Released: 2026-06-04_
