@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('updater', {
   // callback receives percent (integer 0-100)
   onDownloadProgress: (callback) => ipcRenderer.on('update-download-progress', (_e, percent) => callback(percent)),
   onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', () => callback()),
+  // callback receives a human-readable error message string
+  onError: (callback) => ipcRenderer.on('update-error', (_e, message) => callback(message)),
   startDownload: () => ipcRenderer.invoke('start-update-download'),
   restartAndUpdate: () => ipcRenderer.invoke('restart-and-update'),
 });

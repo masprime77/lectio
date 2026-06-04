@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, Menu, dialog, shell } = require('electron');
 const { autoUpdater } = require('electron-updater');
+const log = require('electron-log/main');
 const fs = require('fs');
 const path = require('path');
 const { registerIpcHandlers } = require('./lib/ipc-handlers');
@@ -119,6 +120,13 @@ function buildAppMenu() {
 // Auto-update (electron-updater + GitHub Releases)
 // ---------------------------------------------------------------------------
 function setupAutoUpdater(enabled) {
+  // Route electron-updater's internal logging (and the underlying Squirrel.Mac /
+  // ShipIt errors on macOS) to a file so update failures are diagnosable on a
+  // user's machine. Log path: ~/Library/Logs/Lectio/main.log (macOS),
+  // %USERPROFILE%\AppData\Roaming\Lectio\logs\main.log (Windows).
+  log.transports.file.level = 'debug';
+  autoUpdater.logger = log;
+
   // Suppress autoUpdater's built-in notification; we handle the UI ourselves.
   autoUpdater.autoDownload = enabled; // download automatically only when enabled
   // Safety net: if the explicit quitAndInstall relaunch ever fails to swap the
@@ -141,7 +149,11 @@ function setupAutoUpdater(enabled) {
   });
 
   autoUpdater.on('error', (err) => {
-    console.error('autoUpdater error:', err == null ? 'unknown' : err.message || err);
+    const message = err == null ? 'unknown' : err.message || String(err);
+    log.error('autoUpdater error:', err);
+    // Surface to the dialog so a failed install/relaunch doesn't look like a
+    // dead button — the user (and we) can see the actual reason.
+    sendToRenderer('update-error', message);
   });
 
   // Renderer triggers a manual download (used when autoDownload is false).
