@@ -18,11 +18,37 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- Auto-update banner (hidden until electron-updater fires an event) -->
-  <div id="update-banner" class="update-banner hidden" role="status">
-    <span id="update-banner-text" class="update-banner-text"></span>
-    <button id="update-restart-btn" class="btn btn-small hidden">Restart to update</button>
-    <button id="update-dismiss-btn" class="update-dismiss" aria-label="Dismiss"></button>
+  <!-- Update dialog -->
+  <div id="update-overlay" class="modal-overlay hidden" role="dialog"
+       aria-modal="true" aria-labelledby="update-dialog-title">
+    <div class="modal update-dialog">
+      <div class="update-dialog-header">
+        <h2 id="update-dialog-title" class="update-dialog-title">Update available</h2>
+        <span id="update-dialog-version" class="update-dialog-version"></span>
+      </div>
+
+      <!-- Release notes -->
+      <div id="update-notes-area" class="update-notes-area">
+        <p id="update-notes-loading" class="update-notes-loading">Loading release notes…</p>
+        <pre id="update-notes-content" class="update-notes-content hidden"></pre>
+        <p id="update-notes-error" class="update-notes-error hidden">Release notes unavailable.</p>
+      </div>
+
+      <!-- Download progress bar (hidden until download starts) -->
+      <div id="update-progress-area" class="update-progress-area hidden">
+        <div class="update-progress-track">
+          <div id="update-progress-bar" class="update-progress-bar" style="width:0%"></div>
+        </div>
+        <span id="update-progress-label" class="update-progress-label">0%</span>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" id="update-later-btn" class="btn">Later</button>
+        <button type="button" id="update-action-btn" class="btn btn-primary">
+          Download &amp; Install
+        </button>
+      </div>
+    </div>
   </div>
 
   <header class="header">

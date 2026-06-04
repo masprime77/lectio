@@ -1,4 +1,15 @@
-## Unreleased
+## v1.8.1
+
+_Released: 2026-06-04_
+
+- Replaced the auto-update banner with a modal dialog that opens on `update-available`, shows the GitHub Release notes for the new version, and renders a download progress bar.
+- When auto-update is off, the dialog lets the user start the download manually via "Download & Install"; when it is on, the download runs in the background and the progress bar shows immediately. After the download completes the primary button becomes "Install & Relaunch".
+- Fixed `quitAndInstall` to pass `isSilent` + `isForceRunAfter`, so the update reliably relaunches on macOS and skips the NSIS re-install wizard on Windows.
+- Exposed `update-download-progress` and `start-update-download` IPC channels plus `onDownloadProgress`/`startDownload` on the `window.updater` bridge.
+
+## v1.8.0
+
+_Released: 2026-06-03_
 
 - Added IPC handlers for exporting a single course (`export-course`) and a full semester (`export-semester`) to `.lectio.json` files, and for reading a `.lectio.json` file back (`import-file`).
 - Added native save/open file-dialog IPC handlers (`show-save-dialog`, `show-open-dialog`) scoped to the `.lectio.json` extension.

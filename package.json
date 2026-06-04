@@ -1,6 +1,6 @@
 {
   "name": "lectio",
-  "version": "1.8.0",
+  "version": "1.8.1",
   "description": "Lectio — a minimal desktop app for planning a university semester, backed by JSON files",
   "main": "main.js",
   "scripts": {

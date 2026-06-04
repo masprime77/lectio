@@ -16,8 +16,12 @@ contextBridge.exposeInMainWorld('planner', {
 
 // Auto-update bridge. Main → renderer notifications plus a restart trigger.
 contextBridge.exposeInMainWorld('updater', {
-  onUpdateAvailable: (callback) => ipcRenderer.on('update-available', () => callback()),
+  // callback receives the new version string (e.g. "1.8.0")
+  onUpdateAvailable: (callback) => ipcRenderer.on('update-available', (_e, version) => callback(version)),
+  // callback receives percent (integer 0-100)
+  onDownloadProgress: (callback) => ipcRenderer.on('update-download-progress', (_e, percent) => callback(percent)),
   onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', () => callback()),
+  startDownload: () => ipcRenderer.invoke('start-update-download'),
   restartAndUpdate: () => ipcRenderer.invoke('restart-and-update'),
 });
 

@@ -58,9 +58,9 @@ function createWindow() {
 }
 
 // Notify the renderer (if the window is still around).
-function sendToRenderer(channel) {
+function sendToRenderer(channel, payload) {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send(channel);
+    mainWindow.webContents.send(channel, payload);
   }
 }
 
@@ -119,23 +119,46 @@ function buildAppMenu() {
 // Auto-update (electron-updater + GitHub Releases)
 // ---------------------------------------------------------------------------
 function setupAutoUpdater(enabled) {
-  autoUpdater.on('update-available', () => sendToRenderer('update-available'));
-  autoUpdater.on('update-downloaded', () => sendToRenderer('update-downloaded'));
-  // Never crash the app over an update error — just log it.
+  // Suppress autoUpdater's built-in notification; we handle the UI ourselves.
+  autoUpdater.autoDownload = enabled; // download automatically only when enabled
+  autoUpdater.autoInstallOnAppQuit = false;
+
+  autoUpdater.on('update-available', (info) => {
+    // Pass version string to renderer so it can fetch release notes.
+    sendToRenderer('update-available', info.version);
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    // progress.percent is 0-100 (float).
+    sendToRenderer('update-download-progress', Math.round(progress.percent));
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    sendToRenderer('update-downloaded');
+  });
+
   autoUpdater.on('error', (err) => {
     console.error('autoUpdater error:', err == null ? 'unknown' : err.message || err);
   });
 
+  // Renderer triggers a manual download (used when autoDownload is false).
+  ipcMain.handle('start-update-download', () => {
+    try { autoUpdater.downloadUpdate(); } catch (e) {
+      console.error('downloadUpdate error:', e && e.message);
+    }
+  });
+
   // Restart into the freshly downloaded update.
-  ipcMain.handle('restart-and-update', () => autoUpdater.quitAndInstall());
+  // isSilent=true  → skip the NSIS re-install wizard on Windows.
+  // isForceRunAfter=true → relaunch immediately after install on both platforms.
+  ipcMain.handle('restart-and-update', () => {
+    autoUpdater.quitAndInstall(/* isSilent */ true, /* isForceRunAfter */ true);
+  });
 
-  // Auto-update disabled in settings → register handlers but skip the check.
-  if (!enabled) return;
-
-  // Check in the background, then notify. Wrapped so a dev/offline failure is
-  // swallowed (the 'error' handler also covers async rejections).
+  // Always check for updates (even when autoDownload is false, we want to
+  // know if a new version exists so we can show the dialog).
   try {
-    autoUpdater.checkForUpdatesAndNotify();
+    autoUpdater.checkForUpdates();
   } catch (err) {
     console.error('autoUpdater check failed:', err && err.message);
   }
