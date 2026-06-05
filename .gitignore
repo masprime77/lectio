@@ -7,6 +7,8 @@ dist/
 coverage/
 packages/desktop/assets/logo_raw/
 packages/desktop/semesters/dev-test-semester.json
+# Vendored copy of @lectio/core's planner-core for the renderer (see scripts/sync-core.js)
+packages/desktop/planner-core.js
 
 
 # Secrets / credentials (defensive — none used today)
