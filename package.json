@@ -1,8 +1,12 @@
 {
   "name": "lectio",
   "version": "1.8.8",
+  "private": true,
   "description": "Lectio — a minimal desktop app for planning a university semester, backed by JSON files",
   "main": "main.js",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev-tools",
