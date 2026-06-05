@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import store from '../../lib/semester-store.js';
-import core from '../../lib/planner-core.js';
+import store from '../../src/semester-store.js';
+import core from '../../src/planner-core.js';
 
 let dir;
 beforeEach(() => {

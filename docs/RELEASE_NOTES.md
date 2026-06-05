@@ -1,5 +1,13 @@
 ## Unreleased
 
+### Mobile preparation — Phase 1: extract @lectio/core
+
+- Moved the three dual-mode core modules (`planner-core.js`, `semester-store.js`, `ipc-handlers.js`) from the repo-root `lib/` into `packages/core/src/` as the `@lectio/core` package, using `git mv` to preserve history. No logic was changed — the moved files are byte-identical.
+- Moved the Vitest suite (`tests/unit/*`, `tests/integration/*`) into `packages/core/tests/` and rewired each test's relative imports from `../../lib/<mod>.js` to `../../src/<mod>.js`.
+- Added `packages/core/package.json` (`@lectio/core`) with an `exports` map that preserves the subpath imports the desktop adopts in Phase 2 (`@lectio/core/semester-store`, `@lectio/core/ipc-handlers`), plus `packages/core/vitest.config.mjs` (coverage measured against `src/**`, same 70% line/function thresholds). Removed the now-redundant root `vitest.config.mjs`.
+- Delegated the root `test`/`test:watch`/`test:coverage` scripts to the `@lectio/core` workspace.
+- Left thin compatibility shims at the old `lib/` paths so the still-rooted desktop keeps running until Phase 2: `semester-store.js`/`ipc-handlers.js` are one-line CommonJS re-exports, and `planner-core.js` is a guarded re-export. Repointed the single `index.html` `<script src>` at `packages/core/src/planner-core.js` (the only renderer edit), since a CommonJS shim cannot serve the browser.
+
 ### Mobile preparation — Phase 0: monorepo scaffold + Node 22 baseline
 
 - Introduced npm workspaces at the repo root (`"workspaces": ["packages/*"]`, `"private": true`) and created the empty `packages/core/` and `packages/desktop/` directories (tracked via `.gitkeep`) so the monorepo layout exists before any source moves. No source files were moved — the desktop app builds, runs, and tests exactly as before.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import core from '../../lib/planner-core.js';
+import core from '../../src/planner-core.js';
 
 const sample = () => ({
   id: 'ss2025',
