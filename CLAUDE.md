@@ -25,8 +25,8 @@ npm run icon:win       # rebuild assets/icon.ico (cross-platform: png-to-ico)
 npm run icons          # both icons (icon:win runs anywhere; icon needs macOS)
 ```
 
-Node 18+ for the app and tests (CI uses Node 20); `icon:win`/`png-to-ico`
-need Node 20+. Build each OS's installer on that OS: `.dmg`/`.icns` need
+Node 22 for the app and tests (CI uses Node 22); `icon:win`/`png-to-ico`
+need Node 22. Build each OS's installer on that OS: `.dmg`/`.icns` need
 macOS tooling; the `.exe` is produced on Windows in CI. The `.ico` is
 cross-platform, so it's generated once and **committed** (`assets/icon.ico`).
 

@@ -99,7 +99,7 @@ brew tap masprime77/tap && brew install --cask lectio
 
 ## Development
 
-Requires [Node.js](https://nodejs.org) (v18+). Install dependencies and launch
+Requires [Node.js](https://nodejs.org) (v22+). Install dependencies and launch
 the app from source:
 
 ```bash
@@ -132,7 +132,7 @@ npm run test:coverage   # run with a V8 coverage report (written to coverage/)
 - Coverage thresholds are enforced at **70% lines** and **70% functions**
   (see `vitest.config.mjs`); the run fails if they aren't met.
 
-CI runs the suite on **macOS** and **Ubuntu** (Node 20) on every push and on
+CI runs the suite on **macOS** and **Ubuntu** (Node 22) on every push and on
 pull requests to `main`, and uploads the coverage report as an artifact. A
 release is only built once CI passes — see
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) and
@@ -210,7 +210,7 @@ Replace `assets/icon.png` (1024×1024) with your artwork, then rebuild the `.icn
 
 ```bash
 npm run icon       # assets/icon.png → assets/icon.icns (macOS: sips + iconutil)
-npm run icon:win   # assets/icon.png → assets/icon.ico (cross-platform, Node 20+)
+npm run icon:win   # assets/icon.png → assets/icon.ico (cross-platform, Node 22+)
 npm run icons      # rebuild both icon.icns and icon.ico
 ```
 
