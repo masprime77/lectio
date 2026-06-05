@@ -381,7 +381,10 @@
     </div>
   </div>
 
-  <script src="packages/core/src/planner-core.js"></script>
+  <!-- Shared @lectio/core logic, vendored next to index.html by scripts/sync-core.js
+       (and by electron-builder when packaged) so this relative path resolves both
+       under `npm start` and inside the flattened app bundle. -->
+  <script src="planner-core.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

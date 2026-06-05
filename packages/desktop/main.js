@@ -3,7 +3,7 @@ const { autoUpdater } = require('electron-updater');
 const log = require('electron-log/main');
 const fs = require('fs');
 const path = require('path');
-const { registerIpcHandlers } = require('./lib/ipc-handlers');
+const { registerIpcHandlers } = require('@lectio/core/ipc-handlers');
 
 let mainWindow = null;
 
@@ -186,7 +186,7 @@ function setupAutoUpdater(enabled) {
 }
 
 // IPC: filesystem handlers (replace the old Express endpoints). The actual
-// logic lives in lib/semester-store.js so it can be tested without Electron.
+// logic lives in @lectio/core (semester-store) so it can be tested without Electron.
 registerIpcHandlers(ipcMain, () => SEMESTERS_DIR);
 
 // ---------------------------------------------------------------------------
@@ -235,7 +235,7 @@ ipcMain.handle('get-version', () => app.getVersion());
 
 // Native file dialogs for export/import. The renderer calls these to choose a
 // destination/source path, then passes the path to the export/import IPC
-// handlers in lib/ipc-handlers.js.
+// handlers in @lectio/core (ipc-handlers).
 ipcMain.handle('show-save-dialog', async (event, { defaultName, title }) => {
   const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
     title: title || 'Export',
