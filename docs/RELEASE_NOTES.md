@@ -1,3 +1,12 @@
+## Unreleased
+
+### Mobile preparation — Phase 0: monorepo scaffold + Node 22 baseline
+
+- Introduced npm workspaces at the repo root (`"workspaces": ["packages/*"]`, `"private": true`) and created the empty `packages/core/` and `packages/desktop/` directories (tracked via `.gitkeep`) so the monorepo layout exists before any source moves. No source files were moved — the desktop app builds, runs, and tests exactly as before.
+- Bumped the Node baseline to 22: added a root `.nvmrc` pinning Node 22 and an `"engines": { "node": ">=22" }` field in `package.json`.
+- Updated CI (`.github/workflows/ci.yml`) and the release workflow (`.github/workflows/release.yml`, both the macOS and Windows jobs) to run on Node 22.
+- Updated the stated Node requirement to 22 in `README.md` and `CLAUDE.md`.
+
 ## v1.8.8
 
 _Released: 2026-06-04_
