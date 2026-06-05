@@ -5,8 +5,8 @@ npm-debug.log*
 .claude/
 dist/
 coverage/
-assets/logo_raw/
-semesters/dev-test-semester.json
+packages/desktop/assets/logo_raw/
+packages/desktop/semesters/dev-test-semester.json
 
 
 # Secrets / credentials (defensive — none used today)
