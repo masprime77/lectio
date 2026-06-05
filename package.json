@@ -18,9 +18,9 @@
     "icon": "bash assets/build-icns.sh",
     "icon:win": "node assets/build-ico.js",
     "icons": "npm run icon && npm run icon:win",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test": "npm test --workspace @lectio/core",
+    "test:watch": "npm run test:watch --workspace @lectio/core",
+    "test:coverage": "npm run test:coverage --workspace @lectio/core"
   },
   "keywords": [
     "semester",
