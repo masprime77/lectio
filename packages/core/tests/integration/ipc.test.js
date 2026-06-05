@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { registerIpcHandlers } from '../../lib/ipc-handlers.js';
-import core from '../../lib/planner-core.js';
+import { registerIpcHandlers } from '../../src/ipc-handlers.js';
+import core from '../../src/planner-core.js';
 
 // Minimal mock of Electron's ipcMain: records handlers and lets us invoke them
 // the way the renderer would (ipcRenderer.invoke → ipcMain.handle).
