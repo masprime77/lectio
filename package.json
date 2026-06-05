@@ -7,6 +7,9 @@
   "workspaces": [
     "packages/*"
   ],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev-tools",
