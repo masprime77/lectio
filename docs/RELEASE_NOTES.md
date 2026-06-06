@@ -1,5 +1,12 @@
 ## Unreleased
 
+### Mobile preparation — Phase 3: CI monorepo fixes
+
+- Fixed the CI coverage artifact path: the "Upload coverage report" step now uploads from `packages/core/coverage/` (where Vitest writes coverage in the monorepo) instead of the stale root `coverage/`.
+- Switched CI installs to `npm ci` for reproducible, lockfile-pinned dependencies, and narrowed the `ci.yml` triggers to push/PR on `main` + `mobile-prep` (keeping `workflow_call` so `release.yml` can require the workflow) instead of running on every push of every branch.
+- Added a macOS-only `build-macos` job to `ci.yml` that runs the full prebuild chain (`sync-core` + `bundle-deps`) and electron-builder without `--publish`, so packaging breakage is caught on PRs rather than at tag time. It gates on the `test` job and uploads no artifacts.
+- Fixed the `release.yml` "Upload build artifacts" paths (macOS and Windows) to point at `packages/desktop/dist/` (electron-builder's output in the monorepo) instead of the stale root `dist/`.
+
 ### Mobile preparation — Phase 2: relocate desktop into @lectio/desktop
 
 - Moved the entire desktop app (`main.js`, `preload.js`, `index.html`, `app.js`, `style.css`, `start.command`, and the `assets/`, `build/`, `semesters/` dirs) from the repo root into `packages/desktop/` via `git mv` to preserve history.

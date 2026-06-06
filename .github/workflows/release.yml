@@ -83,9 +83,9 @@ jobs:
         with:
           name: macos-app
           path: |
-            dist/*.dmg
-            dist/*.zip
-            dist/latest-mac.yml
+            packages/desktop/dist/*.dmg
+            packages/desktop/dist/*.zip
+            packages/desktop/dist/latest-mac.yml
           if-no-files-found: error
 
   build-windows:
@@ -124,7 +124,7 @@ jobs:
         with:
           name: windows-app
           path: |
-            dist/*.exe
-            dist/*.zip
-            dist/latest.yml
+            packages/desktop/dist/*.exe
+            packages/desktop/dist/*.zip
+            packages/desktop/dist/latest.yml
           if-no-files-found: error
