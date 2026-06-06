@@ -12,41 +12,59 @@ process reads and writes those files directly via Node's `fs`.
 
 ## Commands
 
+npm-workspaces monorepo. Run these from the **repo root**; `start`/`dev`/`build:*`
+delegate to the `@lectio/desktop` workspace and `test*` to `@lectio/core`:
+
 ```bash
-npm install            # install deps
-npm start              # run from source (electron .)
+npm install            # install deps + link workspaces
+npm start              # run desktop from source (→ @lectio/desktop: electron .)
 npm run dev            # run with DevTools open
-npm test               # Vitest suite (run once)
+npm test               # Vitest suite (run once, @lectio/core)
 npm run test:coverage  # coverage report (coverage/), thresholds enforced
-npm run build:mac      # build .dmg + .zip into dist/ (electron-builder)
-npm run build:win      # build NSIS .exe + .zip into dist/ (electron-builder)
-npm run icon           # rebuild assets/icon.icns (macOS only: sips + iconutil)
-npm run icon:win       # rebuild assets/icon.ico (cross-platform: png-to-ico)
-npm run icons          # both icons (icon:win runs anywhere; icon needs macOS)
+npm run build:mac      # build .dmg + .zip into packages/desktop/dist/ (electron-builder)
+npm run build:win      # build NSIS .exe + .zip into packages/desktop/dist/ (electron-builder)
+# Icon scripts live in the desktop workspace (not delegated from root):
+npm run icon --workspace @lectio/desktop      # rebuild assets/icon.icns (macOS only: sips + iconutil)
+npm run icon:win --workspace @lectio/desktop  # rebuild assets/icon.ico (cross-platform: png-to-ico)
+npm run icons --workspace @lectio/desktop     # both icons (icon:win runs anywhere; icon needs macOS)
 ```
 
 Node 22 for the app and tests (CI uses Node 22); `icon:win`/`png-to-ico`
 need Node 22. Build each OS's installer on that OS: `.dmg`/`.icns` need
 macOS tooling; the `.exe` is produced on Windows in CI. The `.ico` is
-cross-platform, so it's generated once and **committed** (`assets/icon.ico`).
+cross-platform, so it's generated once and **committed**
+(`packages/desktop/assets/icon.ico`).
 
 ## Architecture
 
-Electron, three layers + a shared core:
+npm-workspaces monorepo: `@lectio/core` (`packages/core/`) holds the shared,
+Electron-free logic; `@lectio/desktop` (`packages/desktop/`) is the Electron app
+and depends on core. The root `package.json` is a thin workspace manager that
+delegates scripts. Repo-level concerns (`api/`, `homebrew/`, `macos-signing/`,
+`scripts/`) stay at the root.
 
-- **`main.js`** (main process): creates the `BrowserWindow`, builds the app menu
-  (incl. File → Save), registers IPC handlers, runs auto-update, and owns the
+Desktop has three layers + the shared core:
+
+- **`packages/desktop/main.js`** (main process): creates the `BrowserWindow`,
+  builds the app menu (incl. File → Save), registers IPC handlers (via
+  `require('@lectio/core/ipc-handlers')`), runs auto-update, and owns the
   unsaved-changes close prompt (`before-quit`).
-- **`preload.js`**: exposes three `contextBridge` APIs to the renderer and never
-  leaks `ipcRenderer`:
+- **`packages/desktop/preload.js`**: exposes the `contextBridge` APIs to the
+  renderer and never leaks `ipcRenderer`:
   - `window.planner` — `listSemesters / getSemester / saveSemester / deleteSemester`
   - `window.updater` — auto-update events + `restartAndUpdate`
   - `window.saver` — File→Save trigger, `setDirty`, save-before-quit handshake
-- **`index.html` + `app.js` + `style.css`** (renderer): all UI, rendering,
-  views, the save system, theme, and session restore. `app.js` is global-scoped
-  (not a module); it auto-runs `init()` at the bottom.
-- **`lib/`** — pure, DOM/Electron-free logic, imported by both the app (browser
-  global) and the tests (CommonJS):
+- **`index.html` + `app.js` + `style.css`** (renderer, in `packages/desktop/`):
+  all UI, rendering, views, the save system, theme, and session restore. `app.js`
+  is global-scoped (not a module); it auto-runs `init()` at the bottom. The
+  renderer loads core's `planner-core.js` via `<script src="planner-core.js">`;
+  that file is vendored next to `index.html` by `scripts/sync-core.js`
+  (prestart/predev/prebuild, git-ignored) so the same relative path resolves
+  under `npm start` and in the flattened packaged bundle — the sandboxed renderer
+  (`contextIsolation:true`, `nodeIntegration:false`) can't `require()` it.
+- **`@lectio/core`** (`packages/core/src/`) — pure, DOM/Electron-free logic,
+  imported by the desktop main process (CommonJS), the renderer (browser global),
+  and the tests (CommonJS):
   - `planner-core.js` — status cycles, `courseProgress`, course CRUD, `uid`
     (dual-mode: attaches `window.PlannerCore` in the browser, `module.exports`
     in Node)
@@ -75,7 +93,7 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
 
 - Reading status: `pending → seen → summarized → studied` (cycles).
 - Task status: `not done → done → reviewed` (cycles).
-- **Where files live:** dev → project `semesters/`; packaged → per-OS
+- **Where files live:** dev → `packages/desktop/semesters/`; packaged → per-OS
   `app.getPath('userData')`: macOS
   `~/Library/Application Support/Lectio/semesters/`, Windows
   `%APPDATA%\Lectio\semesters\` (seeded from the bundled `example.json` on
@@ -98,9 +116,10 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
 
 ## Testing
 
-- Vitest tests live in `tests/` and import `lib/` only (Node env). They do **not**
-  load `app.js`/`main.js`.
-- Coverage thresholds (70% lines/functions) apply to `lib/**` (`vitest.config.mjs`).
+- Vitest tests live in `packages/core/tests/` and import `@lectio/core`'s `src/`
+  only (Node env). They do **not** load the desktop `app.js`/`main.js`.
+- Coverage thresholds (70% lines/functions) apply to core's `src/**`
+  (`packages/core/vitest.config.mjs`).
 - Renderer + Electron-process behaviour (save indicator, IPC, menu, quit prompt,
   session restore) is verified with **hidden-window Electron smoke tests** run
   ad hoc — not part of the CI suite.
@@ -128,7 +147,7 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
 
 ## Gotchas
 
-- **Signing:** on the free path `build/afterPack.js` signs the bundle — with a
+- **Signing:** on the free path `packages/desktop/build/afterPack.js` signs the bundle — with a
   **persistent self-signed cert** when the CI secrets `MAC_CSC_P12_BASE64` /
   `MAC_CSC_PASSWORD` are set (release workflow imports them → `MAC_SIGN_IDENTITY`),
   otherwise **ad-hoc**. Neither is notarized, so downloaded copies are
@@ -139,7 +158,7 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
   auto-update (its requirement is pinned to each build's hash). See
   [`docs/MACOS_SIGNING.md`](docs/MACOS_SIGNING.md). Setting `APPLE_TEAM_ID`
   (+ certs) switches to real Developer ID signing + notarization
-  (`build/afterSign.js`).
+  (`packages/desktop/build/afterSign.js`).
 - **iCloud:** building inside an iCloud-synced folder (e.g. `~/Documents`) can
   re-add xattrs that break local `codesign`; `afterPack` handles this gracefully
   (local copies aren't quarantined, so it's harmless). CI runs in a clean checkout.
@@ -149,7 +168,22 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
   no-op on Windows (`electronPlatformName !== 'darwin'`).
 - **arm64-only macOS build** — no Intel/universal mac build yet (cask has
   `depends_on arch: :arm64`); the Windows target is x64.
-- **appId** is `com.masprime77.lectio` in `package.json`; changing it alters the
-  bundle id (affects signing/updates and the userData folder location).
+- **appId** is `com.masprime77.lectio` in `packages/desktop/package.json` (the
+  electron-builder `build` block); changing it alters the bundle id (affects
+  signing/updates and the userData folder location). `productName` (`Lectio`)
+  there drives the packaged app name / userData folder; in dev (unpackaged) the
+  userData folder follows the package `name`, so it differs from the packaged
+  `Lectio` path — dev scratch state only, not the shipped app.
+- **Packaged build deps (npm workspace):** deps are hoisted to the repo-root
+  `node_modules`, so `packages/desktop` has no local `node_modules`.
+  electron-builder bundles only `<appDir>/node_modules` and otherwise runs a
+  destructive `npm install --omit=dev` that prunes the hoisted root mid-build.
+  `prebuild:mac`/`prebuild:win` therefore run `scripts/bundle-deps.js`, which
+  seeds `packages/desktop/node_modules` with the production-dependency closure
+  (computed by `npm ls`, copied from the hoisted modules) so electron-builder
+  skips its install and bundles the right modules; `predev`/`prestart` run
+  `scripts/clean-deps.js` to drop that seed so dev uses the live workspace.
+  `electron` is **pinned to an exact version** in the desktop `package.json`
+  because electron-builder can't derive it from a range when electron is hoisted.
 - Don't touch the user's `../homebrew-tap` repo unless asked; `sync-tap.sh`
   commits + pushes there.

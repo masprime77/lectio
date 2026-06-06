@@ -1,5 +1,15 @@
 ## Unreleased
 
+### Mobile preparation — Phase 2: relocate desktop into @lectio/desktop
+
+- Moved the entire desktop app (`main.js`, `preload.js`, `index.html`, `app.js`, `style.css`, `start.command`, and the `assets/`, `build/`, `semesters/` dirs) from the repo root into `packages/desktop/` via `git mv` to preserve history.
+- Rewired the desktop to consume `@lectio/core` directly: `main.js` now requires `@lectio/core/ipc-handlers`, and the three temporary `lib/` re-export shims from Phase 1 (plus the empty `lib/` dir) are removed.
+- The sandboxed renderer can't `require()` core, so `scripts/sync-core.js` vendors `planner-core.js` next to `index.html` (on prestart/predev/prebuild, git-ignored); `index.html` loads it via `<script src="planner-core.js">`, a relative path that resolves identically under `npm start` and in the flattened packaged bundle. electron-builder bundles `@lectio/core` as a production dependency for the main process.
+- Added `packages/desktop/package.json` (`@lectio/desktop`) carrying the desktop scripts, the Electron dependencies, and the electron-builder `build` block (moved out of the root); its `files` list now bundles the vendored `planner-core.js` instead of `lib/`.
+- Made the packaged build work from the npm workspace: pinned `electron` to an exact version (electron-builder can't compute it from a range when the module is hoisted) and added `scripts/bundle-deps.js` (a prebuild step) that seeds `packages/desktop/node_modules` with the production-dependency closure so electron-builder bundles `@lectio/core` + `electron-log` + `electron-updater` into the app instead of running a destructive workspace install. `scripts/clean-deps.js` removes that seed on predev/prestart so dev keeps using the live workspace packages.
+- Slimmed the root `package.json` to a thin workspace manager: removed the desktop scripts, the `build` block, the Electron deps, and the `main` field; added `start`/`dev`/`build:mac`/`build:win` scripts that delegate to the `@lectio/desktop` workspace.
+- Updated `README.md` and `CLAUDE.md` for the `packages/core` + `packages/desktop` layout (project tree, command paths, data/dev folder locations); `api/`, `scripts/`, `macos-signing/`, and `homebrew/` remain at the repo root.
+
 ### Mobile preparation — Phase 1: extract @lectio/core
 
 - Moved the three dual-mode core modules (`planner-core.js`, `semester-store.js`, `ipc-handlers.js`) from the repo-root `lib/` into `packages/core/src/` as the `@lectio/core` package, using `git mv` to preserve history. No logic was changed — the moved files are byte-identical.

@@ -195,7 +195,7 @@ async function flushSave() {
   }
 }
 
-// Shared pure logic, loaded from lib/planner-core.js before this script.
+// Shared pure logic, loaded from @lectio/core (planner-core) before this script.
 const {
   getReadingTags, getTaskTags,
   isProtectedTag, addTag, deleteTag, editTag, reorderTags,
@@ -372,7 +372,7 @@ function courseBreakdown(course, sem, studyMode) {
 
 // ---------------------------------------------------------------------------
 // Dashboard: per-course progress + current week indicator
-// (courseProgress comes from lib/planner-core.js)
+// (courseProgress comes from @lectio/core planner-core)
 // ---------------------------------------------------------------------------
 function renderDashboard() {
   const sem = state.semester;

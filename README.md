@@ -107,17 +107,19 @@ npm install
 npm start
 ```
 
-`npm start` runs `electron .`, which opens the desktop window directly — no
-terminal interaction, no browser, no `localhost`. Use `npm run dev` to launch
-with DevTools open. You can also double-click **`start.command`** in Finder to
-run the app from source without a terminal.
+`npm start` (from the repo root) delegates to the `@lectio/desktop` workspace,
+which runs `electron .` and opens the desktop window directly — no terminal
+interaction, no browser, no `localhost`. Use `npm run dev` to launch with
+DevTools open. You can also double-click **`packages/desktop/start.command`** in
+Finder to run the app from source without a terminal.
 
-In development the app reads and writes the project's own `semesters/` folder.
+In development the app reads and writes the desktop package's own
+`packages/desktop/semesters/` folder.
 
 ## Testing
 
-The core logic is extracted into `lib/` (pure, DOM-free modules) and tested with
-[Vitest](https://vitest.dev/):
+The core logic lives in `@lectio/core` (`packages/core/`, pure DOM-free modules)
+and is tested with [Vitest](https://vitest.dev/):
 
 ```bash
 npm test            # run the suite once
@@ -125,12 +127,12 @@ npm run test:watch  # watch mode
 npm run test:coverage   # run with a V8 coverage report (written to coverage/)
 ```
 
-- **Unit tests** (`tests/unit/`) cover status cycling, progress calculation,
-  course CRUD, and the filesystem store.
-- **Integration tests** (`tests/integration/`) drive the IPC handlers through a
-  mock `ipcMain` against a temp directory.
+- **Unit tests** (`packages/core/tests/unit/`) cover status cycling, progress
+  calculation, course CRUD, and the filesystem store.
+- **Integration tests** (`packages/core/tests/integration/`) drive the IPC
+  handlers through a mock `ipcMain` against a temp directory.
 - Coverage thresholds are enforced at **70% lines** and **70% functions**
-  (see `vitest.config.mjs`); the run fails if they aren't met.
+  (see `packages/core/vitest.config.mjs`); the run fails if they aren't met.
 
 CI runs the suite on **macOS** and **Ubuntu** (Node 22) on every push and on
 pull requests to `main`, and uploads the coverage report as an artifact. A
@@ -145,8 +147,9 @@ lives in [`docs/USER_STORIES.md`](docs/USER_STORIES.md).
 npm run build:mac
 ```
 
-This runs [electron-builder](https://www.electron.build/) and produces, in the
-**`dist/`** folder:
+`npm run build:mac` (from the repo root) delegates to the `@lectio/desktop`
+workspace. This runs [electron-builder](https://www.electron.build/) and
+produces, in the **`packages/desktop/dist/`** folder:
 
 - a **`.dmg`** installer — drag-and-drop, ready to share or upload to a GitHub
   Release, and
@@ -183,7 +186,7 @@ On Windows, build the installer with:
 npm run build:win
 ```
 
-This produces, in the **`dist/`** folder, a **`Lectio Setup <version>.exe`**
+This produces, in the **`packages/desktop/dist/`** folder, a **`Lectio Setup <version>.exe`**
 [NSIS](https://www.electron.build/configuration/nsis) installer (plus a `.zip`
 of the app and `latest.yml` for auto-updates). Run the installer and follow
 **Next → Next → Install** — you can pick the install directory, and it creates
@@ -206,12 +209,13 @@ hook notarizes automatically.
 
 ## Updating the app icon
 
-Replace `assets/icon.png` (1024×1024) with your artwork, then rebuild the `.icns`:
+Replace `packages/desktop/assets/icon.png` (1024×1024) with your artwork, then
+rebuild the `.icns` (the icon scripts live in the `@lectio/desktop` workspace):
 
 ```bash
-npm run icon       # assets/icon.png → assets/icon.icns (macOS: sips + iconutil)
-npm run icon:win   # assets/icon.png → assets/icon.ico (cross-platform, Node 22+)
-npm run icons      # rebuild both icon.icns and icon.ico
+npm run icon --workspace @lectio/desktop      # icon.png → icon.icns (macOS: sips + iconutil)
+npm run icon:win --workspace @lectio/desktop  # icon.png → icon.ico (cross-platform, Node 22+)
+npm run icons --workspace @lectio/desktop     # rebuild both icon.icns and icon.ico
 ```
 
 Commit both files and ship the new icon in the next release. Full details (the
@@ -220,40 +224,50 @@ generated sizes, DMG background, and caching tips) are in
 
 ## Project structure
 
+An npm-workspaces monorepo: shared logic in `@lectio/core`, the Electron app
+in `@lectio/desktop`. Repo-level concerns (signing, Homebrew, the feedback
+function) stay at the root.
+
 ```
 lectio/
-├── main.js             # Electron main process: window, IPC handlers, auto-update
-├── preload.js          # contextBridge bridges: window.planner + window.updater
-├── index.html          # Markup: update banner, header, dashboard, planner, modal
-├── app.js              # Renderer logic: views, save system, session restore
-├── style.css           # Styles (theme variables, banners, indicators)
-├── start.command       # Double-click launcher for running from source
-├── package.json        # Scripts + electron-builder config (dmg, publish)
-├── lib/                # Pure, testable core logic
-│   ├── planner-core.js      # status cycles, progress, course CRUD
-│   ├── semester-store.js    # filesystem read/write/delete
-│   └── ipc-handlers.js      # registers the semester IPC handlers
-├── assets/             # Icon + DMG background, and their generators
-│   ├── icon.png             # 1024×1024 source icon
-│   ├── icon.icns            # built app/volume icon (see docs/UPDATING_THE_ICON.md)
-│   ├── build-icns.sh        # icon.png → icon.icns  (npm run icon)
-│   ├── generate-icon.js     # generate a placeholder icon.png
-│   ├── dmg-background.png / @2x   # DMG window background
-│   └── generate-dmg-background.js
-├── build/
-│   ├── afterPack.js         # ad-hoc sign the .app (free distribution path)
-│   └── afterSign.js         # Notarization hook (runs only if APPLE_TEAM_ID set)
-├── tests/              # Vitest unit + integration tests
+├── package.json        # Workspace root: delegates start/dev/build/test to the packages
+├── packages/
+│   ├── core/           # @lectio/core — pure, testable logic (DOM/Electron-free)
+│   │   ├── src/
+│   │   │   ├── planner-core.js   # status cycles, progress, course CRUD
+│   │   │   ├── semester-store.js # filesystem read/write/delete
+│   │   │   └── ipc-handlers.js   # registers the semester IPC handlers
+│   │   └── tests/                # Vitest unit + integration tests
+│   └── desktop/        # @lectio/desktop — the Electron app + electron-builder config
+│       ├── main.js               # Main process: window, IPC handlers, auto-update
+│       ├── preload.js            # contextBridge bridges: window.planner + window.updater
+│       ├── index.html            # Markup: update banner, header, dashboard, planner, modal
+│       ├── app.js                # Renderer logic: views, save system, session restore
+│       ├── style.css             # Styles (theme variables, banners, indicators)
+│       ├── start.command         # Double-click launcher for running from source
+│       ├── package.json          # Desktop scripts + electron-builder config (dmg, publish)
+│       ├── scripts/sync-core.js  # Vendors planner-core next to index.html for the renderer
+│       ├── assets/               # Icon + DMG background, and their generators
+│       │   ├── icon.png              # 1024×1024 source icon
+│       │   ├── icon.icns             # built app/volume icon (see docs/UPDATING_THE_ICON.md)
+│       │   ├── build-icns.sh         # icon.png → icon.icns  (npm run icon)
+│       │   ├── generate-icon.js      # generate a placeholder icon.png
+│       │   ├── dmg-background.png / @2x   # DMG window background
+│       │   └── generate-dmg-background.js
+│       ├── build/
+│       │   ├── afterPack.js          # ad-hoc sign the .app (free distribution path)
+│       │   └── afterSign.js          # Notarization hook (runs only if APPLE_TEAM_ID set)
+│       └── semesters/
+│           └── example.json      # Bundled example semester (starter data)
+├── api/                # Vercel feedback function (repo-level)
 ├── homebrew/
-│   ├── Casks/lectio.rb  # Homebrew cask
+│   ├── Casks/lectio.rb            # Homebrew cask
 │   ├── update-cask.sh             # refresh cask version + sha256 from a release
 │   └── sync-tap.sh                # publish the cask to ../homebrew-tap
 ├── docs/
-│   ├── USER_STORIES.md       # Stories + test traceability
-│   └── UPDATING_THE_ICON.md  # How to rebuild icon files from icon.png
+│   ├── USER_STORIES.md           # Stories + test traceability
+│   └── UPDATING_THE_ICON.md      # How to rebuild icon files from icon.png
 ├── .github/workflows/  # ci.yml (tests) + release.yml (build & publish)
-├── semesters/
-│   └── example.json    # Bundled example semester (starter data)
 └── README.md
 ```
 
@@ -279,15 +293,15 @@ unsaved-changes reporting, and the save-before-quit handshake).
 
 ### Where your data lives
 
-- **Development:** the project's `semesters/` folder.
+- **Development:** the desktop package's `packages/desktop/semesters/` folder.
 - **Packaged app:** `~/Library/Application Support/Lectio/semesters/`
   (`app.getPath('userData')`), so your data persists across app updates. On
   first launch the app seeds this folder with the bundled `example.json`.
 
 ## Adding a semester manually
 
-Create a new file in the active `semesters/` folder (the project folder in
-development, or `~/Library/Application Support/Lectio/semesters/` for
+Create a new file in the active `semesters/` folder (`packages/desktop/semesters/`
+in development, or `~/Library/Application Support/Lectio/semesters/` for
 the installed app), e.g. `ws2025.json`. The filename (without `.json`) is the
 semester's id. Follow this schema:
 
@@ -371,7 +385,7 @@ GitHub Releases (configured via the `build.publish` field in `package.json`).
 
 Auto-updates only run in the packaged app from a published release — in
 development it's a no-op. The renderer talks to the updater only through the
-`window.updater` bridge in [`preload.js`](preload.js); `ipcRenderer` is never
+`window.updater` bridge in [`preload.js`](packages/desktop/preload.js); `ipcRenderer` is never
 exposed.
 
 ## Install via Homebrew (tap)
