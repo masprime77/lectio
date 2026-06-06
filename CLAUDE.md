@@ -174,5 +174,16 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
   there drives the packaged app name / userData folder; in dev (unpackaged) the
   userData folder follows the package `name`, so it differs from the packaged
   `Lectio` path — dev scratch state only, not the shipped app.
+- **Packaged build deps (npm workspace):** deps are hoisted to the repo-root
+  `node_modules`, so `packages/desktop` has no local `node_modules`.
+  electron-builder bundles only `<appDir>/node_modules` and otherwise runs a
+  destructive `npm install --omit=dev` that prunes the hoisted root mid-build.
+  `prebuild:mac`/`prebuild:win` therefore run `scripts/bundle-deps.js`, which
+  seeds `packages/desktop/node_modules` with the production-dependency closure
+  (computed by `npm ls`, copied from the hoisted modules) so electron-builder
+  skips its install and bundles the right modules; `predev`/`prestart` run
+  `scripts/clean-deps.js` to drop that seed so dev uses the live workspace.
+  `electron` is **pinned to an exact version** in the desktop `package.json`
+  because electron-builder can't derive it from a range when electron is hoisted.
 - Don't touch the user's `../homebrew-tap` repo unless asked; `sync-tap.sh`
   commits + pushes there.

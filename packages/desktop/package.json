@@ -6,13 +6,15 @@
   "license": "MIT",
   "scripts": {
     "sync-core": "node scripts/sync-core.js",
-    "prestart": "npm run sync-core",
+    "bundle-deps": "node scripts/bundle-deps.js",
+    "clean-deps": "node scripts/clean-deps.js",
+    "prestart": "npm run sync-core && npm run clean-deps",
     "start": "electron .",
-    "predev": "npm run sync-core",
+    "predev": "npm run sync-core && npm run clean-deps",
     "dev": "electron . --dev-tools",
-    "prebuild:mac": "npm run sync-core",
+    "prebuild:mac": "npm run sync-core && npm run bundle-deps",
     "build:mac": "electron-builder --mac",
-    "prebuild:win": "npm run sync-core",
+    "prebuild:win": "npm run sync-core && npm run bundle-deps",
     "build:win": "electron-builder --win",
     "icon": "bash assets/build-icns.sh",
     "icon:win": "node assets/build-ico.js",
@@ -24,7 +26,7 @@
     "electron-updater": "^6.8.3"
   },
   "devDependencies": {
-    "electron": "^31.0.0",
+    "electron": "31.7.7",
     "electron-builder": "^24.13.3",
     "png-to-ico": "^3.0.1"
   },
