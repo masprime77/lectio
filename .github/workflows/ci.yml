@@ -2,8 +2,9 @@ name: CI
 
 on:
   push:
+    branches: [main, mobile-prep]
   pull_request:
-    branches: [main]
+    branches: [main, mobile-prep]
   # Allow other workflows (e.g. release) to require this one.
   workflow_call:
 
@@ -26,7 +27,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run tests
         run: npm test
@@ -38,5 +39,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.os }}
-          path: coverage/
+          path: packages/core/coverage/
           if-no-files-found: error
