@@ -39,10 +39,10 @@ export default function SemestersScreen() {
       renderItem={({ item }) => (
         <Link href={`/semester/${item.id}`} asChild>
           <Pressable
-            style={[
+            style={StyleSheet.flatten([
               styles.row,
               { backgroundColor: theme.surface, borderColor: theme.border },
-            ]}
+            ])}
           >
             <Text style={[styles.rowTitle, { color: theme.text }]}>{item.name}</Text>
             <Text style={[styles.chevron, { color: theme.muted }]}>›</Text>
