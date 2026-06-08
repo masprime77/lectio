@@ -8,6 +8,7 @@
 - Added the MVP screens (Expo Router + TypeScript): semesters list → courses list (per-course progress bars from `courseProgress`) → course detail (readings/tasks with their tag name + color dot; tapping an item advances it to the next tag, recomputes progress via core, and persists). All planner math comes from `@lectio/core` — none is reimplemented in the app. Added a minimal light/dark theme (`src/theme.ts`) driven by the OS color scheme.
 - Added root convenience scripts (`mobile`, `mobile:ios`, `mobile:android`) delegating to the `@lectio/mobile` workspace.
 - The device adapter's contract test was skipped this phase (the reusable suite is Vitest-based and AsyncStorage needs RN-specific mocking that isn't worth standing up yet); it will be contract-tested in a later phase. Core and desktop are unchanged.
+- Fixed a launch crash on SDK 56: flattened the `style` arrays on the `Pressable` children of `<Link asChild>` (`StyleSheet.flatten`), which the rewritten Expo Router renders through a `<Slot>` that no longer accepts an array style on its direct child.
 
 ### Mobile preparation — Phase 4: storage abstraction
 
