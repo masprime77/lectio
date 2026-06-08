@@ -14,6 +14,9 @@
     "dev": "npm run dev --workspace @lectio/desktop",
     "build:mac": "npm run build:mac --workspace @lectio/desktop",
     "build:win": "npm run build:win --workspace @lectio/desktop",
+    "mobile": "npm start --workspace @lectio/mobile",
+    "mobile:ios": "npm run ios --workspace @lectio/mobile",
+    "mobile:android": "npm run android --workspace @lectio/mobile",
     "test": "npm test --workspace @lectio/core",
     "test:watch": "npm run test:watch --workspace @lectio/core",
     "test:coverage": "npm run test:coverage --workspace @lectio/core"
