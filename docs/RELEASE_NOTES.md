@@ -1,5 +1,16 @@
 ## Unreleased
 
+### Mobile preparation — Phase 5: mobile scaffold + MVP UI
+
+- Scaffolded a new `@lectio/mobile` workspace package: an Expo (SDK 56, React Native 0.85, React 19.2) app using Expo Router (file-based) and TypeScript, runnable in Expo Go with no native/dev-client build. Added a monorepo-aware `metro.config.js` (watches the repo root, resolves the hoisted `@lectio/core` symlink, disables hierarchical lookup) so Metro bundles the shared core.
+- Added an on-device storage adapter (`src/storage/device-storage.ts`) backed by `@react-native-async-storage/async-storage` that satisfies the Phase-4 async storage contract — same `migrateStatusToTagId` on load, same id guard (rejects ids not matching `/^[a-zA-Z0-9_-]+$/` with "invalid", missing with "not found"), validated by `assertStorage` — so it behaves identically to the desktop fs adapter.
+- Added hand-written ambient types for `@lectio/core` (`types/lectio-core.d.ts`) covering the data shapes and the RN-safe subpaths (`.`, `./planner-core`, `./storage/migrate`, `./storage/contract`); tsconfig `paths` map those specifiers to the declaration file so the symlinked JS package is typed without touching core's published surface. `npx tsc --noEmit` passes. Added a first-run seed (`src/storage/seed.ts`) that saves one realistic sample semester (2 courses with varied readings/tasks) when storage is empty, including the default tag arrays so migration leaves it untouched.
+- Added the MVP screens (Expo Router + TypeScript): semesters list → courses list (per-course progress bars from `courseProgress`) → course detail (readings/tasks with their tag name + color dot; tapping an item advances it to the next tag, recomputes progress via core, and persists). All planner math comes from `@lectio/core` — none is reimplemented in the app. Added a minimal light/dark theme (`src/theme.ts`) driven by the OS color scheme.
+- Added root convenience scripts (`mobile`, `mobile:ios`, `mobile:android`) delegating to the `@lectio/mobile` workspace.
+- The device adapter's contract test was skipped this phase (the reusable suite is Vitest-based and AsyncStorage needs RN-specific mocking that isn't worth standing up yet); it will be contract-tested in a later phase. Core and desktop are unchanged.
+- Fixed a launch crash on SDK 56: flattened the `style` arrays on the `Pressable` children of `<Link asChild>` (`StyleSheet.flatten`), which the rewritten Expo Router renders through a `<Slot>` that no longer accepts an array style on its direct child.
+- Fixed Android bundling: added `@expo/ui` (required by SDK 56's Expo Router for its native toolbar — `@expo/ui/jetpack-compose` on Android) and its `react-native-reanimated`/`react-native-worklets` peers, pinned tree-wide to the SDK 56 versions via a root `overrides` (`reanimated@4.3.1`, `worklets@0.8.3`) so they dedupe to a single copy and satisfy `expo-modules-core`. Verified bundling and launch on both the iOS simulator and the Android emulator.
+
 ### Mobile preparation — Phase 4: storage abstraction
 
 - Extracted `migrateStatusToTagId` from `semester-store.js` into a new platform-agnostic `@lectio/core/storage/migrate` module (depends only on `planner-core`, no `fs`); `semester-store.js` now consumes and re-exports it, keeping its public API and behaviour identical.

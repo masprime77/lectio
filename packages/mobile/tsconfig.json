@@ -1,0 +1,20 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@lectio/core": ["./types/lectio-core.d.ts"],
+      "@lectio/core/planner-core": ["./types/lectio-core.d.ts"],
+      "@lectio/core/storage/migrate": ["./types/lectio-core.d.ts"],
+      "@lectio/core/storage/contract": ["./types/lectio-core.d.ts"]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "types/**/*.d.ts",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ],
+  "exclude": ["node_modules"]
+}
