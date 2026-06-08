@@ -1,5 +1,13 @@
 ## Unreleased
 
+### Mobile preparation — Phase 4: storage abstraction
+
+- Extracted `migrateStatusToTagId` from `semester-store.js` into a new platform-agnostic `@lectio/core/storage/migrate` module (depends only on `planner-core`, no `fs`); `semester-store.js` now consumes and re-exports it, keeping its public API and behaviour identical.
+- Added `@lectio/core/storage/contract`: the canonical async storage interface (`list`/`get`/`save`/`delete`) documented as a single source of truth, with a `STORAGE_METHODS` list and an `assertStorage()` runtime validator that every platform adapter is checked against.
+- Added `@lectio/core/storage/fs` — a filesystem adapter (`createFsStorage(dirOrResolver)`) that satisfies the async contract by wrapping the existing synchronous `semester-store`, accepting a directory string or a `() => dir` resolver (mirroring `ipc-handlers`). Additive only: the desktop, `ipc-handlers.js`, and existing behaviour are unchanged.
+- Added a reusable `tests/contract/storage-contract.js` suite (run by `tests/unit/fs-storage.test.js` against the fs adapter) that exercises the full contract — list/get/save/delete, migration on load, missing-id and traversal-id rejection — so the future Supabase adapter can run the same suite.
+- Added `./storage/migrate`, `./storage/contract`, and `./storage/fs` subpath exports to `@lectio/core`.
+
 ### Mobile preparation — Phase 3: CI monorepo fixes
 
 - Fixed the CI coverage artifact path: the "Upload coverage report" step now uploads from `packages/core/coverage/` (where Vitest writes coverage in the monorepo) instead of the stale root `coverage/`.
