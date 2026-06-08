@@ -9,6 +9,7 @@
 - Added root convenience scripts (`mobile`, `mobile:ios`, `mobile:android`) delegating to the `@lectio/mobile` workspace.
 - The device adapter's contract test was skipped this phase (the reusable suite is Vitest-based and AsyncStorage needs RN-specific mocking that isn't worth standing up yet); it will be contract-tested in a later phase. Core and desktop are unchanged.
 - Fixed a launch crash on SDK 56: flattened the `style` arrays on the `Pressable` children of `<Link asChild>` (`StyleSheet.flatten`), which the rewritten Expo Router renders through a `<Slot>` that no longer accepts an array style on its direct child.
+- Fixed Android bundling: added `@expo/ui` (required by SDK 56's Expo Router for its native toolbar — `@expo/ui/jetpack-compose` on Android) and its `react-native-reanimated`/`react-native-worklets` peers, pinned tree-wide to the SDK 56 versions via a root `overrides` (`reanimated@4.3.1`, `worklets@0.8.3`) so they dedupe to a single copy and satisfy `expo-modules-core`. Verified bundling and launch on both the iOS simulator and the Android emulator.
 
 ### Mobile preparation — Phase 4: storage abstraction
 
