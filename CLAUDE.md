@@ -4,30 +4,54 @@ Guidance for AI assistants (and humans) working in this repo.
 
 ## What this is
 
-**Lectio** — a native **desktop app for macOS and Windows** (Electron) for
-planning a university semester: courses, weekly readings and tasks, status
-badges, and per-course progress. Framework-free **vanilla JS** renderer. **No
-server and no database** — each semester is a plain JSON file; the Electron main
-process reads and writes those files directly via Node's `fs`.
+**Lectio** — an npm-workspaces monorepo for planning a university semester
+(courses, weekly readings and tasks, status badges, per-course progress) that
+ships as two apps sharing one core:
+
+- **`@lectio/desktop`** — a native **desktop app for macOS and Windows**
+  (Electron, framework-free **vanilla JS** renderer). **No server and no
+  database** — each semester is a plain JSON file the Electron main process
+  reads/writes directly via Node's `fs` (the `fs-storage` adapter).
+- **`@lectio/mobile`** — an **Expo / React Native app for iOS and Android**
+  (Expo Router + TypeScript, runs in Expo Go). Semesters sync across devices
+  through **Supabase** (Postgres + RLS) behind email/password auth (the
+  `supabase-storage` adapter); a `device-storage` adapter (on-device
+  AsyncStorage) is kept for a future offline mode.
+- **`@lectio/core`** — pure, DOM/Electron-free planner logic plus the async
+  **storage contract** and adapters, shared by all of the above.
+
+Sync is currently **mobile-only**: desktop still uses `fs-storage` and is not
+wired to Supabase, so cross-device sync works mobile↔mobile. Remaining gaps are
+tracked in [`docs/PENDING_FEATURES.md`](docs/PENDING_FEATURES.md).
 
 ## Commands
 
 npm-workspaces monorepo. Run these from the **repo root**; `start`/`dev`/`build:*`
-delegate to the `@lectio/desktop` workspace and `test*` to `@lectio/core`:
+delegate to `@lectio/desktop`, `mobile*` to `@lectio/mobile`, and `test*` to
+`@lectio/core`:
 
 ```bash
 npm install            # install deps + link workspaces
 npm start              # run desktop from source (→ @lectio/desktop: electron .)
 npm run dev            # run with DevTools open
+npm run mobile         # run mobile in Expo Go (→ @lectio/mobile: expo start)
+npm run mobile:ios     # mobile in the iOS simulator
+npm run mobile:android # mobile on the Android emulator
 npm test               # Vitest suite (run once, @lectio/core)
 npm run test:coverage  # coverage report (coverage/), thresholds enforced
 npm run build:mac      # build .dmg + .zip into packages/desktop/dist/ (electron-builder)
 npm run build:win      # build NSIS .exe + .zip into packages/desktop/dist/ (electron-builder)
+# Mobile typecheck lives in the mobile workspace (no root alias):
+npm run typecheck --workspace @lectio/mobile  # tsc --noEmit
 # Icon scripts live in the desktop workspace (not delegated from root):
 npm run icon --workspace @lectio/desktop      # rebuild assets/icon.icns (macOS only: sips + iconutil)
 npm run icon:win --workspace @lectio/desktop  # rebuild assets/icon.ico (cross-platform: png-to-ico)
 npm run icons --workspace @lectio/desktop     # both icons (icon:win runs anywhere; icon needs macOS)
 ```
+
+The mobile app needs Supabase env vars: copy `packages/mobile/.env.example` to
+`packages/mobile/.env` and set `EXPO_PUBLIC_SUPABASE_URL` +
+`EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` before `npm run mobile`.
 
 Node 22 for the app and tests (CI uses Node 22); `icon:win`/`png-to-ico`
 need Node 22. Build each OS's installer on that OS: `.dmg`/`.icns` need
@@ -37,9 +61,10 @@ cross-platform, so it's generated once and **committed**
 
 ## Architecture
 
-npm-workspaces monorepo: `@lectio/core` (`packages/core/`) holds the shared,
-Electron-free logic; `@lectio/desktop` (`packages/desktop/`) is the Electron app
-and depends on core. The root `package.json` is a thin workspace manager that
+npm-workspaces monorepo with three packages: `@lectio/core` (`packages/core/`)
+holds the shared, Electron-free logic; `@lectio/desktop` (`packages/desktop/`)
+is the Electron app; `@lectio/mobile` (`packages/mobile/`) is the Expo app. Both
+apps depend on core. The root `package.json` is a thin workspace manager that
 delegates scripts. Repo-level concerns (`api/`, `homebrew/`, `macos-signing/`,
 `scripts/`) stay at the root.
 
@@ -70,8 +95,53 @@ Desktop has three layers + the shared core:
     in Node)
   - `semester-store.js` — filesystem read/write/delete (parameterized by dir)
   - `ipc-handlers.js` — `registerIpcHandlers(ipcMain, getDir)`, used by `main.js`
+  - `storage/` — the async storage layer shared across platforms:
+    `contract.js` (the canonical `list`/`get`/`save`/`delete` interface +
+    `assertStorage` validator), `migrate.js` (`migrateStatusToTagId`, the
+    platform-agnostic legacy→tag-id migration), and `fs-storage.js`
+    (`createFsStorage(dirOrResolver)`, used by desktop)
 
 The renderer's `api` object calls `window.planner.*` (IPC) — there is no HTTP.
+
+## Storage contract & adapters
+
+All persistence goes through one async contract — `list()`, `get(id)`,
+`save(id, data)`, `delete(id)` — defined in `@lectio/core/storage/contract` and
+enforced at construction by `assertStorage`. Every adapter migrates on load
+(`migrateStatusToTagId`), guards ids against `[A-Za-z0-9_-]+`, and uses the same
+"invalid"/"not found" error messages, so they're drop-in interchangeable:
+
+- **`fs-storage`** (`@lectio/core/storage/fs`) — filesystem, used by desktop via
+  `ipc-handlers`.
+- **`device-storage`** (`packages/mobile/src/storage/device-storage.ts`) —
+  on-device AsyncStorage; the future offline fallback (kept but not the active
+  adapter).
+- **`supabase-storage`** (`packages/mobile/src/storage/supabase-storage.ts`) —
+  the mobile app's **active** adapter; a `public.semesters` JSON-blob table
+  keyed by `(user_id, id)` with Row Level Security for per-user isolation.
+
+A reusable contract suite (`packages/core/tests/contract/storage-contract.js`)
+exercises the full surface; it runs against `fs-storage` today. The mobile
+adapters are not yet wired to it (see `docs/PENDING_FEATURES.md`).
+
+## Mobile (`@lectio/mobile`)
+
+Expo (SDK 56) / React Native + Expo Router (file-based routing) + TypeScript,
+runnable in Expo Go (no native/dev-client build). Key pieces:
+
+- **Screens** (`app/`): `sign-in.tsx` (email/password), `index.tsx` (semesters
+  list + sign-out), `semester/[id].tsx` (courses with progress bars),
+  `semester/[id]/course/[courseId].tsx` (readings/tasks; tap an item to cycle
+  its tag and persist). `_layout.tsx` redirects to `/sign-in` until authed.
+- **Auth** (`src/auth/AuthProvider.tsx`): Supabase email/password session,
+  restored from AsyncStorage, exposing `signIn`/`signUp`/`signOut`.
+- **Storage** (`src/storage/index.ts`): returns `supabase-storage` as the
+  singleton `storage`; `ensureSeed` exists but is intentionally **not**
+  auto-called (so new cloud accounts aren't seeded with sample data).
+- All planner math comes from `@lectio/core` (typed via the hand-written
+  `types/lectio-core.d.ts` ambient declarations + `tsconfig` `paths`); none is
+  reimplemented. `metro.config.js` is monorepo-aware so Metro bundles the
+  symlinked core.
 
 ## Data model
 
@@ -126,13 +196,16 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
 
 ## Workflow & conventions
 
-- **Branches:** work on `dev`; `main` is protected (PR required, 0 approvals so
+- **Branches:** work on a feature/phase branch and PR into the active
+  integration branch (currently **`mobile-prep`** for the mobile work), which is
+  periodically merged to `main`. `main` is protected (PR required, 0 approvals so
   the owner can self-merge, required checks `Test (macos-latest)` +
-  `Test (ubuntu-latest)`, must be up to date, no force-push). Sync `dev` with
-  `main` before opening a PR (`git merge origin/main`).
+  `Test (ubuntu-latest)`, must be up to date, no force-push). Sync your branch
+  with its base before opening a PR (`git merge origin/<base>`).
 - **Commits:** Conventional-Commits style — `feat:`, `fix:`, `chore:`, `ci:`,
   `docs:`, `test:`, `refactor:`. Small, focused commits.
-- **CI/CD:** `.github/workflows/ci.yml` (tests on macOS + Ubuntu) gates
+- **CI/CD:** `.github/workflows/ci.yml` runs on `main` + `mobile-prep` (tests on
+  macOS + Ubuntu, plus a macOS packaging build with no publish) and gates
   `release.yml`. Release flow: bump `version` in `package.json` → PR → merge →
   `git tag vX.Y.Z && git push origin vX.Y.Z`. The release workflow runs CI, then
   builds and publishes in two parallel, independent jobs — macOS

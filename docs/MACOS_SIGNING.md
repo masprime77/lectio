@@ -32,7 +32,8 @@ A self-signed certificate gives us that stable identity for free. It is **not**
 Apple notarization — Gatekeeper still shows "unidentified developer" on first
 launch, which the Homebrew cask's `postflight` (or a manual right-click → Open)
 clears. For full notarization (and no Gatekeeper warning), set `APPLE_TEAM_ID`
-+ certs instead; that path still takes over automatically (see `build/`).
++ certs instead; that path still takes over automatically (see
+`packages/desktop/build/`).
 
 ## One-time setup
 
@@ -67,8 +68,8 @@ That's it. The next tagged release builds a signed macOS app automatically.
    to the search list, and exports the identity's SHA-1 as `MAC_SIGN_IDENTITY`.
    (The cert is untrusted, so it's listed without `find-identity -v`.)
 2. The build runs with `CSC_IDENTITY_AUTO_DISCOVERY=false`, so electron-builder
-   does not try to sign. Instead `build/afterPack.js` signs the bundle with
-   `MAC_SIGN_IDENTITY` and logs the resulting designated requirement.
+   does not try to sign. Instead `packages/desktop/build/afterPack.js` signs the
+   bundle with `MAC_SIGN_IDENTITY` and logs the resulting designated requirement.
 3. If the secret is absent, the step is skipped and `afterPack` falls back to
    ad-hoc signing (auto-update won't work, but the app still runs).
 

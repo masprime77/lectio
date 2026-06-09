@@ -2,8 +2,14 @@
 
 Feature-level user stories for Lectio, with acceptance criteria and
 links to the automated tests that cover them. UI-only behaviours (rendering,
-DOM interaction, theming) are validated manually and noted as such; the
-extracted core logic in `lib/` is covered by the Vitest suite under `tests/`.
+DOM interaction, theming) are validated manually and noted as such; the shared
+core logic in `@lectio/core` (`packages/core/src/`) is covered by the Vitest
+suite under `packages/core/tests/`.
+
+These stories describe the **desktop app**, which remains the feature-complete
+reference. A **mobile app** (`@lectio/mobile`, Expo) now exists too but mirrors
+only a subset of these stories; mobile feature parity is tracked in
+[`PENDING_FEATURES.md`](PENDING_FEATURES.md).
 
 Test references use the form `file › test name`.
 

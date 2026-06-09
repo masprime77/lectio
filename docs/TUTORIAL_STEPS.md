@@ -1,6 +1,10 @@
 # Tutorial Steps
 
-Lectio shows an interactive tour on first launch, and whenever the user triggers it from **Settings → Start tour**.
+This describes the **desktop app** (`@lectio/desktop`). The mobile app has no
+onboarding tour yet — that gap is tracked in
+[`PENDING_FEATURES.md`](PENDING_FEATURES.md).
+
+The desktop app shows an interactive tour on first launch, and whenever the user triggers it from **Settings → Start tour**.
 
 ## How steps work
 
