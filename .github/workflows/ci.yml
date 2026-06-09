@@ -67,4 +67,4 @@ jobs:
       - name: Build macOS app (no publish)
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
-        run: npm run build:mac
+        run: npm run build:mac -- --publish never

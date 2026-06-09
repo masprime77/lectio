@@ -1,5 +1,7 @@
 ## Unreleased
 
+- Fixed the PR "Build (macOS, no publish)" CI job: it now runs `npm run build:mac -- --publish never` so electron-builder packages the `.dmg`/`.zip` without attempting to publish, dropping the spurious `GH_TOKEN` requirement (`release.yml` still publishes with `--publish always` at tag time).
+
 ### Mobile preparation — Phase 5: mobile scaffold + MVP UI
 
 - Scaffolded a new `@lectio/mobile` workspace package: an Expo (SDK 56, React Native 0.85, React 19.2) app using Expo Router (file-based) and TypeScript, runnable in Expo Go with no native/dev-client build. Added a monorepo-aware `metro.config.js` (watches the repo root, resolves the hoisted `@lectio/core` symlink, disables hierarchical lookup) so Metro bundles the shared core.
