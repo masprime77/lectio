@@ -1,6 +1,7 @@
 ## Unreleased
 
-- Fixed the PR "Build (macOS, no publish)" CI job: it now runs `npm run build:mac -- --publish never` so electron-builder packages the `.dmg`/`.zip` without attempting to publish, dropping the spurious `GH_TOKEN` requirement (`release.yml` still publishes with `--publish always` at tag time).
+- Fixed the PR "Build (macOS, no publish)" CI job: the `--publish never` flag was being lost through the two npm-workspace layers (root alias → workspace script), so electron-builder ran as `--mac never` and failed with "Unknown target: never". The build now invokes the desktop workspace script directly (`npm run build:mac --workspace @lectio/desktop -- --publish never`) so the flag forwards correctly and electron-builder packages the `.dmg`/`.zip` without attempting to publish, dropping the spurious `GH_TOKEN` requirement. Applied the same single-layer fix to `release.yml` (which had the identical latent bug), keeping `--publish always` there for real tagged releases.
+- Bumped the GitHub Actions in `ci.yml`/`release.yml` to majors that run on Node.js 24 (`actions/checkout@v6`, `actions/setup-node@v6`, `actions/upload-artifact@v7`), clearing the Node.js 20 deprecation warning.
 
 ### Mobile preparation — Phase 5: mobile scaffold + MVP UI
 
