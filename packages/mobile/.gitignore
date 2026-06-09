@@ -20,3 +20,7 @@ expo-env.d.ts
 
 # macOS
 .DS_Store
+
+# Supabase secrets — never commit real credentials
+.env
+.env.local
