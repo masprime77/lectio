@@ -203,8 +203,8 @@ the Applications shortcut, then launch it like any native Mac app.
 
 ### First launch on macOS (Gatekeeper)
 
-Builds are **ad-hoc signed** but not notarized (no paid Apple Developer ID), so
-macOS Gatekeeper blocks a freshly downloaded copy the first time. Do this once:
+macOS builds are signed but **not notarized** (no paid Apple Developer ID), so
+Gatekeeper blocks a freshly downloaded copy the first time. Do this once:
 
 > **First launch:** right-click **Lectio** in Applications → **Open** →
 > **Open**. If macOS still refuses (e.g. *"is damaged and can't be opened"*),
@@ -214,12 +214,9 @@ macOS Gatekeeper blocks a freshly downloaded copy the first time. Do this once:
 > xattr -dr com.apple.quarantine "/Applications/Lectio.app"
 > ```
 
-This is only needed on first launch; updates after that open normally.
-
-**Why:** downloaded files get a `com.apple.quarantine` attribute, and without a
-notarized signature Gatekeeper distrusts the app. The `xattr` command removes
-that flag. The build is ad-hoc signed via the `afterPack` hook so its signature
-is valid (which is what avoids the unrecoverable "damaged" state).
+This is only needed on first launch; updates after that open normally. For why
+this happens — and how the persistent self-signed certificate keeps auto-update
+working on the free path — see [`docs/MACOS_SIGNING.md`](docs/MACOS_SIGNING.md).
 
 ### First launch on Windows (SmartScreen)
 
@@ -245,10 +242,10 @@ This is the Windows equivalent of macOS Gatekeeper above; once you've allowed it
 updates after that launch normally.
 
 To produce a fully **signed + notarized** build instead — so downloads open with
-no prompt at all — set `APPLE_TEAM_ID` (plus `APPLE_ID` / `APPLE_ID_PASSWORD`,
-and a Developer ID cert via `CSC_LINK` / `CSC_KEY_PASSWORD`) before building. The
-`afterPack` hook then defers to electron-builder's signing and the `afterSign`
-hook notarizes automatically.
+no prompt at all — set `APPLE_TEAM_ID` (plus the Apple ID and Developer ID cert
+env vars) before building; the signing hooks then defer to electron-builder and
+notarize automatically. The signing model (self-signed free path vs. notarized)
+is documented in [`docs/MACOS_SIGNING.md`](docs/MACOS_SIGNING.md).
 
 ## Updating the app icon
 
