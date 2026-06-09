@@ -1,32 +1,33 @@
-import { useEffect, useState } from 'react';
-import { Stack } from 'expo-router';
+import { useEffect } from 'react';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ActivityIndicator, View, useColorScheme } from 'react-native';
-import { storage, ensureSeed } from '../src/storage';
+import { AuthProvider, useAuth } from '../src/auth/AuthProvider';
 import { useTheme } from '../src/theme';
 
-export default function RootLayout() {
+function AppShell() {
   const theme = useTheme();
   const scheme = useColorScheme();
-  const [ready, setReady] = useState(false);
+  const { session, loading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
 
-  // Seed the sample semester once on first launch, before any screen reads.
+  // Redirect to /sign-in when not authenticated, back to / when authenticated.
   useEffect(() => {
-    ensureSeed(storage)
-      .catch((err) => console.warn('seed failed', err))
-      .finally(() => setReady(true));
-  }, []);
+    if (loading) return;
+    const inSignIn = segments[0] === 'sign-in';
+    if (!session && !inSignIn) {
+      router.replace('/sign-in');
+    } else if (session && inSignIn) {
+      router.replace('/');
+    }
+  }, [session, loading, segments]);
 
-  if (!ready) {
+  if (loading) {
     return (
       <View
-        style={{
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: theme.background,
-        }}
+        style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.background }}
       >
         <ActivityIndicator color={theme.accent} />
       </View>
@@ -44,8 +45,17 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: theme.background },
         }}
       >
+        <Stack.Screen name="sign-in" options={{ headerShown: false }} />
         <Stack.Screen name="index" options={{ title: 'Semesters' }} />
       </Stack>
     </SafeAreaProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <AppShell />
+    </AuthProvider>
   );
 }
