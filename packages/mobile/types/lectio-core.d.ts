@@ -94,6 +94,12 @@ export function editCourseName(
   courseId: string,
   name: string
 ): Course | null;
+export function editCourseColor(
+  semester: Semester,
+  courseId: string,
+  color: string
+): Course | null;
+export function reorderCourses(semester: Semester, orderedIds: string[]): void;
 
 // ---------------------------------------------------------------------------
 // storage/migrate and storage/contract surfaces
