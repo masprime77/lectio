@@ -15,6 +15,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { addCourse, editCourseColor, editCourseName } from '@lectio/core/planner-core';
 import { storage } from '../../src/storage';
 import { useTheme } from '../../src/theme';
+import { FormTabs } from '../../src/components/FormTabs';
 
 const COURSE_COLORS = ['#4a90d9', '#22c55e', '#ef4444', '#f97316',
                        '#a855f7', '#eab308', '#14b8a6', '#ec4899'];
@@ -96,6 +97,7 @@ export default function CourseFormScreen() {
     >
       <Stack.Screen options={{ title: courseId ? 'Edit Course' : 'New Course' }} />
       <View style={styles.form}>
+        {!courseId && <FormTabs tabs={['Course']} active="Course" />}
         <Text style={[styles.label, { color: theme.muted }]}>Name</Text>
         <TextInput
           style={[styles.input, { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text }]}
