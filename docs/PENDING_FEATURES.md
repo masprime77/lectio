@@ -22,12 +22,12 @@ possible on mobile.
 
 ### Content editing (desktop can, mobile can't)
 
-- [ ] Create, edit, or delete **semesters** — the app is read-only over
+- [x] Create, edit, or delete **semesters** — the app is read-only over
       semesters apart from tag cycling.
 - [ ] Create, edit, reorder, or delete **courses**.
 - [ ] Add, rename, retitle, or delete **readings/tasks**; set/clear task
       **due dates**.
-- [ ] Any first-run path to add a first semester. A brand-new cloud account is
+- [x] Any first-run path to add a first semester. A brand-new cloud account is
       empty and shows only "No semesters yet." with no add button — `ensureSeed`
       (the sample-semester seeder in `src/storage/seed.ts`) exists but is
       intentionally **not** auto-called, so there's nothing to act on.
