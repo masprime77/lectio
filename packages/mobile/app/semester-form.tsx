@@ -15,6 +15,7 @@ import { DEFAULT_READING_TAGS, DEFAULT_TASK_TAGS } from '@lectio/core/planner-co
 import { storage } from '../src/storage';
 import { uniqueSemesterId } from '../src/lib/semester-id';
 import { useTheme } from '../src/theme';
+import { FormTabs } from '../src/components/FormTabs';
 import type { Semester } from '../types/lectio-core';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -113,6 +114,7 @@ export default function SemesterFormScreen() {
     >
       <Stack.Screen options={{ title: id ? 'Edit Semester' : 'New Semester' }} />
       <View style={styles.form}>
+        {!id && <FormTabs tabs={['Semester']} active="Semester" />}
         <Text style={[styles.label, { color: theme.muted }]}>Name</Text>
         <TextInput
           style={[styles.input, { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text }]}

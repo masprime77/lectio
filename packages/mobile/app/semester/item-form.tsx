@@ -16,6 +16,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { addItem, editItem, getCourses } from '@lectio/core/planner-core';
 import { storage } from '../../src/storage';
 import { useTheme } from '../../src/theme';
+import { FormTabs } from '../../src/components/FormTabs';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 function isValidDate(s: string): boolean {
@@ -33,7 +34,11 @@ export default function ItemFormScreen() {
     itemId?: string;
   }>();
   const { id, courseId, itemId } = params;
-  const kind: 'reading' | 'task' = params.kind === 'task' ? 'task' : 'reading';
+  // The query param picks the initial kind; in create mode the Reading | Task
+  // tabs can switch it (edit mode keeps the item's kind fixed).
+  const [kind, setKind] = useState<'reading' | 'task'>(
+    params.kind === 'task' ? 'task' : 'reading'
+  );
 
   const [title, setTitle] = useState('');
   const [week, setWeek] = useState('1');
@@ -129,6 +134,13 @@ export default function ItemFormScreen() {
     >
       <Stack.Screen options={{ title: itemId ? `Edit ${noun}` : `New ${noun}` }} />
       <View style={styles.form}>
+        {!itemId && (
+          <FormTabs
+            tabs={['Reading', 'Task']}
+            active={noun}
+            onSelect={(tab) => setKind(tab === 'Task' ? 'task' : 'reading')}
+          />
+        )}
         <Text style={[styles.label, { color: theme.muted }]}>Title</Text>
         <TextInput
           style={[styles.input, { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text }]}
