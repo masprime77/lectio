@@ -2,14 +2,12 @@ import { useCallback, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Link, Stack, useFocusEffect, useRouter } from 'expo-router';
 import { ensureSeed, storage } from '../src/storage';
-import { useAuth } from '../src/auth/AuthProvider';
 import { useTheme } from '../src/theme';
 import type { SemesterSummary } from '../types/lectio-core';
 
 export default function SemestersScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { signOut } = useAuth();
   const [semesters, setSemesters] = useState<SemesterSummary[] | null>(null);
 
   const reload = useCallback(() => {
@@ -24,20 +22,6 @@ export default function SemestersScreen() {
       reload();
     }, [reload])
   );
-
-  function handleSignOut() {
-    Alert.alert('Sign out', 'Sign out of Lectio?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign out',
-        style: 'destructive',
-        onPress: () => {
-          setSemesters(null);
-          signOut().catch((err) => console.warn('sign out failed', err));
-        },
-      },
-    ]);
-  }
 
   function confirmDelete(item: SemesterSummary) {
     Alert.alert(
@@ -79,12 +63,15 @@ export default function SemestersScreen() {
         options={{
           title: 'Semesters',
           headerRight: () => (
-            <View style={{ flexDirection: 'row', gap: 16, marginRight: 4 }}>
-              <Pressable onPress={() => router.push('/semester-form')}>
-                <Text style={{ color: theme.accent, fontSize: 15 }}>+ New</Text>
+            <View style={styles.headerActions}>
+              <Pressable onPress={() => router.push('/profile')}>
+                <Text style={{ color: theme.accent, fontSize: 15 }}>Profile</Text>
               </Pressable>
-              <Pressable onPress={handleSignOut}>
-                <Text style={{ color: theme.accent, fontSize: 15 }}>Sign out</Text>
+              <Pressable
+                style={[styles.newBtn, { backgroundColor: theme.accent }]}
+                onPress={() => router.push('/semester-form')}
+              >
+                <Text style={styles.newBtnText}>+ New</Text>
               </Pressable>
             </View>
           ),
@@ -135,6 +122,13 @@ export default function SemestersScreen() {
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
   list: { padding: 16, gap: 12 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 14, marginRight: 4 },
+  newBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  newBtnText: { color: '#fff', fontWeight: '600', fontSize: 15 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
