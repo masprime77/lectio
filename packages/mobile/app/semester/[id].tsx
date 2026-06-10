@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { courseProgress, deleteCourse, getCourses } from '@lectio/core/planner-core';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { courseProgress, deleteCourse, getCourses, reorderCourses } from '@lectio/core/planner-core';
 import { storage } from '../../src/storage';
 import { useTheme } from '../../src/theme';
 import { ProgressBar } from '../../src/components/ProgressBar';
@@ -11,22 +12,24 @@ import type { Course, Semester } from '../../types/lectio-core';
 export default function CoursesScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [semester, setSemester] = useState<Semester | null>(null);
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
+  const reload = useCallback(() => {
+    return storage
+      .get(id)
+      .then(setSemester)
+      .catch((err) => console.warn('load failed', err));
+  }, [id]);
+
   // Reload on focus so tag changes made in course detail update the bars here.
   useFocusEffect(
     useCallback(() => {
-      let active = true;
-      storage.get(id).then((s) => {
-        if (active) setSemester(s);
-      });
-      return () => {
-        active = false;
-      };
-    }, [id])
+      reload();
+    }, [reload])
   );
 
   const persist = useCallback(
@@ -49,6 +52,32 @@ export default function CoursesScreen() {
       else next.add(courseId);
       return next;
     });
+  }
+
+  // Swap-based reorder through core's reorderCourses.
+  function moveCourse(courseId: string, dir: -1 | 1) {
+    if (!semester) return;
+    const ids = getCourses(semester).map((c) => c.id);
+    const idx = ids.indexOf(courseId);
+    const swap = idx + dir;
+    if (idx === -1 || swap < 0 || swap >= ids.length) return;
+    [ids[idx], ids[swap]] = [ids[swap], ids[idx]];
+    const next: Semester = JSON.parse(JSON.stringify(semester));
+    reorderCourses(next, ids);
+    persist(next);
+  }
+
+  function showCourseActions(course: Course) {
+    Alert.alert(course.name, undefined, [
+      {
+        text: 'Edit',
+        onPress: () => router.push(`/semester/course-form?id=${id}&courseId=${course.id}`),
+      },
+      { text: 'Move up', onPress: () => moveCourse(course.id, -1) },
+      { text: 'Move down', onPress: () => moveCourse(course.id, +1) },
+      { text: 'Delete', style: 'destructive', onPress: () => confirmDeleteCourse(course) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   }
 
   function confirmDeleteCourse(course: Course) {
@@ -133,19 +162,33 @@ export default function CoursesScreen() {
         keyExtractor={(c) => c.id}
         ListEmptyComponent={
           semester ? (
-            <Text style={[styles.empty, { color: theme.muted }]}>No courses.</Text>
+            <View style={styles.emptyWrap}>
+              <Text style={{ color: theme.muted }}>No courses.</Text>
+              <Pressable
+                style={[styles.emptyBtn, { backgroundColor: theme.accent }]}
+                onPress={() => router.push(`/semester/course-form?id=${id}`)}
+              >
+                <Text style={styles.emptyBtnText}>Add a course</Text>
+              </Pressable>
+            </View>
           ) : null
         }
         renderItem={({ item }) => {
           const progress = courseProgress(item, semester!, false);
           return (
-            <SwipeableRow enabled={!editing} onDelete={() => confirmDeleteCourse(item)}>
+            <SwipeableRow
+              enabled={!editing}
+              editColor={theme.accent}
+              onEdit={() => router.push(`/semester/course-form?id=${id}&courseId=${item.id}`)}
+              onDelete={() => confirmDeleteCourse(item)}
+            >
               <Pressable
                 onPress={() =>
                   editing
                     ? toggleSelect(item.id)
                     : router.push(`/semester/${id}/course/${item.id}`)
                 }
+                onLongPress={editing ? undefined : () => showCourseActions(item)}
                 style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}
               >
                 <View style={styles.cardHeader}>
@@ -177,13 +220,47 @@ export default function CoursesScreen() {
           );
         }}
       />
+      {!editing && (
+        <Pressable
+          style={[
+            styles.fab,
+            { backgroundColor: theme.accent, bottom: insets.bottom + 24 },
+          ]}
+          onPress={() => router.push(`/semester/course-form?id=${id}`)}
+        >
+          <Text style={styles.fabText}>+ Course</Text>
+        </Pressable>
+      )}
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  list: { padding: 16, gap: 12 },
-  empty: { textAlign: 'center', marginTop: 32 },
+  list: { padding: 16, gap: 12, paddingBottom: 112 },
+  emptyWrap: { alignItems: 'center', gap: 12, marginTop: 32 },
+  emptyBtn: {
+    height: 48,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  emptyBtnText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    height: 56,
+    paddingHorizontal: 24,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  fabText: { color: '#fff', fontWeight: '700', fontSize: 17 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 14, marginRight: 4 },
   card: {
     padding: 16,
