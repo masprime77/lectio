@@ -10,6 +10,7 @@ import {
 } from '@lectio/core/planner-core';
 import { storage } from '../../../../src/storage';
 import { useTheme } from '../../../../src/theme';
+import { Fab } from '../../../../src/components/Fab';
 import { ProgressBar } from '../../../../src/components/ProgressBar';
 import { SwipeableRow } from '../../../../src/components/SwipeableRow';
 import type { PlannerItem, Semester, Tag } from '../../../../types/lectio-core';
@@ -292,13 +293,14 @@ export default function CourseDetailScreen() {
           course.tasks.map((t) => renderItem('task', t, taskTags))
         )}
       </ScrollView>
+      <Fab onPress={() => pushAddItem('reading')} />
     </>
   );
 }
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  content: { padding: 16, paddingBottom: 40 },
+  content: { padding: 16, paddingBottom: 112 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 14, marginRight: 4 },
   summary: {
     padding: 16,

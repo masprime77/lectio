@@ -1,10 +1,10 @@
 import { useCallback, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { courseProgress, deleteCourse, getCourses, reorderCourses } from '@lectio/core/planner-core';
 import { storage } from '../../src/storage';
 import { useTheme } from '../../src/theme';
+import { Fab } from '../../src/components/Fab';
 import { ProgressBar } from '../../src/components/ProgressBar';
 import { SwipeableRow } from '../../src/components/SwipeableRow';
 import type { Course, Semester } from '../../types/lectio-core';
@@ -12,7 +12,6 @@ import type { Course, Semester } from '../../types/lectio-core';
 export default function CoursesScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [semester, setSemester] = useState<Semester | null>(null);
   const [editing, setEditing] = useState(false);
@@ -220,17 +219,7 @@ export default function CoursesScreen() {
           );
         }}
       />
-      {!editing && (
-        <Pressable
-          style={[
-            styles.fab,
-            { backgroundColor: theme.accent, bottom: insets.bottom + 24 },
-          ]}
-          onPress={() => router.push(`/semester/course-form?id=${id}`)}
-        >
-          <Text style={styles.fabText}>+ Course</Text>
-        </Pressable>
-      )}
+      <Fab onPress={() => router.push(`/semester/course-form?id=${id}`)} />
     </>
   );
 }
@@ -246,21 +235,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   emptyBtnText: { color: '#fff', fontWeight: '600', fontSize: 16 },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    height: 56,
-    paddingHorizontal: 24,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
-  },
-  fabText: { color: '#fff', fontWeight: '700', fontSize: 17 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 14, marginRight: 4 },
   card: {
     padding: 16,
