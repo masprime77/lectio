@@ -1,3 +1,71 @@
+## Unreleased
+
+- Fixed the PR "Build (macOS, no publish)" CI job: the `--publish never` flag was being lost through the two npm-workspace layers (root alias → workspace script), so electron-builder ran as `--mac never` and failed with "Unknown target: never". The build now invokes the desktop workspace script directly (`npm run build:mac --workspace @lectio/desktop -- --publish never`) so the flag forwards correctly and electron-builder packages the `.dmg`/`.zip` without attempting to publish, dropping the spurious `GH_TOKEN` requirement. Applied the same single-layer fix to `release.yml` (which had the identical latent bug), keeping `--publish always` there for real tagged releases.
+- Bumped the GitHub Actions in `ci.yml`/`release.yml` to majors that run on Node.js 24 (`actions/checkout@v6`, `actions/setup-node@v6`, `actions/upload-artifact@v7`), clearing the Node.js 20 deprecation warning.
+- Documentation sync: brought `README.md`, `CLAUDE.md`, and the `docs/` files in line with the monorepo + desktop + mobile + Supabase reality (no longer "desktop-only"), de-duplicated the macOS signing prose into `docs/MACOS_SIGNING.md`, fixed stale root-relative paths in the icon/signing docs, and added `docs/PENDING_FEATURES.md` plus a `packages/mobile/README.md`.
+
+### Mobile preparation — Phase 6: Supabase sync
+
+- Added `@supabase/supabase-js` and `react-native-url-polyfill` to `@lectio/mobile`; the Supabase client (`src/supabase/client.ts`) reads `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from env vars and throws a clear error when either is missing. Token auto-refresh is wired to `AppState` so the session refreshes when the app returns to the foreground.
+- Added a Supabase storage adapter (`src/storage/supabase-storage.ts`) backed by the `public.semesters` table that satisfies the same `@lectio/core` async storage contract as the device adapter — same method names, same id guard, same "invalid"/"not found" error messages, same `migrateStatusToTagId` on load, validated by `assertStorage`. Row Level Security on the server enforces user isolation; the adapter sets `user_id` on upsert using the composite primary key `(user_id, id)`.
+- Added an `AuthProvider` React context (`src/auth/AuthProvider.tsx`) that restores the persisted session via `AsyncStorage` on launch, subscribes to `onAuthStateChange`, and exposes `signIn` / `signUp` / `signOut` to the app.
+- Added a sign-in screen (`app/sign-in.tsx`) with email + password fields, "Sign in" and "Create account" buttons, inline error display, and a loading state — no OAuth, no native modules, works in Expo Go.
+- Wired the root layout (`app/_layout.tsx`) to show a spinner during session restore, redirect unauthenticated users to `/sign-in`, and redirect back to `/` on sign-in — using `useSegments` + `router.replace` for the Expo Router file-based navigation model.
+- Switched the app's active storage from `createDeviceStorage` to `createSupabaseStorage`; `createDeviceStorage` is kept exported as the offline/local fallback for a future offline-mode phase. The first-run seed (`ensureSeed`) is no longer auto-called to avoid silently pushing sample data to every new cloud account.
+- Added a "Sign out" header button to the semesters screen; on sign-out, in-memory state is cleared and the auth redirect navigates back to the sign-in screen.
+- Added `packages/mobile/.env.example` with placeholder values (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`) and added `.env` / `.env.local` to `packages/mobile/.gitignore` (the root `.gitignore` already covers `.env*`). The Supabase adapter contract test is deferred — manual cross-device round-trip and RLS isolation are the verification criteria for this phase.
+
+### Mobile preparation — Phase 5: mobile scaffold + MVP UI
+
+- Scaffolded a new `@lectio/mobile` workspace package: an Expo (SDK 56, React Native 0.85, React 19.2) app using Expo Router (file-based) and TypeScript, runnable in Expo Go with no native/dev-client build. Added a monorepo-aware `metro.config.js` (watches the repo root, resolves the hoisted `@lectio/core` symlink, disables hierarchical lookup) so Metro bundles the shared core.
+- Added an on-device storage adapter (`src/storage/device-storage.ts`) backed by `@react-native-async-storage/async-storage` that satisfies the Phase-4 async storage contract — same `migrateStatusToTagId` on load, same id guard (rejects ids not matching `/^[a-zA-Z0-9_-]+$/` with "invalid", missing with "not found"), validated by `assertStorage` — so it behaves identically to the desktop fs adapter.
+- Added hand-written ambient types for `@lectio/core` (`types/lectio-core.d.ts`) covering the data shapes and the RN-safe subpaths (`.`, `./planner-core`, `./storage/migrate`, `./storage/contract`); tsconfig `paths` map those specifiers to the declaration file so the symlinked JS package is typed without touching core's published surface. `npx tsc --noEmit` passes. Added a first-run seed (`src/storage/seed.ts`) that saves one realistic sample semester (2 courses with varied readings/tasks) when storage is empty, including the default tag arrays so migration leaves it untouched.
+- Added the MVP screens (Expo Router + TypeScript): semesters list → courses list (per-course progress bars from `courseProgress`) → course detail (readings/tasks with their tag name + color dot; tapping an item advances it to the next tag, recomputes progress via core, and persists). All planner math comes from `@lectio/core` — none is reimplemented in the app. Added a minimal light/dark theme (`src/theme.ts`) driven by the OS color scheme.
+- Added root convenience scripts (`mobile`, `mobile:ios`, `mobile:android`) delegating to the `@lectio/mobile` workspace.
+- The device adapter's contract test was skipped this phase (the reusable suite is Vitest-based and AsyncStorage needs RN-specific mocking that isn't worth standing up yet); it will be contract-tested in a later phase. Core and desktop are unchanged.
+- Fixed a launch crash on SDK 56: flattened the `style` arrays on the `Pressable` children of `<Link asChild>` (`StyleSheet.flatten`), which the rewritten Expo Router renders through a `<Slot>` that no longer accepts an array style on its direct child.
+- Fixed Android bundling: added `@expo/ui` (required by SDK 56's Expo Router for its native toolbar — `@expo/ui/jetpack-compose` on Android) and its `react-native-reanimated`/`react-native-worklets` peers, pinned tree-wide to the SDK 56 versions via a root `overrides` (`reanimated@4.3.1`, `worklets@0.8.3`) so they dedupe to a single copy and satisfy `expo-modules-core`. Verified bundling and launch on both the iOS simulator and the Android emulator.
+
+### Mobile preparation — Phase 4: storage abstraction
+
+- Extracted `migrateStatusToTagId` from `semester-store.js` into a new platform-agnostic `@lectio/core/storage/migrate` module (depends only on `planner-core`, no `fs`); `semester-store.js` now consumes and re-exports it, keeping its public API and behaviour identical.
+- Added `@lectio/core/storage/contract`: the canonical async storage interface (`list`/`get`/`save`/`delete`) documented as a single source of truth, with a `STORAGE_METHODS` list and an `assertStorage()` runtime validator that every platform adapter is checked against.
+- Added `@lectio/core/storage/fs` — a filesystem adapter (`createFsStorage(dirOrResolver)`) that satisfies the async contract by wrapping the existing synchronous `semester-store`, accepting a directory string or a `() => dir` resolver (mirroring `ipc-handlers`). Additive only: the desktop, `ipc-handlers.js`, and existing behaviour are unchanged.
+- Added a reusable `tests/contract/storage-contract.js` suite (run by `tests/unit/fs-storage.test.js` against the fs adapter) that exercises the full contract — list/get/save/delete, migration on load, missing-id and traversal-id rejection — so the future Supabase adapter can run the same suite.
+- Added `./storage/migrate`, `./storage/contract`, and `./storage/fs` subpath exports to `@lectio/core`.
+
+### Mobile preparation — Phase 3: CI monorepo fixes
+
+- Fixed the CI coverage artifact path: the "Upload coverage report" step now uploads from `packages/core/coverage/` (where Vitest writes coverage in the monorepo) instead of the stale root `coverage/`.
+- Switched CI installs to `npm ci` for reproducible, lockfile-pinned dependencies, and narrowed the `ci.yml` triggers to push/PR on `main` + `mobile-prep` (keeping `workflow_call` so `release.yml` can require the workflow) instead of running on every push of every branch.
+- Added a macOS-only `build-macos` job to `ci.yml` that runs the full prebuild chain (`sync-core` + `bundle-deps`) and electron-builder without `--publish`, so packaging breakage is caught on PRs rather than at tag time. It gates on the `test` job and uploads no artifacts.
+- Fixed the `release.yml` "Upload build artifacts" paths (macOS and Windows) to point at `packages/desktop/dist/` (electron-builder's output in the monorepo) instead of the stale root `dist/`.
+
+### Mobile preparation — Phase 2: relocate desktop into @lectio/desktop
+
+- Moved the entire desktop app (`main.js`, `preload.js`, `index.html`, `app.js`, `style.css`, `start.command`, and the `assets/`, `build/`, `semesters/` dirs) from the repo root into `packages/desktop/` via `git mv` to preserve history.
+- Rewired the desktop to consume `@lectio/core` directly: `main.js` now requires `@lectio/core/ipc-handlers`, and the three temporary `lib/` re-export shims from Phase 1 (plus the empty `lib/` dir) are removed.
+- The sandboxed renderer can't `require()` core, so `scripts/sync-core.js` vendors `planner-core.js` next to `index.html` (on prestart/predev/prebuild, git-ignored); `index.html` loads it via `<script src="planner-core.js">`, a relative path that resolves identically under `npm start` and in the flattened packaged bundle. electron-builder bundles `@lectio/core` as a production dependency for the main process.
+- Added `packages/desktop/package.json` (`@lectio/desktop`) carrying the desktop scripts, the Electron dependencies, and the electron-builder `build` block (moved out of the root); its `files` list now bundles the vendored `planner-core.js` instead of `lib/`.
+- Made the packaged build work from the npm workspace: pinned `electron` to an exact version (electron-builder can't compute it from a range when the module is hoisted) and added `scripts/bundle-deps.js` (a prebuild step) that seeds `packages/desktop/node_modules` with the production-dependency closure so electron-builder bundles `@lectio/core` + `electron-log` + `electron-updater` into the app instead of running a destructive workspace install. `scripts/clean-deps.js` removes that seed on predev/prestart so dev keeps using the live workspace packages.
+- Slimmed the root `package.json` to a thin workspace manager: removed the desktop scripts, the `build` block, the Electron deps, and the `main` field; added `start`/`dev`/`build:mac`/`build:win` scripts that delegate to the `@lectio/desktop` workspace.
+- Updated `README.md` and `CLAUDE.md` for the `packages/core` + `packages/desktop` layout (project tree, command paths, data/dev folder locations); `api/`, `scripts/`, `macos-signing/`, and `homebrew/` remain at the repo root.
+
+### Mobile preparation — Phase 1: extract @lectio/core
+
+- Moved the three dual-mode core modules (`planner-core.js`, `semester-store.js`, `ipc-handlers.js`) from the repo-root `lib/` into `packages/core/src/` as the `@lectio/core` package, using `git mv` to preserve history. No logic was changed — the moved files are byte-identical.
+- Moved the Vitest suite (`tests/unit/*`, `tests/integration/*`) into `packages/core/tests/` and rewired each test's relative imports from `../../lib/<mod>.js` to `../../src/<mod>.js`.
+- Added `packages/core/package.json` (`@lectio/core`) with an `exports` map that preserves the subpath imports the desktop adopts in Phase 2 (`@lectio/core/semester-store`, `@lectio/core/ipc-handlers`), plus `packages/core/vitest.config.mjs` (coverage measured against `src/**`, same 70% line/function thresholds). Removed the now-redundant root `vitest.config.mjs`.
+- Delegated the root `test`/`test:watch`/`test:coverage` scripts to the `@lectio/core` workspace.
+- Left thin compatibility shims at the old `lib/` paths so the still-rooted desktop keeps running until Phase 2: `semester-store.js`/`ipc-handlers.js` are one-line CommonJS re-exports, and `planner-core.js` is a guarded re-export. Repointed the single `index.html` `<script src>` at `packages/core/src/planner-core.js` (the only renderer edit), since a CommonJS shim cannot serve the browser.
+
+### Mobile preparation — Phase 0: monorepo scaffold + Node 22 baseline
+
+- Introduced npm workspaces at the repo root (`"workspaces": ["packages/*"]`, `"private": true`) and created the empty `packages/core/` and `packages/desktop/` directories (tracked via `.gitkeep`) so the monorepo layout exists before any source moves. No source files were moved — the desktop app builds, runs, and tests exactly as before.
+- Bumped the Node baseline to 22: added a root `.nvmrc` pinning Node 22 and an `"engines": { "node": ">=22" }` field in `package.json`.
+- Updated CI (`.github/workflows/ci.yml`) and the release workflow (`.github/workflows/release.yml`, both the macOS and Windows jobs) to run on Node 22.
+- Updated the stated Node requirement to 22 in `README.md` and `CLAUDE.md`.
+
 ## v1.8.8
 
 _Released: 2026-06-04_

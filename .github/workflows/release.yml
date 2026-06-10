@@ -20,12 +20,12 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -76,16 +76,16 @@ jobs:
           # Don't let electron-builder hunt for an Apple identity; afterPack
           # signs the bundle itself (with MAC_SIGN_IDENTITY when set, else ad-hoc).
           CSC_IDENTITY_AUTO_DISCOVERY: false
-        run: npm run build:mac -- --publish always
+        run: npm run build:mac --workspace @lectio/desktop -- --publish always
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macos-app
           path: |
-            dist/*.dmg
-            dist/*.zip
-            dist/latest-mac.yml
+            packages/desktop/dist/*.dmg
+            packages/desktop/dist/*.zip
+            packages/desktop/dist/latest-mac.yml
           if-no-files-found: error
 
   build-windows:
@@ -99,12 +99,12 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -117,14 +117,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Unsigned build in CI, mirroring macOS.
           CSC_IDENTITY_AUTO_DISCOVERY: false
-        run: npm run build:win -- --publish always
+        run: npm run build:win --workspace @lectio/desktop -- --publish always
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-app
           path: |
-            dist/*.exe
-            dist/*.zip
-            dist/latest.yml
+            packages/desktop/dist/*.exe
+            packages/desktop/dist/*.zip
+            packages/desktop/dist/latest.yml
           if-no-files-found: error
