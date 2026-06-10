@@ -55,4 +55,31 @@ describe('course operations', () => {
     expect(sem.courses[0].name).toBe('Advanced Algorithms');
     expect(sem.courses[1].name).toBe('Databases');
   });
+
+  it('editing a course color changes only the color and returns the course', () => {
+    const sem = sample();
+    const course = core.editCourseColor(sem, 'c1', '#abc');
+    expect(course).toBe(sem.courses[0]);
+    expect(sem.courses[0]).toMatchObject({ id: 'c1', name: 'Algorithms', color: '#abc' });
+    expect(sem.courses[1].color).toBe('#222');
+  });
+
+  it('editing the color of an unknown course returns null', () => {
+    const sem = sample();
+    expect(core.editCourseColor(sem, 'nope', '#abc')).toBeNull();
+  });
+
+  it('reordering courses applies the given order in place', () => {
+    const sem = sample();
+    const ref = sem.courses;
+    core.reorderCourses(sem, ['c2', 'c1']);
+    expect(sem.courses.map((c) => c.id)).toEqual(['c2', 'c1']);
+    expect(sem.courses).toBe(ref); // mutated in place, same array reference
+  });
+
+  it('reordering drops unknown ids and appends omitted courses', () => {
+    const sem = sample();
+    core.reorderCourses(sem, ['nope', 'c2']);
+    expect(sem.courses.map((c) => c.id)).toEqual(['c2', 'c1']);
+  });
 });
