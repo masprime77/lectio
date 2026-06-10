@@ -47,6 +47,7 @@ function AppShell() {
       >
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />
         <Stack.Screen name="index" options={{ title: 'Semesters' }} />
+        <Stack.Screen name="semester-form" options={{ presentation: 'modal', title: 'New Semester' }} />
       </Stack>
     </SafeAreaProvider>
   );
