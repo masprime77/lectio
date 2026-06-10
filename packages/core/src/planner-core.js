@@ -135,6 +135,42 @@
     arr.splice(0, arr.length, ...reordered);
   }
 
+  // Add a reading or task to a course. Readings get status 'r-pending',
+  // tasks 't-pending' and a dueDate ('' when none). Returns the new item.
+  function addItem(course, kind, { title, week, dueDate }) {
+    if (kind === 'reading') {
+      if (!Array.isArray(course.readings)) course.readings = [];
+      const item = { id: uid('r'), week, title, status: 'r-pending' };
+      course.readings.push(item);
+      return item;
+    }
+    if (!Array.isArray(course.tasks)) course.tasks = [];
+    const item = { id: uid('t'), week, title, dueDate: dueDate || '', status: 't-pending' };
+    course.tasks.push(item);
+    return item;
+  }
+
+  // Patch an item's title / week / dueDate. Only provided fields change; an
+  // empty-string dueDate clears it (tasks only). Returns the item or null.
+  function editItem(course, kind, itemId, { title, week, dueDate }) {
+    const arr = (kind === 'reading' ? course.readings : course.tasks) || [];
+    const item = arr.find((it) => it.id === itemId);
+    if (!item) return null;
+    if (typeof title === 'string' && title.trim()) item.title = title.trim();
+    if (typeof week === 'number') item.week = week;
+    if (kind === 'task' && dueDate !== undefined) item.dueDate = dueDate || '';
+    return item;
+  }
+
+  // Remove an item by id; returns true if removed.
+  function deleteItem(course, kind, itemId) {
+    const arr = (kind === 'reading' ? course.readings : course.tasks) || [];
+    const idx = arr.findIndex((it) => it.id === itemId);
+    if (idx === -1) return false;
+    arr.splice(idx, 1);
+    return true;
+  }
+
   // Add a custom tag to a semester's tag list (`type` is 'reading' or 'task').
   // Returns the new tag with a generated unique id.
   function addTag(semester, type, { name, color, section }) {
@@ -211,5 +247,8 @@
     editCourseName,
     editCourseColor,
     reorderCourses,
+    addItem,
+    editItem,
+    deleteItem,
   };
 });
