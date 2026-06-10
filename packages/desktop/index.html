@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Apply the saved theme before any rendering to avoid a flash of wrong theme. -->
+  <script>
+    (function () {
+      var t = localStorage.getItem('theme');
+      if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+      // 'auto' or unset: leave no attribute so prefers-color-scheme applies.
+    })();
+  </script>
+  <title>Lectio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Update dialog -->
+  <div id="update-overlay" class="modal-overlay hidden" role="dialog"
+       aria-modal="true" aria-labelledby="update-dialog-title">
+    <div class="modal update-dialog">
+      <div class="update-dialog-header">
+        <h2 id="update-dialog-title" class="update-dialog-title">Update available</h2>
+        <span id="update-dialog-version" class="update-dialog-version"></span>
+      </div>
+
+      <!-- Release notes -->
+      <div id="update-notes-area" class="update-notes-area">
+        <p id="update-notes-loading" class="update-notes-loading">Loading release notes…</p>
+        <pre id="update-notes-content" class="update-notes-content hidden"></pre>
+        <p id="update-notes-error" class="update-notes-error hidden">Release notes unavailable.</p>
+      </div>
+
+      <!-- Download progress bar (hidden until download starts) -->
+      <div id="update-progress-area" class="update-progress-area hidden">
+        <div class="update-progress-track">
+          <div id="update-progress-bar" class="update-progress-bar" style="width:0%"></div>
+        </div>
+        <span id="update-progress-label" class="update-progress-label">0%</span>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" id="update-later-btn" class="btn">Later</button>
+        <button type="button" id="update-action-btn" class="btn btn-primary">
+          Download &amp; Install
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <header class="header">
+    <div class="header-inner">
+      <div class="header-left">
+        <img src="assets/icon.png"
+             class="app-logo" alt="Lectio logo" width="28" height="28" />
+        <h1 class="logo">Lectio</h1>
+        <span id="save-status" class="save-status" aria-live="polite"></span>
+      </div>
+      <div class="header-controls">
+        <div class="selector-group">
+          <select id="semester-select" class="semester-select" aria-label="Select semester"></select>
+          <div class="semester-actions">
+            <button id="edit-semester-btn" class="semester-action-btn" title="Edit semester" aria-label="Edit semester"></button>
+            <button id="delete-semester-btn" class="semester-action-btn semester-action-delete" title="Delete semester" aria-label="Delete semester"></button>
+          </div>
+        </div>
+        <div class="view-toggle" role="group" aria-label="Layout view">
+          <button type="button" id="view-week" class="view-btn" data-view="week">Weekly view</button>
+          <button type="button" id="view-course" class="view-btn" data-view="course">All Courses</button>
+        </div>
+        <div class="collapse-toggle" role="group" aria-label="Expand or collapse weeks">
+          <button type="button" id="expand-all-btn" class="collapse-btn" title="Expand all weeks" aria-label="Expand all weeks"></button>
+          <button type="button" id="collapse-all-btn" class="collapse-btn" title="Collapse all weeks" aria-label="Collapse all weeks"></button>
+          <button type="button" id="expand-current-btn" class="collapse-btn" title="Expand current week only" aria-label="Expand current week only"></button>
+        </div>
+        <button type="button" id="study-mode-btn" class="btn btn-small study-mode-btn">
+          Study Mode: Off
+        </button>
+        <select id="sort-select" title="Sort courses" aria-label="Sort courses">
+          <option value="progress-desc">Sort: Progress ↓</option>
+          <option value="progress-asc">Sort: Progress ↑</option>
+          <option value="alpha-asc">Sort: A → Z</option>
+          <option value="alpha-desc">Sort: Z → A</option>
+          <option value="week-asc">Sort: Week ↑</option>
+          <option value="week-desc">Sort: Week ↓</option>
+        </select>
+        <button id="new-btn" class="btn btn-primary btn-icon-text">
+          <!-- icon injected by app.js -->
+          <span>New</span>
+        </button>
+        <button id="feedback-btn" class="icon-btn" title="Feedback" aria-label="Feedback"></button>
+        <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings"></button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+    <section id="dashboard" class="dashboard"></section>
+    <section id="planner" class="planner"></section>
+  </main>
+
+  <!-- Tutorial overlay -->
+  <div id="tutorial-overlay" class="tutorial-overlay hidden" role="dialog" aria-modal="true" aria-label="Tutorial">
+    <div id="tutorial-spotlight" class="tutorial-spotlight" aria-hidden="true"></div>
+    <div id="tutorial-tooltip" class="tutorial-tooltip" role="document">
+      <p id="tutorial-counter" class="tutorial-counter"></p>
+      <h3 id="tutorial-title"></h3>
+      <p id="tutorial-desc"></p>
+      <div class="tutorial-actions">
+        <button type="button" id="tutorial-skip" class="btn btn-small">Skip tour</button>
+        <div class="tutorial-nav">
+          <button type="button" id="tutorial-prev" class="btn btn-small">Back</button>
+          <button type="button" id="tutorial-next" class="btn btn-small btn-primary">Next</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- New semester modal -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h2 id="modal-title">New</h2>
+      <form id="new-semester-form">
+        <div class="modal-tabs">
+          <button type="button" class="modal-tab active" data-tab="semester">Semester</button>
+          <button type="button" class="modal-tab" data-tab="courses">Courses</button>
+          <button type="button" class="modal-tab" data-tab="tags">Tags</button>
+        </div>
+
+        <!-- Tab: Semester -->
+        <div class="modal-tab-panel" data-panel="semester">
+          <label>
+            Semester name
+            <input type="text" id="ns-name" placeholder="Winter Semester 2025" required />
+          </label>
+          <label>
+            Start date
+            <input type="date" id="ns-start" required />
+          </label>
+          <label>
+            Number of weeks
+            <input type="number" id="ns-weeks" min="1" max="30" value="15" required />
+          </label>
+        </div>
+
+        <!-- Tab: Courses -->
+        <div class="modal-tab-panel hidden" data-panel="courses">
+          <div class="ns-courses-header">
+            <span>Courses</span>
+            <button type="button" id="ns-add-course" class="btn btn-small btn-icon-text">
+              <svg class="ti" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+              Add course
+            </button>
+          </div>
+          <div id="ns-courses" class="ns-courses"></div>
+        </div>
+
+        <!-- Tab: Tags -->
+        <div class="modal-tab-panel hidden" data-panel="tags">
+          <div class="tags-editor">
+
+            <div class="tags-editor-section">
+              <h3>Reading tags</h3>
+              <div>
+                <p class="tags-section-label">Pending (don't count toward progress)</p>
+                <ul id="reading-tags-pending-list" class="tags-sortable-list"></ul>
+                <button type="button" id="add-reading-pending-tag" class="btn btn-small">+ Add tag</button>
+              </div>
+              <div>
+                <p class="tags-section-label">Done (count toward progress)</p>
+                <ul id="reading-tags-done-list" class="tags-sortable-list"></ul>
+                <button type="button" id="add-reading-done-tag" class="btn btn-small">+ Add tag</button>
+              </div>
+            </div>
+
+            <div class="tags-editor-section">
+              <h3>Task tags</h3>
+              <div>
+                <p class="tags-section-label">Pending</p>
+                <ul id="task-tags-pending-list" class="tags-sortable-list"></ul>
+                <button type="button" id="add-task-pending-tag" class="btn btn-small">+ Add tag</button>
+              </div>
+              <div>
+                <p class="tags-section-label">Done</p>
+                <ul id="task-tags-done-list" class="tags-sortable-list"></ul>
+                <button type="button" id="add-task-done-tag" class="btn btn-small">+ Add tag</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <div class="modal-actions-left">
+            <button type="button" id="modal-import-btn" class="btn btn-small btn-icon-text hidden"
+                    title="Import a .lectio.json semester file">
+              <!-- icon injected by app.js -->
+            </button>
+            <button type="button" id="modal-export-btn" class="btn btn-small btn-icon-text hidden"
+                    title="Export this semester to a .lectio.json file">
+              <!-- icon injected by app.js -->
+            </button>
+          </div>
+          <div class="modal-actions-right">
+            <button type="button" id="modal-cancel" class="btn">Cancel</button>
+            <button type="submit" id="modal-submit" class="btn btn-primary">Create</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Settings modal -->
+  <div id="settings-overlay" class="modal-overlay hidden">
+    <div class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="settings-header">
+        <h2 id="settings-title">Settings</h2>
+        <button id="settings-close" class="icon-btn" aria-label="Close settings"></button>
+      </div>
+
+      <div class="settings-row">
+        <span class="settings-label">Theme</span>
+        <div class="theme-segmented" id="set-theme" role="group" aria-label="Theme">
+          <button type="button" class="theme-seg-btn" data-theme-val="light">Light</button>
+          <button type="button" class="theme-seg-btn" data-theme-val="dark">Dark</button>
+          <button type="button" class="theme-seg-btn" data-theme-val="auto">Auto</button>
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <span class="settings-label">Autosave</span>
+        <label class="switch">
+          <input type="checkbox" id="set-autosave" />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="settings-row">
+        <span class="settings-label">Auto-update</span>
+        <label class="switch">
+          <input type="checkbox" id="set-autoupdate" />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="settings-row">
+        <span class="settings-label">Tutorial</span>
+        <button type="button" id="set-tutorial-btn" class="btn btn-small">Start tour</button>
+      </div>
+
+      <div class="settings-row">
+        <span class="settings-label">Version</span>
+        <span class="settings-value" id="set-version">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feedback modal -->
+  <div id="feedback-overlay" class="modal-overlay hidden">
+    <div class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="feedback-title">
+      <div class="settings-header">
+        <h2 id="feedback-title">Feedback</h2>
+        <button id="feedback-close" class="icon-btn" aria-label="Close feedback"></button>
+      </div>
+
+      <div id="feedback-form-body">
+        <div class="feedback-type-toggle">
+          <button type="button" id="feedback-type-bug" class="btn feedback-type-btn active">🐛 Bug report</button>
+          <button type="button" id="feedback-type-feature" class="btn feedback-type-btn">💡 Feature request</button>
+        </div>
+
+        <label for="feedback-input-title">Title
+          <input type="text" id="feedback-input-title" placeholder="Short title…" />
+        </label>
+        <label for="feedback-input-body">Description
+          <textarea id="feedback-input-body" rows="5" placeholder="Describe the bug or feature in detail…"></textarea>
+        </label>
+
+        <span id="feedback-error" class="hidden">Title and description are required.</span>
+      </div>
+
+      <div id="feedback-success" class="hidden feedback-success">
+        <span>✅</span>
+        <p>Feedback sent — thank you!</p>
+      </div>
+
+      <div id="feedback-actions" class="feedback-actions">
+        <button type="button" id="feedback-cancel" class="btn">Cancel</button>
+        <button type="button" id="feedback-submit" class="btn btn-primary">Send</button>
+      </div>
+
+      <p class="feedback-footer">Lectio <span id="feedback-version">—</span></p>
+    </div>
+  </div>
+
+  <!-- Add reading / task modal -->
+  <div id="add-item-overlay" class="modal-overlay hidden">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="add-item-title">
+      <div class="settings-header">
+        <h2 id="add-item-title">Add reading / task</h2>
+        <button id="add-item-close" class="icon-btn" aria-label="Close"></button>
+      </div>
+
+      <!-- Type toggle -->
+      <div class="add-item-type-toggle">
+        <button type="button" id="add-item-type-reading" class="btn btn-small add-item-type-btn active">Reading</button>
+        <button type="button" id="add-item-type-task" class="btn btn-small add-item-type-btn">Task</button>
+      </div>
+
+      <!-- Course selector -->
+      <label>
+        Course
+        <select id="add-item-course" style="display:block;width:100%;margin-top:0.25rem;padding:0.5rem;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;color:var(--text);background:var(--surface);"></select>
+      </label>
+
+      <!-- Week selector -->
+      <label style="display:block;margin-top:0.75rem;">
+        Week
+        <select id="add-item-week" style="display:block;width:100%;margin-top:0.25rem;padding:0.5rem;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;color:var(--text);background:var(--surface);"></select>
+      </label>
+
+      <!-- Title -->
+      <label style="display:block;margin-top:0.75rem;">
+        Title
+        <input type="text" id="add-item-title-input" placeholder="Title…"
+          style="display:block;width:100%;margin-top:0.25rem;" />
+      </label>
+
+      <!-- Due date (task only) -->
+      <label id="add-item-due-row" style="display:none;margin-top:0.75rem;">
+        Due date (optional)
+        <input type="date" id="add-item-due"
+          style="display:block;width:100%;margin-top:0.25rem;" />
+      </label>
+
+      <!-- Inline error -->
+      <span id="add-item-error" class="hidden"
+        style="display:block;font-size:0.8rem;color:var(--danger);margin-top:0.4rem;"></span>
+
+      <!-- Actions -->
+      <div class="modal-actions">
+        <button type="button" id="add-item-cancel" class="btn">Cancel</button>
+        <button type="button" id="add-item-submit" class="btn btn-primary">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="import-sem-overlay" class="modal-overlay hidden">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="import-sem-title">
+      <h2 id="import-sem-title">Import Semester</h2>
+      <p id="import-sem-info" class="import-sem-info"></p>
+      <fieldset class="import-sem-fieldset">
+        <legend>Reading &amp; task statuses</legend>
+        <label class="import-sem-radio">
+          <input type="radio" name="import-sem-status" value="keep" checked />
+          Keep statuses from file
+        </label>
+        <label class="import-sem-radio">
+          <input type="radio" name="import-sem-status" value="reset" />
+          Reset all to default (pending / not done)
+        </label>
+      </fieldset>
+      <fieldset class="import-sem-fieldset" id="import-sem-conflict-section">
+        <legend>Conflict: a semester with this id already exists</legend>
+        <label class="import-sem-radio">
+          <input type="radio" name="import-sem-conflict" value="replace" checked />
+          Replace existing semester
+        </label>
+        <label class="import-sem-radio">
+          <input type="radio" name="import-sem-conflict" value="new" />
+          Save as a new semester (new id)
+        </label>
+      </fieldset>
+      <div class="modal-actions">
+        <button id="import-sem-cancel" class="btn">Cancel</button>
+        <button id="import-sem-confirm" class="btn btn-primary">Import</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shared @lectio/core logic, vendored next to index.html by scripts/sync-core.js
+       (and by electron-builder when packaged) so this relative path resolves both
+       under `npm start` and inside the flattened app bundle. -->
+  <script src="planner-core.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

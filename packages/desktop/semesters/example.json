@@ -1,0 +1,537 @@
+{
+  "id": "dev-test-semester",
+  "name": "Dev Test Semester",
+  "startDate": "2025-10-06",
+  "weeks": 8,
+  "courses": [
+    {
+      "id": "course-dev-001",
+      "name": "Algorithms & Data Structures",
+      "color": "#4a90d9",
+      "readings": [
+        {
+          "id": "r-dev-001",
+          "week": 1,
+          "title": "00 Introduction & Admin",
+          "status": "r-studied"
+        },
+        {
+          "id": "r-dev-002",
+          "week": 1,
+          "title": "01 Asymptotic Notation (1–20)",
+          "status": "r-summarized"
+        },
+        {
+          "id": "r-dev-003",
+          "week": 2,
+          "title": "01 Asymptotic Notation (21–45)",
+          "status": "r-summarized"
+        },
+        {
+          "id": "r-dev-004",
+          "week": 2,
+          "title": "02 Sorting – Part 1 (1–30)",
+          "status": "r-seen"
+        },
+        {
+          "id": "r-dev-005",
+          "week": 3,
+          "title": "02 Sorting – Part 2 (31–70)",
+          "status": "r-seen"
+        },
+        {
+          "id": "r-dev-006",
+          "week": 3,
+          "title": "02 Sorting – Part 3 (71–110)",
+          "status": "r-pending"
+        },
+        {
+          "id": "r-dev-007",
+          "week": 4,
+          "title": "03 Basic Data Structures (1–40)",
+          "status": "r-pending"
+        },
+        {
+          "id": "r-dev-008",
+          "week": 4,
+          "title": "03 Basic Data Structures (41–80)",
+          "status": "r-pending"
+        },
+        {
+          "id": "r-dev-009",
+          "week": 5,
+          "title": "04 Advanced Data Structures (1–50)",
+          "status": "r-pending"
+        },
+        {
+          "id": "r-dev-010",
+          "week": 6,
+          "title": "04 Advanced Data Structures (51–100)",
+          "status": "r-pending"
+        },
+        {
+          "id": "r-dev-011",
+          "week": 7,
+          "title": "05 Graph Algorithms – Part 1",
+          "status": "r-pending"
+        },
+        {
+          "id": "r-dev-012",
+          "week": 8,
+          "title": "05 Graph Algorithms – Part 2",
+          "status": "r-pending"
+        }
+      ],
+      "tasks": [
+        {
+          "id": "t-dev-001",
+          "week": 1,
+          "title": "Exercise Sheet 00",
+          "dueDate": "2025-10-13",
+          "status": "t-done"
+        },
+        {
+          "id": "t-dev-002",
+          "week": 2,
+          "title": "Exercise Sheet 01",
+          "dueDate": "2025-10-20",
+          "status": "t-done"
+        },
+        {
+          "id": "t-dev-003",
+          "week": 2,
+          "title": "Theory Assignment 01",
+          "dueDate": "2025-10-22",
+          "status": "t-done"
+        },
+        {
+          "id": "t-dev-004",
+          "week": 3,
+          "title": "Exercise Sheet 02",
+          "dueDate": "2025-10-27",
+          "status": "t-pending"
+        },
+        {
+          "id": "t-dev-005",
+          "week": 4,
+          "title": "Exercise Sheet 03",
+          "dueDate": "2025-11-03",
+          "status": "t-pending"
+        },
+        {
+          "id": "t-dev-006",
+          "week": 4,
+          "title": "Programming Assignment 01",
+          "dueDate": "2025-11-05",
+          "status": "t-pending"
+        },
+        {
+          "id": "t-dev-007",
+          "week": 5,
+          "title": "Exercise Sheet 04",
+          "dueDate": "2025-11-10",
+          "status": "t-pending"
+        },
+        {
+          "id": "t-dev-008",
+          "week": 6,
+          "title": "Exercise Sheet 05",
+          "dueDate": "2025-11-17",
+          "status": "t-pending"
+        },
+        {
+          "id": "t-dev-009",
+          "week": 7,
+          "title": "Theory Assignment 02",
+          "dueDate": "2025-11-24",
+          "status": "t-pending"
+        },
+        {
+          "id": "t-dev-010",
+          "week": 8,
+          "title": "Programming Assignment 02",
+          "dueDate": "2025-12-01",
+          "status": "t-pending"
+        }
+      ]
+    },
+    {
+      "id": "course-dev-002",
+      "name": "Machine Learning",
+      "color": "#e2725b",
+      "readings": [
+        {
+          "id": "r-dev-101",
+          "week": 1,
+          "title": "01 Introduction",
+          "status": "r-studied"
+        },
+        {
+          "id": "r-dev-102",
+          "week": 2,
+          "title": "02 Linear Models",
+          "status": "r-summarized"
+        },
+        {
+          "id": "r-dev-103",
+          "week": 3,
+          "title": "03 Model Evaluation",
+          "status": "r-seen"
+        },
+        {
+          "id": "r-dev-104",
+          "week": 4,
+          "title": "04 Tree-Based Methods",
+          "status": "r-pending"
+        },
+        {
+          "id": "r-dev-105",
+          "week": 5,
+          "title": "05 Ensemble Methods",
+          "status": "r-pending"
+        },
+        {
+          "id": "r-dev-106",
+          "week": 6,
+          "title": "06 Neural Networks – Basics",
+          "status": "r-pending"
+        },
+        {
+          "id": "r-dev-107",
+          "week": 7,
+          "title": "07 Neural Networks – Deep Learning",
+          "status": "r-pending"
+        },
+        {
+          "id": "r-dev-108",
+          "week": 8,
+          "title": "08 Unsupervised Learning",
+          "status": "r-pending"
+        }
+      ],
+      "tasks": [
+        {
+          "id": "t-dev-101",
+          "week": 2,
+          "title": "Exercise 01",
+          "dueDate": "2025-10-20",
+          "status": "t-done"
+        },
+        {
+          "id": "t-dev-102",
+          "week": 3,
+          "title": "Exercise 02",
+          "dueDate": "2025-10-27",
+          "status": "t-done"
+        },
+        {
+          "id": "t-dev-103",
+          "week": 4,
+          "title": "Exercise 03",
+          "dueDate": "2025-11-03",
+          "status": "t-pending"
+        },
+        {
+          "id": "t-dev-104",
+          "week": 5,
+          "title": "Exercise 04",
+          "dueDate": "2025-11-10",
+          "status": "t-pending"
+        },
+        {
+          "id": "t-dev-105",
+          "week": 6,
+          "title": "Mini Project – Data Exploration",
+          "dueDate": "2025-11-17",
+          "status": "t-pending"
+        },
+        {
+          "id": "t-dev-106",
+          "week": 8,
+          "title": "Final Project Submission",
+          "dueDate": "2025-12-03",
+          "status": "t-pending"
+        }
+      ]
+    },
+    {
+      "id": "course-dev-003",
+      "name": "Databases",
+      "color": "#7e57c2",
+      "readings": [
+        {
+          "id": "r-dev-201",
+          "week": 1,
+          "title": "01 Intro & ER Modeling",
+          "status": "r-summarized"
+        },
+        {
+          "id": "r-dev-202",
+          "week": 2,
+          "title": "02 Relational Model",
+          "status": "r-summarized"
+        },
+        {
+          "id": "r-dev-203",
+          "week": 3,
+          "title": "03 SQL – Basics",
+          "status": "r-seen"
+        },
+        {
+          "id": "r-dev-204",
+          "week": 4,
+          "title": "04 SQL – Complex Queries",
+          "status": "r-pending"
+        },
+        {
+          "id": "r-dev-205",
+          "week": 5,
+          "title": "05 Normalization – 1NF to 3NF",
+          "status": "r-pending"
+        },
+        {
+          "id": "r-dev-206",
+          "week": 6,
+          "title": "06 Transactions & Concurrency",
+          "status": "r-pending"
+        },
+        {
+          "id": "r-dev-207",
+          "week": 7,
+          "title": "07 Indexing & Query Optimization",
+          "status": "r-pending"
+        }
+      ],
+      "tasks": [
+        {
+          "id": "t-dev-201",
+          "week": 1,
+          "title": "Quiz 00 – Sample Quiz",
+          "dueDate": "",
+          "status": "t-done"
+        },
+        {
+          "id": "t-dev-202",
+          "week": 2,
+          "title": "Quiz 01 – ER Modeling",
+          "dueDate": "",
+          "status": "t-done"
+        },
+        {
+          "id": "t-dev-203",
+          "week": 2,
+          "title": "Exercise 01",
+          "dueDate": "2025-10-20",
+          "status": "t-done"
+        },
+        {
+          "id": "t-dev-204",
+          "week": 3,
+          "title": "Quiz 02 – Relational Model",
+          "dueDate": "",
+          "status": "t-done"
+        },
+        {
+          "id": "t-dev-205",
+          "week": 3,
+          "title": "Exercise 02",
+          "dueDate": "2025-10-27",
+          "status": "t-pending"
+        },
+        {
+          "id": "t-dev-206",
+          "week": 4,
+          "title": "Quiz 03 – SQL",
+          "dueDate": "",
+          "status": "t-pending"
+        },
+        {
+          "id": "t-dev-207",
+          "week": 4,
+          "title": "Exercise 03",
+          "dueDate": "2025-11-03",
+          "status": "t-pending"
+        },
+        {
+          "id": "t-dev-208",
+          "week": 5,
+          "title": "Quiz 04 – Normalization",
+          "dueDate": "",
+          "status": "t-pending"
+        },
+        {
+          "id": "t-dev-209",
+          "week": 6,
+          "title": "Exercise 04",
+          "dueDate": "2025-11-17",
+          "status": "t-pending"
+        }
+      ]
+    },
+    {
+      "id": "course-dev-004",
+      "name": "Scientific Computing",
+      "color": "#f0ad4e",
+      "readings": [
+        {
+          "id": "r-dev-301",
+          "week": 1,
+          "title": "00 Introduction",
+          "status": "r-studied"
+        },
+        {
+          "id": "r-dev-302",
+          "week": 2,
+          "title": "01 Computer Arithmetic & Rounding",
+          "status": "r-summarized"
+        },
+        {
+          "id": "r-dev-303",
+          "week": 2,
+          "title": "02 Linear Systems – Part 1",
+          "status": "r-seen"
+        },
+        {
+          "id": "r-dev-304",
+          "week": 3,
+          "title": "02 Linear Systems – Part 2",
+          "status": "r-pending"
+        },
+        {
+          "id": "r-dev-305",
+          "week": 4,
+          "title": "03 Nonlinear Equations",
+          "status": "r-pending"
+        },
+        {
+          "id": "r-dev-306",
+          "week": 5,
+          "title": "04 Numerical Integration",
+          "status": "r-pending"
+        },
+        {
+          "id": "r-dev-307",
+          "week": 6,
+          "title": "05 ODEs – Part 1",
+          "status": "r-pending"
+        },
+        {
+          "id": "r-dev-308",
+          "week": 7,
+          "title": "05 ODEs – Part 2",
+          "status": "r-pending"
+        },
+        {
+          "id": "r-dev-309",
+          "week": 8,
+          "title": "06 ODE Simulation – Practical Aspects",
+          "status": "r-pending"
+        }
+      ],
+      "tasks": [
+        {
+          "id": "t-dev-301",
+          "week": 1,
+          "title": "Exercise 00",
+          "dueDate": "",
+          "status": "t-done"
+        },
+        {
+          "id": "t-dev-302",
+          "week": 2,
+          "title": "Exercise 01",
+          "dueDate": "2025-10-20",
+          "status": "t-done"
+        },
+        {
+          "id": "t-dev-303",
+          "week": 3,
+          "title": "Exercise 02",
+          "dueDate": "2025-10-27",
+          "status": "t-pending"
+        },
+        {
+          "id": "t-dev-304",
+          "week": 3,
+          "title": "Programming Exercise 01",
+          "dueDate": "2025-10-29",
+          "status": "t-pending"
+        },
+        {
+          "id": "t-dev-305",
+          "week": 4,
+          "title": "Exercise 03",
+          "dueDate": "2025-11-03",
+          "status": "t-pending"
+        },
+        {
+          "id": "t-dev-306",
+          "week": 5,
+          "title": "Exercise 04",
+          "dueDate": "2025-11-10",
+          "status": "t-pending"
+        },
+        {
+          "id": "t-dev-307",
+          "week": 6,
+          "title": "Programming Exercise 02",
+          "dueDate": "2025-11-17",
+          "status": "t-pending"
+        },
+        {
+          "id": "t-dev-308",
+          "week": 8,
+          "title": "Exercise 05",
+          "dueDate": "2025-12-01",
+          "status": "t-pending"
+        }
+      ]
+    }
+  ],
+  "readingTags": [
+    {
+      "id": "r-pending",
+      "name": "pending",
+      "color": "#ef4444",
+      "section": "pending"
+    },
+    {
+      "id": "r-seen",
+      "name": "seen",
+      "color": "#f97316",
+      "section": "pending"
+    },
+    {
+      "id": "r-summarized",
+      "name": "summarized",
+      "color": "#3b82f6",
+      "section": "done"
+    },
+    {
+      "id": "r-studied",
+      "name": "studied",
+      "color": "#22c55e",
+      "section": "done"
+    }
+  ],
+  "taskTags": [
+    {
+      "id": "t-pending",
+      "name": "pending",
+      "color": "#ef4444",
+      "section": "pending"
+    },
+    {
+      "id": "t-done",
+      "name": "done",
+      "color": "#3b82f6",
+      "section": "done"
+    },
+    {
+      "id": "t-studied",
+      "name": "studied",
+      "color": "#22c55e",
+      "section": "done"
+    }
+  ]
+}

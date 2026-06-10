@@ -1,19 +1,25 @@
 {
   "name": "lectio",
   "version": "1.8.8",
+  "private": true,
   "description": "Lectio — a minimal desktop app for planning a university semester, backed by JSON files",
-  "main": "main.js",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "start": "electron .",
-    "dev": "electron . --dev-tools",
-    "build:mac": "electron-builder --mac",
-    "build:win": "electron-builder --win",
-    "icon": "bash assets/build-icns.sh",
-    "icon:win": "node assets/build-ico.js",
-    "icons": "npm run icon && npm run icon:win",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "start": "npm start --workspace @lectio/desktop",
+    "dev": "npm run dev --workspace @lectio/desktop",
+    "build:mac": "npm run build:mac --workspace @lectio/desktop",
+    "build:win": "npm run build:win --workspace @lectio/desktop",
+    "mobile": "npm start --workspace @lectio/mobile",
+    "mobile:ios": "npm run ios --workspace @lectio/mobile",
+    "mobile:android": "npm run android --workspace @lectio/mobile",
+    "test": "npm test --workspace @lectio/core",
+    "test:watch": "npm run test:watch --workspace @lectio/core",
+    "test:coverage": "npm run test:coverage --workspace @lectio/core"
   },
   "keywords": [
     "semester",
@@ -25,87 +31,10 @@
   "license": "MIT",
   "devDependencies": {
     "@vitest/coverage-v8": "^2.1.9",
-    "electron": "^31.0.0",
-    "electron-builder": "^24.13.3",
-    "png-to-ico": "^3.0.1",
     "vitest": "^2.1.9"
   },
-  "build": {
-    "appId": "com.masprime77.lectio",
-    "productName": "Lectio",
-    "mac": {
-      "category": "public.app-category.productivity",
-      "icon": "assets/icon.icns",
-      "target": [
-        "dmg",
-        "zip"
-      ]
-    },
-    "dmg": {
-      "title": "Lectio",
-      "icon": "assets/icon.icns",
-      "background": "assets/dmg-background.png",
-      "artifactName": "Lectio-${arch}.${ext}",
-      "window": {
-        "width": 540,
-        "height": 380
-      },
-      "contents": [
-        {
-          "x": 150,
-          "y": 185,
-          "type": "file"
-        },
-        {
-          "x": 390,
-          "y": 185,
-          "type": "link",
-          "path": "/Applications"
-        }
-      ]
-    },
-    "win": {
-      "target": [
-        "nsis",
-        "zip"
-      ],
-      "icon": "assets/icon.ico"
-    },
-    "nsis": {
-      "artifactName": "Lectio-Setup.${ext}",
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "installerIcon": "assets/icon.ico",
-      "uninstallerIcon": "assets/icon.ico"
-    },
-    "afterPack": "build/afterPack.js",
-    "afterSign": "build/afterSign.js",
-    "files": [
-      "main.js",
-      "preload.js",
-      "index.html",
-      "app.js",
-      "style.css",
-      "lib/",
-      "semesters/",
-      "assets/icon.png"
-    ],
-    "extraResources": [
-      {
-        "from": "semesters/",
-        "to": "semesters/"
-      }
-    ],
-    "publish": {
-      "provider": "github",
-      "owner": "masprime77",
-      "repo": "lectio"
-    }
-  },
-  "dependencies": {
-    "electron-log": "^5.4.4",
-    "electron-updater": "^6.8.3"
+  "overrides": {
+    "react-native-reanimated": "4.3.1",
+    "react-native-worklets": "0.8.3"
   }
 }

@@ -1,0 +1,25 @@
+{
+  "name": "@lectio/core",
+  "version": "1.8.8",
+  "description": "Lectio shared planner logic (pure, DOM/Electron-free)",
+  "license": "MIT",
+  "main": "src/planner-core.js",
+  "exports": {
+    ".": "./src/planner-core.js",
+    "./planner-core": "./src/planner-core.js",
+    "./semester-store": "./src/semester-store.js",
+    "./ipc-handlers": "./src/ipc-handlers.js",
+    "./storage/migrate": "./src/storage/migrate.js",
+    "./storage/contract": "./src/storage/contract.js",
+    "./storage/fs": "./src/storage/fs-storage.js"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.9",
+    "vitest": "^2.1.9"
+  }
+}

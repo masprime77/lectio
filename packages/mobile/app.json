@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Lectio",
+    "slug": "lectio",
+    "version": "1.8.8",
+    "orientation": "portrait",
+    "scheme": "lectio",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.masprime77.lectio"
+    },
+    "android": {
+      "package": "com.masprime77.lectio",
+      "edgeToEdgeEnabled": true
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
