@@ -14,19 +14,21 @@ any scattered roadmap notes. Checkboxes mark open items.
 
 ## Mobile (`@lectio/mobile`)
 
-What the mobile app can do today: sign in / create an account / sign out
-(`app/sign-in.tsx`, `app/index.tsx`), browse semesters and courses, see
-per-course progress bars, and tap a reading/task to advance its tag (which
-recomputes progress and persists to Supabase). Everything below is **not** yet
-possible on mobile.
+What the mobile app can do today: sign in / create an account / sign out via
+the profile screen (`app/sign-in.tsx`, `app/profile.tsx`), browse semesters and
+courses, see per-course progress bars, tap a reading/task to advance its tag
+(which recomputes progress and persists to Supabase), create/edit/delete
+semesters, and delete courses and readings/tasks (swipe left or the header
+Edit batch mode). Everything below is **not** yet possible on mobile.
 
 ### Content editing (desktop can, mobile can't)
 
 - [x] Create, edit, or delete **semesters** — the app is read-only over
       semesters apart from tag cycling.
-- [ ] Create, edit, reorder, or delete **courses**.
-- [ ] Add, rename, retitle, or delete **readings/tasks**; set/clear task
-      **due dates**.
+- [ ] Create, edit, or reorder **courses** — deleting courses is now possible
+      (swipe left or batch edit).
+- [ ] Add, rename, or retitle **readings/tasks**; set/clear task **due dates**
+      — deleting items is now possible (swipe left or batch edit).
 - [x] Any first-run path to add a first semester. A brand-new cloud account is
       empty and shows only "No semesters yet." with no add button — `ensureSeed`
       (the sample-semester seeder in `src/storage/seed.ts`) exists but is
@@ -34,8 +36,10 @@ possible on mobile.
 
 ### Account
 
-- [ ] Account management beyond sign-out — no password reset, email change, or
-      account deletion (the auth surface is `signIn`/`signUp`/`signOut` only).
+- [ ] Account management beyond sign-out — the profile screen
+      (`app/profile.tsx`) only offers sign out; no password reset, email
+      change, or account deletion (the auth surface is
+      `signIn`/`signUp`/`signOut` only).
 
 ### Desktop features not yet ported
 
