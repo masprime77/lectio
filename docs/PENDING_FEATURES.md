@@ -18,14 +18,15 @@ What the mobile app can do today: sign in / create an account / sign out via
 the profile screen (`app/sign-in.tsx`, `app/profile.tsx`), browse semesters and
 courses, see per-course progress bars, tap a reading/task to advance its tag
 (which recomputes progress and persists to Supabase), create/edit/delete
-semesters, and delete courses and readings/tasks (swipe left or the header
-Edit batch mode). Everything below is **not** yet possible on mobile.
+semesters, create/rename/recolor/reorder/delete courses, and delete
+readings/tasks (swipe left or the header Edit batch mode). Everything below is
+**not** yet possible on mobile.
 
 ### Content editing (desktop can, mobile can't)
 
 - [x] Create, edit, or delete **semesters** — the app is read-only over
       semesters apart from tag cycling.
-- [ ] Create, edit, or reorder **courses** — deleting courses is now possible
+- [x] Create, edit, or reorder **courses** — deleting courses is now possible
       (swipe left or batch edit).
 - [ ] Add, rename, or retitle **readings/tasks**; set/clear task **due dates**
       — deleting items is now possible (swipe left or batch edit).
