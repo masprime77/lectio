@@ -18,9 +18,10 @@ What the mobile app can do today: sign in / create an account / sign out via
 the profile screen (`app/sign-in.tsx`, `app/profile.tsx`), browse semesters and
 courses, see per-course progress bars, tap a reading/task to advance its tag
 (which recomputes progress and persists to Supabase), create/edit/delete
-semesters, create/rename/recolor/reorder/delete courses, and delete
-readings/tasks (swipe left or the header Edit batch mode). Everything below is
-**not** yet possible on mobile.
+semesters, create/rename/recolor/reorder/delete courses, and
+add/retitle/move/delete readings and tasks including task due dates — a new
+account can build a full semester from scratch on the phone. Everything below
+is **not** yet possible on mobile.
 
 ### Content editing (desktop can, mobile can't)
 
@@ -28,7 +29,7 @@ readings/tasks (swipe left or the header Edit batch mode). Everything below is
       semesters apart from tag cycling.
 - [x] Create, edit, or reorder **courses** — deleting courses is now possible
       (swipe left or batch edit).
-- [ ] Add, rename, or retitle **readings/tasks**; set/clear task **due dates**
+- [x] Add, rename, or retitle **readings/tasks**; set/clear task **due dates**
       — deleting items is now possible (swipe left or batch edit).
 - [x] Any first-run path to add a first semester. A brand-new cloud account is
       empty and shows only "No semesters yet." with no add button — `ensureSeed`

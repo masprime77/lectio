@@ -1,8 +1,9 @@
 import { useCallback, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import {
   courseProgress,
+  deleteItem,
   getCourses,
   getReadingTags,
   getTaskTags,
@@ -17,6 +18,7 @@ type Kind = 'reading' | 'task';
 
 export default function CourseDetailScreen() {
   const theme = useTheme();
+  const router = useRouter();
   const { id, courseId } = useLocalSearchParams<{ id: string; courseId: string }>();
   const [semester, setSemester] = useState<Semester | null>(null);
   const [editing, setEditing] = useState(false);
@@ -78,23 +80,40 @@ export default function CourseDetailScreen() {
     });
   }
 
-  function deleteItem(kind: Kind, item: PlannerItem) {
+  function confirmDeleteItem(kind: Kind, item: PlannerItem) {
     Alert.alert(`Delete ${kind}`, `Delete "${item.title ?? 'Untitled'}"?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
         onPress: () => {
-          if (!semester) return;
+          if (!semester || !item.id) return;
           const next: Semester = JSON.parse(JSON.stringify(semester));
           const c = getCourses(next).find((x) => x.id === courseId);
           if (!c) return;
-          if (kind === 'reading') c.readings = c.readings.filter((it) => it.id !== item.id);
-          else c.tasks = c.tasks.filter((it) => it.id !== item.id);
+          deleteItem(c, kind, item.id);
           persist(next);
         },
       },
     ]);
+  }
+
+  function showItemActions(kind: Kind, item: PlannerItem) {
+    Alert.alert(item.title ?? 'Item', undefined, [
+      {
+        text: 'Edit',
+        onPress: () =>
+          router.push(
+            `/semester/item-form?id=${id}&courseId=${courseId}&kind=${kind}&itemId=${item.id}`
+          ),
+      },
+      { text: 'Delete', style: 'destructive', onPress: () => confirmDeleteItem(kind, item) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
+
+  function pushAddItem(kind: Kind) {
+    router.push(`/semester/item-form?id=${id}&courseId=${courseId}&kind=${kind}`);
   }
 
   function batchDelete() {
@@ -143,13 +162,23 @@ export default function CourseDetailScreen() {
       <SwipeableRow
         key={item.id}
         enabled={!editing}
-        onDelete={item.id ? () => deleteItem(kind, item) : undefined}
+        editColor={theme.accent}
+        onEdit={
+          item.id
+            ? () =>
+                router.push(
+                  `/semester/item-form?id=${id}&courseId=${courseId}&kind=${kind}&itemId=${item.id}`
+                )
+            : undefined
+        }
+        onDelete={item.id ? () => confirmDeleteItem(kind, item) : undefined}
         containerStyle={styles.itemContainer}
       >
         <Pressable
           onPress={() =>
             editing ? item.id && toggleSelect(item.id) : cycleTag(kind, item.id)
           }
+          onLongPress={editing ? undefined : () => showItemActions(kind, item)}
           style={[styles.item, { backgroundColor: theme.surface, borderColor: theme.border }]}
         >
           {editing && (
@@ -169,6 +198,9 @@ export default function CourseDetailScreen() {
             <Text style={[styles.itemTitle, { color: theme.text }]}>{item.title}</Text>
             {typeof item.week === 'number' && (
               <Text style={[styles.itemWeek, { color: theme.muted }]}>Week {item.week}</Text>
+            )}
+            {kind === 'task' && typeof item.dueDate === 'string' && item.dueDate !== '' && (
+              <Text style={[styles.itemWeek, { color: theme.muted }]}>due {item.dueDate}</Text>
             )}
           </View>
           <View style={styles.tagWrap}>
@@ -226,20 +258,36 @@ export default function CourseDetailScreen() {
           <Text style={[styles.hint, { color: theme.muted }]}>
             {editing
               ? 'Tap items to select them, then delete.'
-              : 'Tap an item to advance its tag. Swipe left to delete.'}
+              : 'Tap an item to advance its tag. Long-press to edit or delete.'}
           </Text>
         </View>
 
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Readings</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Readings</Text>
+          <Pressable onPress={() => pushAddItem('reading')}>
+            <Text style={{ color: theme.accent, fontSize: 15 }}>+ Add</Text>
+          </Pressable>
+        </View>
         {course.readings.length === 0 ? (
-          <Text style={[styles.empty, { color: theme.muted }]}>No readings.</Text>
+          <Pressable onPress={() => pushAddItem('reading')}>
+            <Text style={[styles.empty, { color: theme.muted }]}>
+              No readings. Tap to add one.
+            </Text>
+          </Pressable>
         ) : (
           course.readings.map((r) => renderItem('reading', r, readingTags))
         )}
 
-        <Text style={[styles.sectionTitle, { color: theme.text, marginTop: 24 }]}>Tasks</Text>
+        <View style={[styles.sectionHeader, { marginTop: 24 }]}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Tasks</Text>
+          <Pressable onPress={() => pushAddItem('task')}>
+            <Text style={{ color: theme.accent, fontSize: 15 }}>+ Add</Text>
+          </Pressable>
+        </View>
         {course.tasks.length === 0 ? (
-          <Text style={[styles.empty, { color: theme.muted }]}>No tasks.</Text>
+          <Pressable onPress={() => pushAddItem('task')}>
+            <Text style={[styles.empty, { color: theme.muted }]}>No tasks. Tap to add one.</Text>
+          </Pressable>
         ) : (
           course.tasks.map((t) => renderItem('task', t, taskTags))
         )}
@@ -261,7 +309,14 @@ const styles = StyleSheet.create({
   },
   summaryPct: { fontSize: 28, fontWeight: '700' },
   hint: { fontSize: 12 },
-  sectionTitle: { fontSize: 20, fontWeight: '700', marginTop: 16, marginBottom: 8 },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  sectionTitle: { fontSize: 20, fontWeight: '700' },
   empty: { fontSize: 14 },
   itemContainer: { marginBottom: 8 },
   item: {
