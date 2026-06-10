@@ -1,26 +1,28 @@
 import { useCallback, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Link, Stack, useFocusEffect } from 'expo-router';
-import { storage } from '../src/storage';
+import { Link, Stack, useFocusEffect, useRouter } from 'expo-router';
+import { ensureSeed, storage } from '../src/storage';
 import { useAuth } from '../src/auth/AuthProvider';
 import { useTheme } from '../src/theme';
 import type { SemesterSummary } from '../types/lectio-core';
 
 export default function SemestersScreen() {
   const theme = useTheme();
+  const router = useRouter();
   const { signOut } = useAuth();
   const [semesters, setSemesters] = useState<SemesterSummary[] | null>(null);
 
+  const reload = useCallback(() => {
+    return storage
+      .list()
+      .then(setSemesters)
+      .catch((err) => console.warn('list failed', err));
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      let active = true;
-      storage.list().then((list) => {
-        if (active) setSemesters(list);
-      }).catch((err) => console.warn('list failed', err));
-      return () => {
-        active = false;
-      };
-    }, [])
+      reload();
+    }, [reload])
   );
 
   function handleSignOut() {
@@ -37,21 +39,72 @@ export default function SemestersScreen() {
     ]);
   }
 
+  function confirmDelete(item: SemesterSummary) {
+    Alert.alert(
+      'Delete semester',
+      `Delete "${item.name}"? All its courses, readings and tasks will be lost.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            storage
+              .delete(item.id)
+              .then(reload)
+              .catch((err) => console.warn('delete failed', err));
+          },
+        },
+      ]
+    );
+  }
+
+  function showRowActions(item: SemesterSummary) {
+    Alert.alert(item.name, undefined, [
+      { text: 'Edit', onPress: () => router.push(`/semester-form?id=${item.id}`) },
+      { text: 'Delete', style: 'destructive', onPress: () => confirmDelete(item) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
+
+  function handleAddSample() {
+    ensureSeed(storage)
+      .then(reload)
+      .catch((err) => console.warn('seed failed', err));
+  }
+
   return (
     <>
       <Stack.Screen
         options={{
           title: 'Semesters',
           headerRight: () => (
-            <Pressable onPress={handleSignOut} style={{ marginRight: 4 }}>
-              <Text style={{ color: theme.accent, fontSize: 15 }}>Sign out</Text>
-            </Pressable>
+            <View style={{ flexDirection: 'row', gap: 16, marginRight: 4 }}>
+              <Pressable onPress={() => router.push('/semester-form')}>
+                <Text style={{ color: theme.accent, fontSize: 15 }}>+ New</Text>
+              </Pressable>
+              <Pressable onPress={handleSignOut}>
+                <Text style={{ color: theme.accent, fontSize: 15 }}>Sign out</Text>
+              </Pressable>
+            </View>
           ),
         }}
       />
       {semesters !== null && semesters.length === 0 ? (
         <View style={[styles.center, { backgroundColor: theme.background }]}>
           <Text style={{ color: theme.muted }}>No semesters yet.</Text>
+          <Pressable
+            style={[styles.emptyBtn, { backgroundColor: theme.accent }]}
+            onPress={() => router.push('/semester-form')}
+          >
+            <Text style={styles.emptyBtnText}>Create your first semester</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.emptyBtnOutline, { borderColor: theme.border }]}
+            onPress={handleAddSample}
+          >
+            <Text style={[styles.emptyBtnOutlineText, { color: theme.text }]}>Add sample semester</Text>
+          </Pressable>
         </View>
       ) : (
         <FlatList
@@ -62,6 +115,7 @@ export default function SemestersScreen() {
           renderItem={({ item }) => (
             <Link href={`/semester/${item.id}`} asChild>
               <Pressable
+                onLongPress={() => showRowActions(item)}
                 style={StyleSheet.flatten([
                   styles.row,
                   { backgroundColor: theme.surface, borderColor: theme.border },
@@ -79,7 +133,7 @@ export default function SemestersScreen() {
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
   list: { padding: 16, gap: 12 },
   row: {
     flexDirection: 'row',
@@ -91,4 +145,22 @@ const styles = StyleSheet.create({
   },
   rowTitle: { fontSize: 17, fontWeight: '600' },
   chevron: { fontSize: 22 },
+  emptyBtn: {
+    height: 48,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    marginTop: 8,
+  },
+  emptyBtnText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+  emptyBtnOutline: {
+    height: 48,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  emptyBtnOutlineText: { fontWeight: '600', fontSize: 16 },
 });
