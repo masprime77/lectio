@@ -1,16 +1,20 @@
 import { useCallback, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Link, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { courseProgress, getCourses } from '@lectio/core/planner-core';
+import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { courseProgress, deleteCourse, getCourses } from '@lectio/core/planner-core';
 import { storage } from '../../src/storage';
 import { useTheme } from '../../src/theme';
 import { ProgressBar } from '../../src/components/ProgressBar';
-import type { Semester } from '../../types/lectio-core';
+import { SwipeableRow } from '../../src/components/SwipeableRow';
+import type { Course, Semester } from '../../types/lectio-core';
 
 export default function CoursesScreen() {
   const theme = useTheme();
+  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [semester, setSemester] = useState<Semester | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   // Reload on focus so tag changes made in course detail update the bars here.
   useFocusEffect(
@@ -25,11 +29,103 @@ export default function CoursesScreen() {
     }, [id])
   );
 
+  const persist = useCallback(
+    (next: Semester) => {
+      setSemester(next);
+      storage.save(id, next).catch((err) => console.warn('save failed', err));
+    },
+    [id]
+  );
+
+  function toggleEditing() {
+    setEditing((e) => !e);
+    setSelected(new Set());
+  }
+
+  function toggleSelect(courseId: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(courseId)) next.delete(courseId);
+      else next.add(courseId);
+      return next;
+    });
+  }
+
+  function confirmDeleteCourse(course: Course) {
+    Alert.alert(
+      'Delete course',
+      `Delete "${course.name}"? Its readings and tasks will be lost.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            if (!semester) return;
+            const next: Semester = JSON.parse(JSON.stringify(semester));
+            deleteCourse(next, course.id);
+            persist(next);
+          },
+        },
+      ]
+    );
+  }
+
+  function batchDelete() {
+    const count = selected.size;
+    if (count === 0 || !semester) return;
+    Alert.alert(
+      'Delete courses',
+      `Delete ${count} ${count === 1 ? 'course' : 'courses'}? Their readings and tasks will be lost.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            const next: Semester = JSON.parse(JSON.stringify(semester));
+            selected.forEach((courseId) => deleteCourse(next, courseId));
+            setEditing(false);
+            setSelected(new Set());
+            persist(next);
+          },
+        },
+      ]
+    );
+  }
+
   const courses = semester ? getCourses(semester) : [];
 
   return (
     <>
-      <Stack.Screen options={{ title: semester?.name ?? 'Semester' }} />
+      <Stack.Screen
+        options={{
+          title: semester?.name ?? 'Semester',
+          headerRight: () =>
+            editing ? (
+              <View style={styles.headerActions}>
+                <Pressable onPress={batchDelete} disabled={selected.size === 0}>
+                  <Text
+                    style={{
+                      color: selected.size === 0 ? theme.muted : '#ef4444',
+                      fontSize: 15,
+                      fontWeight: '600',
+                    }}
+                  >
+                    Delete{selected.size > 0 ? ` (${selected.size})` : ''}
+                  </Text>
+                </Pressable>
+                <Pressable onPress={toggleEditing}>
+                  <Text style={{ color: theme.accent, fontSize: 15 }}>Done</Text>
+                </Pressable>
+              </View>
+            ) : courses.length > 0 ? (
+              <Pressable onPress={toggleEditing} style={{ marginRight: 4 }}>
+                <Text style={{ color: theme.accent, fontSize: 15 }}>Edit</Text>
+              </Pressable>
+            ) : null,
+        }}
+      />
       <FlatList
         style={{ backgroundColor: theme.background }}
         contentContainerStyle={styles.list}
@@ -43,14 +139,28 @@ export default function CoursesScreen() {
         renderItem={({ item }) => {
           const progress = courseProgress(item, semester!, false);
           return (
-            <Link href={`/semester/${id}/course/${item.id}`} asChild>
+            <SwipeableRow enabled={!editing} onDelete={() => confirmDeleteCourse(item)}>
               <Pressable
-                style={StyleSheet.flatten([
-                  styles.card,
-                  { backgroundColor: theme.surface, borderColor: theme.border },
-                ])}
+                onPress={() =>
+                  editing
+                    ? toggleSelect(item.id)
+                    : router.push(`/semester/${id}/course/${item.id}`)
+                }
+                style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}
               >
                 <View style={styles.cardHeader}>
+                  {editing && (
+                    <View
+                      style={[
+                        styles.selectCircle,
+                        { borderColor: theme.border },
+                        selected.has(item.id) && {
+                          backgroundColor: theme.accent,
+                          borderColor: theme.accent,
+                        },
+                      ]}
+                    />
+                  )}
                   <View
                     style={[styles.dot, { backgroundColor: item.color || theme.accent }]}
                   />
@@ -63,7 +173,7 @@ export default function CoursesScreen() {
                   {progress}% · {item.readings.length} readings · {item.tasks.length} tasks
                 </Text>
               </Pressable>
-            </Link>
+            </SwipeableRow>
           );
         }}
       />
@@ -74,6 +184,7 @@ export default function CoursesScreen() {
 const styles = StyleSheet.create({
   list: { padding: 16, gap: 12 },
   empty: { textAlign: 'center', marginTop: 32 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 14, marginRight: 4 },
   card: {
     padding: 16,
     borderRadius: 12,
@@ -81,6 +192,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  selectCircle: { width: 20, height: 20, borderRadius: 10, borderWidth: 2 },
   dot: { width: 12, height: 12, borderRadius: 6 },
   cardTitle: { fontSize: 17, fontWeight: '600', flexShrink: 1 },
   meta: { fontSize: 13 },
