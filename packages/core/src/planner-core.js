@@ -113,6 +113,28 @@
     return course;
   }
 
+  // Recolor a course; returns the updated course, or null if not found.
+  function editCourseColor(semester, courseId, color) {
+    const course = getCourses(semester).find((c) => c.id === courseId);
+    if (!course) return null;
+    course.color = color;
+    return course;
+  }
+
+  // Reorder courses to match the given ordered array of ids. Ids not present
+  // are dropped; any courses missing from the list are appended (safety net).
+  // Mirrors reorderTags.
+  function reorderCourses(semester, orderedIds) {
+    const arr = getCourses(semester);
+    const byId = new Map(arr.map((c) => [c.id, c]));
+    const reordered = orderedIds.map((id) => byId.get(id)).filter(Boolean);
+    const seen = new Set(reordered);
+    arr.forEach((c) => {
+      if (!seen.has(c)) reordered.push(c);
+    });
+    arr.splice(0, arr.length, ...reordered);
+  }
+
   // Add a custom tag to a semester's tag list (`type` is 'reading' or 'task').
   // Returns the new tag with a generated unique id.
   function addTag(semester, type, { name, color, section }) {
@@ -187,5 +209,7 @@
     addCourse,
     deleteCourse,
     editCourseName,
+    editCourseColor,
+    reorderCourses,
   };
 });
