@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ensureSeed, storage } from '../src/storage';
 import { useTheme } from '../src/theme';
 import { SwipeableRow } from '../src/components/SwipeableRow';
@@ -9,6 +10,7 @@ import type { SemesterSummary } from '../types/lectio-core';
 export default function SemestersScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [semesters, setSemesters] = useState<SemesterSummary[] | null>(null);
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -128,17 +130,9 @@ export default function SemestersScreen() {
                 </Text>
               </Pressable>
             ) : (
-              <View style={styles.headerActions}>
-                <Pressable onPress={() => router.push('/profile')}>
-                  <Text style={{ color: theme.accent, fontSize: 15 }}>Profile</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.newBtn, { backgroundColor: theme.accent }]}
-                  onPress={() => router.push('/semester-form')}
-                >
-                  <Text style={styles.newBtnText}>+ New</Text>
-                </Pressable>
-              </View>
+              <Pressable onPress={() => router.push('/profile')} style={{ marginRight: 4 }}>
+                <Text style={{ color: theme.accent, fontSize: 15 }}>Profile</Text>
+              </Pressable>
             ),
         }}
       />
@@ -199,20 +193,39 @@ export default function SemestersScreen() {
           )}
         />
       )}
+      {!editing && (
+        <Pressable
+          style={[
+            styles.fab,
+            { backgroundColor: theme.accent, bottom: insets.bottom + 24 },
+          ]}
+          onPress={() => router.push('/semester-form')}
+        >
+          <Text style={styles.fabText}>+ New</Text>
+        </Pressable>
+      )}
     </>
   );
 }
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
-  list: { padding: 16, gap: 12 },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 14, marginRight: 4 },
-  newBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+  list: { padding: 16, gap: 12, paddingBottom: 112 },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    height: 56,
+    paddingHorizontal: 24,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
-  newBtnText: { color: '#fff', fontWeight: '600', fontSize: 15 },
+  fabText: { color: '#fff', fontWeight: '700', fontSize: 17 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
