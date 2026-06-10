@@ -199,7 +199,7 @@ async function flushSave() {
 const {
   getReadingTags, getTaskTags,
   isProtectedTag, addTag, deleteTag, editTag, reorderTags,
-  courseProgress, uid, deleteCourse,
+  courseProgress, uid, deleteCourse, addItem,
 } = window.PlannerCore;
 
 // ---------------------------------------------------------------------------
@@ -2019,7 +2019,7 @@ function setupModal() {
     submitModal();
   });
 
-  // Tab switching between Semester / Courses / Tags panels.
+  // Tab switching between Semester / Courses / Tags / Reading-Task panels.
   document.querySelectorAll('.modal-tab').forEach((tab) => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.modal-tab').forEach((t) => t.classList.remove('active'));
@@ -2031,25 +2031,84 @@ function setupModal() {
       if (tab.dataset.tab === 'tags' && state.editingSemester) {
         renderTagsEditor(state.editingSemester);
       }
+      if (tab.dataset.tab === 'items') renderItemsPanel();
+      // The semester fields are hidden on the items tab; lift their `required`
+      // so the browser doesn't block the form submit on invisible inputs.
+      setSemesterFieldsRequired(tab.dataset.tab !== 'items');
       updateModalFooter();
     });
   });
+
+  // Reading | Task toggle inside the items panel.
+  document.querySelectorAll('.ni-kind-btn').forEach((btn) => {
+    btn.addEventListener('click', () => setItemKind(btn.dataset.kind));
+  });
+}
+
+// Select the kind being added on the items panel and adapt the fields.
+function setItemKind(kind) {
+  document.querySelectorAll('.ni-kind-btn').forEach((b) => {
+    b.classList.toggle('active', b.dataset.kind === kind);
+  });
+  document.getElementById('ni-due-label').classList.toggle('hidden', kind !== 'task');
+  document.getElementById('ni-title').placeholder =
+    kind === 'task' ? 'New task…' : 'New reading…';
+}
+
+function getItemKind() {
+  const active = document.querySelector('.ni-kind-btn.active');
+  return active && active.dataset.kind === 'task' ? 'task' : 'reading';
+}
+
+function setSemesterFieldsRequired(required) {
+  ['ns-name', 'ns-start', 'ns-weeks'].forEach((fid) => {
+    document.getElementById(fid).required = required;
+  });
+}
+
+// Populate the items panel from the currently open semester. Without an open
+// semester (or with no courses) the fields give way to a hint and the submit
+// button is disabled by updateModalFooter.
+function renderItemsPanel() {
+  const select = document.getElementById('ni-course');
+  const courses = (state.semester && state.semester.courses) || [];
+  select.innerHTML = '';
+  courses.forEach((c) => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name;
+    select.appendChild(opt);
+  });
+  document.getElementById('ni-week').max = (state.semester && state.semester.weeks) || 52;
+  const ok = courses.length > 0;
+  document.getElementById('ni-fields').classList.toggle('hidden', !ok);
+  document.getElementById('ni-empty-hint').classList.toggle('hidden', ok);
 }
 
 // Show/hide the footer Import & Export buttons based on the active tab and mode.
 // Import shows on the Semester tab (semester import) and Courses tab (course
 // import), in both create and edit modes. Export only appears on the Semester
-// tab in edit mode. The Tags tab shows neither — tags can't be im/exported yet.
+// tab in edit mode. The Tags and Reading/Task tabs show neither. The submit
+// button reads "Add" on the Reading/Task tab (and is disabled until the open
+// semester has a course to add to).
 function updateModalFooter() {
   const activeTab = document.querySelector('.modal-tab.active');
   const tab = activeTab ? activeTab.dataset.tab : 'semester';
   const isEdit = !!state.editingId;
   document
     .getElementById('modal-import-btn')
-    .classList.toggle('hidden', tab === 'tags');
+    .classList.toggle('hidden', tab === 'tags' || tab === 'items');
   document
     .getElementById('modal-export-btn')
     .classList.toggle('hidden', !(tab === 'semester' && isEdit));
+  const submit = document.getElementById('modal-submit');
+  if (tab === 'items') {
+    submit.textContent = 'Add';
+    submit.disabled = !(state.semester && (state.semester.courses || []).length > 0);
+  } else {
+    submit.textContent = isEdit ? 'Save' : 'Create';
+    submit.disabled = false;
+  }
 }
 
 // The header "＋ New" button opens the semester-creation modal directly.
@@ -2063,6 +2122,8 @@ function setupNewBtn() {
 function resetModalToFirstTab() {
   document.querySelectorAll('.modal-tab').forEach((t, i) => t.classList.toggle('active', i === 0));
   document.querySelectorAll('.modal-tab-panel').forEach((p, i) => p.classList.toggle('hidden', i !== 0));
+  setSemesterFieldsRequired(true);
+  setItemKind('reading');
 }
 
 // Activate a specific tab by its data-tab value ('semester' | 'courses' | 'tags').
@@ -2082,6 +2143,8 @@ function activateModalTab(tabName) {
     tabs[0].classList.add('active');
     panels[0].classList.remove('hidden');
   }
+  if (activated && tabName === 'items') renderItemsPanel();
+  setSemesterFieldsRequired(!(activated && tabName === 'items'));
 }
 
 function closeModal() {
@@ -2184,8 +2247,35 @@ function slugify(s) {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'semester';
 }
 
+// Add the reading/task described by the items panel to the currently open
+// semester, mirroring the inline add-rows (same shape, via core's addItem).
+function submitItemFromModal() {
+  if (!state.semester) return;
+  const kind = getItemKind();
+  const courseId = document.getElementById('ni-course').value;
+  const course = state.semester.courses.find((c) => c.id === courseId);
+  const title = document.getElementById('ni-title').value.trim();
+  if (!course || !title) return;
+  const maxWeeks = state.semester.weeks || 52;
+  const week = Math.min(
+    maxWeeks,
+    Math.max(1, parseInt(document.getElementById('ni-week').value, 10) || 1)
+  );
+  const dueDate = kind === 'task' ? document.getElementById('ni-due').value || '' : undefined;
+  addItem(course, kind, { title, week, dueDate });
+  persist();
+  render();
+  closeModal();
+}
+
 // Handle the modal form for both create and edit.
 async function submitModal() {
+  const activeModalTab = document.querySelector('.modal-tab.active');
+  if (activeModalTab && activeModalTab.dataset.tab === 'items') {
+    submitItemFromModal();
+    return;
+  }
+
   const name = document.getElementById('ns-name').value.trim();
   const startDate = document.getElementById('ns-start').value;
   const weeks = parseInt(document.getElementById('ns-weeks').value, 10) || 15;

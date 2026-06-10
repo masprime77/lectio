@@ -128,6 +128,7 @@
           <button type="button" class="modal-tab active" data-tab="semester">Semester</button>
           <button type="button" class="modal-tab" data-tab="courses">Courses</button>
           <button type="button" class="modal-tab" data-tab="tags">Tags</button>
+          <button type="button" class="modal-tab" data-tab="items">Reading / Task</button>
         </div>
 
         <!-- Tab: Semester -->
@@ -191,6 +192,35 @@
             </div>
 
           </div>
+        </div>
+
+        <!-- Tab: Reading / Task — adds an item to the currently open semester -->
+        <div class="modal-tab-panel hidden" data-panel="items">
+          <div class="ni-kind-toggle" role="group" aria-label="Item type">
+            <button type="button" class="ni-kind-btn active" data-kind="reading">Reading</button>
+            <button type="button" class="ni-kind-btn" data-kind="task">Task</button>
+          </div>
+          <div id="ni-fields">
+            <label>
+              Course
+              <select id="ni-course"></select>
+            </label>
+            <label>
+              Week
+              <input type="number" id="ni-week" min="1" value="1" />
+            </label>
+            <label>
+              Title
+              <input type="text" id="ni-title" placeholder="New reading…" />
+            </label>
+            <label id="ni-due-label" class="hidden">
+              Due date (optional)
+              <input type="date" id="ni-due" />
+            </label>
+          </div>
+          <p id="ni-empty-hint" class="ni-empty-hint hidden">
+            Open a semester with at least one course to add readings or tasks.
+          </p>
         </div>
 
         <div class="modal-actions">
