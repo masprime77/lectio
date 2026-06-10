@@ -100,6 +100,22 @@ export function editCourseColor(
   color: string
 ): Course | null;
 export function reorderCourses(semester: Semester, orderedIds: string[]): void;
+export function addItem(
+  course: Course,
+  kind: 'reading' | 'task',
+  item: { title: string; week: number; dueDate?: string }
+): PlannerItem;
+export function editItem(
+  course: Course,
+  kind: 'reading' | 'task',
+  itemId: string,
+  patch: { title?: string; week?: number; dueDate?: string }
+): PlannerItem | null;
+export function deleteItem(
+  course: Course,
+  kind: 'reading' | 'task',
+  itemId: string
+): boolean;
 
 // ---------------------------------------------------------------------------
 // storage/migrate and storage/contract surfaces
