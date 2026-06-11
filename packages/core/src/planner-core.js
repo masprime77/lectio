@@ -88,6 +88,75 @@
     return Math.round(((doneR + doneT) / total) * 100);
   }
 
+  // Per-course done/total split by type. Mirrors courseProgress but separated;
+  // an item counts as done when its tag is in the 'done' section (or it is a
+  // ghost remembering a 'done' section). In studyMode only 'r-studied' /
+  // 't-studied' count. Returns { readings:{done,total}, tasks:{done,total} }.
+  function courseBreakdown(course, semester, studyMode) {
+    const readings = (course && course.readings) || [];
+    const tasks = (course && course.tasks) || [];
+    let doneR, doneT;
+    if (studyMode) {
+      doneR = readings.filter((r) => r.status === 'r-studied').length;
+      doneT = tasks.filter((t) => t.status === 't-studied').length;
+    } else {
+      const rTags = getReadingTags(semester || {});
+      const tTags = getTaskTags(semester || {});
+      const rDoneIds = new Set(rTags.filter((t) => t.section === 'done').map((t) => t.id));
+      const tDoneIds = new Set(tTags.filter((t) => t.section === 'done').map((t) => t.id));
+      doneR = readings.filter(
+        (r) => rDoneIds.has(r.status) || (r.status === '__deleted__' && r._ghostSection === 'done')
+      ).length;
+      doneT = tasks.filter(
+        (t) => tDoneIds.has(t.status) || (t.status === '__deleted__' && t._ghostSection === 'done')
+      ).length;
+    }
+    return {
+      readings: { done: doneR, total: readings.length },
+      tasks: { done: doneT, total: tasks.length },
+    };
+  }
+
+  // The sort orders the UI offers. Keep these EXACT string values — they match
+  // the desktop's state.sortOrder and are persisted on mobile too.
+  const SORT_ORDERS = [
+    'progress-asc',
+    'progress-desc',
+    'alpha-asc',
+    'alpha-desc',
+    'week-asc',
+    'week-desc',
+  ];
+
+  // Return a NEW sorted array of courses (never mutates input). Progress sorts
+  // use courseProgress with the given studyMode. 'week-asc'/'week-desc' fall
+  // back to alphabetical A→Z for course ordering (weeks reorder elsewhere).
+  function sortedCourses(courses, semester, sortOrder, studyMode) {
+    const copy = [...(courses || [])];
+    if (sortOrder === 'progress-asc')
+      return copy.sort(
+        (a, b) => courseProgress(a, semester, studyMode) - courseProgress(b, semester, studyMode)
+      );
+    if (sortOrder === 'progress-desc')
+      return copy.sort(
+        (a, b) => courseProgress(b, semester, studyMode) - courseProgress(a, semester, studyMode)
+      );
+    if (sortOrder === 'alpha-desc') return copy.sort((a, b) => b.name.localeCompare(a.name));
+    // alpha-asc, week-asc and week-desc all use alphabetical (A → Z) order.
+    return copy.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  // Set an item's tag id directly (the tag-menu pick). Clears any ghost
+  // marker. Returns the item, or null if not found. `kind` is 'reading'|'task'.
+  function setItemStatus(course, kind, itemId, tagId) {
+    const arr = (kind === 'reading' ? course.readings : course.tasks) || [];
+    const item = arr.find((it) => it.id === itemId);
+    if (!item) return null;
+    item.status = tagId;
+    delete item._ghostSection;
+    return item;
+  }
+
   // Add a course with a generated unique id; returns the new course.
   function addCourse(semester, { name, color }) {
     if (!Array.isArray(semester.courses)) semester.courses = [];
@@ -242,6 +311,10 @@
     uid,
     getCourses,
     courseProgress,
+    courseBreakdown,
+    SORT_ORDERS,
+    sortedCourses,
+    setItemStatus,
     addCourse,
     deleteCourse,
     editCourseName,
