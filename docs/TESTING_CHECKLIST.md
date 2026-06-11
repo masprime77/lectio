@@ -30,68 +30,16 @@ npm run typecheck --workspace @lectio/mobile   # tsc --noEmit del móvil
 
 ---
 
-## Fase 7 — CRUD básico del móvil
-
-### 7a — CRUD de semestres (`phase-7a-semesters-crud`)
-
-- [ ] **[CI]** `planner-core.js` sin cambios (esta sub-fase no toca core).
-- [ ] **[M]** (móvil) Cuenta nueva → estado vacío muestra **"Create your first semester"** y **"Add sample semester"**.
-- [ ] **[M]** (móvil) Crear un semestre desde el formulario → aparece en la lista.
-- [ ] **[M]** (móvil) Long-press → **Edit** cambia el nombre y persiste.
-- [ ] **[M]** (móvil) Long-press → **Delete** elimina tras el diálogo de confirmación.
-- [ ] **[M]** (móvil) "Add sample semester" siembra `ss2025` **solo** cuando la lista está vacía.
-- [ ] **[M]** (móvil) La fecha se guarda como `YYYY-MM-DD` y `weeks` queda entre 1 y 52.
-- [ ] **[M]** (móvil) Los tags por defecto se clonan (no se referencia el singleton de core) — crear dos semestres y editar tags de uno no afecta al otro (se valida a fondo en 05a).
-
-### 7b — CRUD de cursos (`phase-7b-courses-crud`)
-
-- [ ] **[CI]** Tests nuevos de core: `editCourseColor` y `reorderCourses` pasan.
-- [ ] **[CI]** `editCourseColor` devuelve el curso y `null` si el id no existe.
-- [ ] **[CI]** `reorderCourses` aplica el orden, descarta ids ausentes, agrega los omitidos al final y muta in-place (misma referencia del array).
-- [ ] **[M]** (móvil) "+ Course" crea un curso que se renderiza con su color y barra al 0%.
-- [ ] **[M]** (móvil) Long-press → **Edit** renombra y recolorea (paleta fija de 8 colores).
-- [ ] **[M]** (móvil) Editar un curso cuyo color no está en la paleta **no** cambia el color en silencio (aparece como swatch extra).
-- [ ] **[M]** (móvil) **Move up / Move down** reordena y **persiste** (sobrevive al salir y volver a entrar).
-- [ ] **[M]** (móvil) **Delete** elimina tras confirmación.
-- [ ] **[M]** (móvil) Semestre sin cursos muestra "Add a course".
-- [ ] **[M]** (móvil) En Android el Alert con 5 opciones: Edit/Delete siguen accesibles (limitación conocida de 3 botones).
-
-### 7c — Ítems (lecturas/tareas) + fechas de entrega (`phase-7c-items-due-dates`)
-
-- [ ] **[CI]** `items.test.js` pasa: `addItem`/`editItem`/`deleteItem`.
-- [ ] **[CI]** `addItem('reading')` → `status: 'r-pending'`, sin `dueDate`; `addItem('task')` → `status: 't-pending'`, `dueDate: ''` por defecto.
-- [ ] **[CI]** `editItem` parchea solo los campos provistos; `dueDate: ''` limpia la fecha; se ignora `dueDate` en readings; `null` si id desconocido.
-- [ ] **[CI]** `deleteItem` elimina y devuelve `true`; `false` si id desconocido.
-- [ ] **[M]** (móvil) En un curso nuevo, "+ Add" crea una lectura y una tarea; la tarea con fecha muestra "due YYYY-MM-DD".
-- [ ] **[M]** (móvil) Tap sigue ciclando el tag; el % de progreso se actualiza al añadir/borrar.
-- [ ] **[M]** (móvil) Long-press → **Edit** retitula, cambia la semana y limpia la fecha con "Clear".
-- [ ] **[M]** (móvil) **End-to-end**: una cuenta nueva puede construir un semestre completo (semestre → cursos → ítems) solo desde el teléfono.
-
-### 7d — Botón "+" persistente con tabs (`phase-7d-persistent-add-fab`)
-
-> Nota: en el repo actual el FAB quedó implementado enrutando directo al formulario de cada
-> pantalla (con `FormTabs` dentro de cada form), no como un único `add.tsx`. Prueba el
-> comportamiento real:
-
-- [ ] **[M]** (móvil) El FAB "+" aparece **fijo abajo a la derecha** en Semestres, Cursos y Detalle de curso.
-- [ ] **[M]** (móvil) El FAB se mantiene fijo mientras la lista hace scroll; la última fila no queda tapada.
-- [ ] **[M]** (móvil) En **Semestres** el "+" abre el alta de semestre (tab "Semester").
-- [ ] **[M]** (móvil) En **Cursos** el "+" abre el alta de curso (tab "Course").
-- [ ] **[M]** (móvil) En **Detalle de curso** el "+" abre el alta de ítem con tabs **Reading | Task** (Reading por defecto); al pasar a Task aparece el campo de fecha.
-- [ ] **[M]** (móvil) Long-press → Edit en semestre/curso/ítem sigue abriendo el formulario de edición original.
-
----
-
 ## Serie de paridad con desktop
 
 ### 01 — Core: breakdown + sort + setItemStatus (`01-core-breakdown-sort`)
 
-- [ ] **[CI]** `breakdown.test.js`: curso mixto da done/total correcto por tipo; curso vacío → `{done:0,total:0}`.
-- [ ] **[CI]** `courseBreakdown` en studyMode cuenta solo `*-studied`; un ghost (`__deleted__` + `_ghostSection:'done'`) cuenta como done en modo normal pero **no** en studyMode.
-- [ ] **[CI]** `sort.test.js`: cada valor de `SORT_ORDER`; progress-asc/desc por `courseProgress`; alpha-asc/desc por nombre; week-asc/desc caen a alfabético A→Z.
-- [ ] **[CI]** `sortedCourses` **no muta** el array de entrada (otra referencia, orden original preservado).
-- [ ] **[CI]** `setItemStatus` asigna el tag, limpia `_ghostSection`, devuelve `null` si id desconocido.
-- [ ] **[CI]** El wrapper dual-mode de `planner-core.js` sigue intacto (`require()` y global de browser funcionan).
+- [X] **[CI]** `breakdown.test.js`: curso mixto da done/total correcto por tipo; curso vacío → `{done:0,total:0}`.
+- [X] **[CI]** `courseBreakdown` en studyMode cuenta solo `*-studied`; un ghost (`__deleted__` + `_ghostSection:'done'`) cuenta como done en modo normal pero **no** en studyMode.
+- [X] **[CI]** `sort.test.js`: cada valor de `SORT_ORDER`; progress-asc/desc por `courseProgress`; alpha-asc/desc por nombre; week-asc/desc caen a alfabético A→Z.
+- [X] **[CI]** `sortedCourses` **no muta** el array de entrada (otra referencia, orden original preservado).
+- [X] **[CI]** `setItemStatus` asigna el tag, limpia `_ghostSection`, devuelve `null` si id desconocido.
+- [X] **[CI]** El wrapper dual-mode de `planner-core.js` sigue intacto (`require()` y global de browser funcionan).
 
 ### 02 — Prefs locales + reabrir último semestre (`02-mobile-prefs-last-semester`)
 
