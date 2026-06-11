@@ -3,6 +3,7 @@ import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { courseProgress, deleteCourse, getCourses, reorderCourses } from '@lectio/core/planner-core';
 import { storage } from '../../src/storage';
+import { prefs } from '../../src/lib/prefs';
 import { useTheme } from '../../src/theme';
 import { Fab } from '../../src/components/Fab';
 import { ProgressBar } from '../../src/components/ProgressBar';
@@ -25,10 +26,12 @@ export default function CoursesScreen() {
   }, [id]);
 
   // Reload on focus so tag changes made in course detail update the bars here.
+  // Also record this semester as the last opened one (fire-and-forget).
   useFocusEffect(
     useCallback(() => {
+      prefs.setLastSemesterId(id);
       reload();
-    }, [reload])
+    }, [id, reload])
   );
 
   const persist = useCallback(

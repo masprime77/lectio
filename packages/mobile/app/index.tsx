@@ -1,11 +1,16 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { ensureSeed, storage } from '../src/storage';
+import { prefs } from '../src/lib/prefs';
 import { useTheme } from '../src/theme';
 import { Fab } from '../src/components/Fab';
 import { SwipeableRow } from '../src/components/SwipeableRow';
 import type { SemesterSummary } from '../types/lectio-core';
+
+// Reopen the last-opened semester only on the first list load after app
+// launch — never when the user deliberately navigates back to the list.
+let didAutoOpen = false;
 
 export default function SemestersScreen() {
   const theme = useTheme();
@@ -13,13 +18,31 @@ export default function SemestersScreen() {
   const [semesters, setSemesters] = useState<SemesterSummary[] | null>(null);
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const editingRef = useRef(editing);
+  editingRef.current = editing;
 
   const reload = useCallback(() => {
     return storage
       .list()
-      .then(setSemesters)
+      .then((list) => {
+        setSemesters(list);
+        if (!didAutoOpen) {
+          didAutoOpen = true;
+          if (!editingRef.current) {
+            prefs.getLastSemesterId().then((lastId) => {
+              if (!lastId) return;
+              if (list.some((s) => s.id === lastId)) {
+                router.push(`/semester/${lastId}`);
+              } else {
+                // Last-opened semester was deleted — forget it, stay on the list.
+                prefs.clearLastSemesterId();
+              }
+            });
+          }
+        }
+      })
       .catch((err) => console.warn('list failed', err));
-  }, []);
+  }, [router]);
 
   useFocusEffect(
     useCallback(() => {
