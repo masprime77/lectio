@@ -43,12 +43,12 @@ npm run typecheck --workspace @lectio/mobile   # tsc --noEmit del móvil
 
 ### 02 — Prefs locales + reabrir último semestre (`02-mobile-prefs-last-semester`)
 
-- [ ] **[M]** (móvil) Abrir semestre A, forzar cierre, relanzar → la app aterriza en A.
-- [ ] **[M]** (móvil) Volver a la lista, entrar a B, relanzar → aterriza en B.
-- [ ] **[M]** (móvil) Borrar el último semestre abierto → al relanzar muestra la lista sin crash.
-- [ ] **[M]** (móvil) El auto-abrir ocurre **una sola vez** por lanzamiento (no re-salta al volver a la lista).
-- [ ] **[M]** (móvil) No auto-abre si estás en modo edición de la lista.
-- [ ] **[M]** (móvil) El JSON y las filas de Supabase no cambian (las prefs viven solo en AsyncStorage).
+- [X] **[M]** (móvil) Abrir semestre A, forzar cierre, relanzar → la app aterriza en A.
+- [X] **[M]** (móvil) Volver a la lista, entrar a B, relanzar → aterriza en B.
+- [X] **[M]** (móvil) Borrar el último semestre abierto → al relanzar muestra la lista sin crash.
+- [X] **[M]** (móvil) El auto-abrir ocurre **una sola vez** por lanzamiento (no re-salta al volver a la lista).
+- [X] **[M]** (móvil) No auto-abre si estás en modo edición de la lista.
+- [X] **[M]** (móvil) El JSON y las filas de Supabase no cambian (las prefs viven solo en AsyncStorage).
 
 ### 03 — Entrada de fecha por calendario (`03-mobile-date-picker`)
 
