@@ -52,12 +52,12 @@ npm run typecheck --workspace @lectio/mobile   # tsc --noEmit del móvil
 
 ### 03 — Entrada de fecha por calendario (`03-mobile-date-picker`)
 
-- [ ] **[CI]** Exactamente **una** dependencia nueva: `@react-native-community/datetimepicker`, fijada por `expo install` a la versión de SDK 56.
-- [ ] **[M]** (móvil) Crear un semestre con el calendario escribe `startDate` como `YYYY-MM-DD` idéntico al del desktop.
-- [ ] **[M]** (móvil) Fecha de tarea fijada con el calendario y luego limpiada hace round-trip a `''`.
-- [ ] **[M]** (móvil) Los valores se muestran correctos al reabrir el formulario.
-- [ ] **[M]** (móvil) **No** hay desfase de un día en tu zona horaria (se usa `toYMD`, no `toISOString`).
-- [ ] **[M]** (móvil) Abrir un semestre exportado del desktop (o el seed) muestra las fechas sin cambios.
+- [X] **[CI]** Exactamente **una** dependencia nueva: `@react-native-community/datetimepicker`, fijada por `expo install` a la versión de SDK 56.
+- [X] **[M]** (móvil) Crear un semestre con el calendario escribe `startDate` como `YYYY-MM-DD` idéntico al del desktop.
+- [X] **[M]** (móvil) Fecha de tarea fijada con el calendario y luego limpiada hace round-trip a `''`.
+- [X] **[M]** (móvil) Los valores se muestran correctos al reabrir el formulario.
+- [X] **[M]** (móvil) **No** hay desfase de un día en tu zona horaria (se usa `toYMD`, no `toISOString`).
+- [X] **[M]** (móvil) Abrir un semestre exportado del desktop (o el seed) muestra las fechas sin cambios.
 
 ### 04 — Barra de arrastre en los modales del "+" (`04-modal-grabber`)
 
