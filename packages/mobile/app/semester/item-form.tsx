@@ -16,6 +16,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { addItem, editItem, getCourses } from '@lectio/core/planner-core';
 import { storage } from '../../src/storage';
 import { useTheme } from '../../src/theme';
+import { DateField } from '../../src/components/DateField';
 import { FormTabs } from '../../src/components/FormTabs';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -165,25 +166,7 @@ export default function ItemFormScreen() {
         {kind === 'task' && (
           <>
             <Text style={[styles.label, { color: theme.muted }]}>Due date</Text>
-            <View style={styles.dueRow}>
-              <TextInput
-                style={[
-                  styles.input,
-                  styles.dueInput,
-                  { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text },
-                ]}
-                placeholder="YYYY-MM-DD (optional)"
-                placeholderTextColor={theme.muted}
-                autoCapitalize="none"
-                autoCorrect={false}
-                value={dueDate}
-                onChangeText={setDueDate}
-                editable={!busy}
-              />
-              <Pressable onPress={() => setDueDate('')} disabled={busy}>
-                <Text style={{ color: theme.accent, fontSize: 15 }}>Clear</Text>
-              </Pressable>
-            </View>
+            <DateField value={dueDate} onChange={setDueDate} placeholder="No due date" allowClear disabled={busy} />
           </>
         )}
 
@@ -212,8 +195,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     fontSize: 16,
   },
-  dueRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  dueInput: { flex: 1 },
   error: { color: '#ef4444', fontSize: 13, textAlign: 'center', marginTop: 4 },
   btn: {
     height: 48,

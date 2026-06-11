@@ -15,6 +15,7 @@ import { DEFAULT_READING_TAGS, DEFAULT_TASK_TAGS } from '@lectio/core/planner-co
 import { storage } from '../src/storage';
 import { uniqueSemesterId } from '../src/lib/semester-id';
 import { useTheme } from '../src/theme';
+import { DateField } from '../src/components/DateField';
 import { FormTabs } from '../src/components/FormTabs';
 import type { Semester } from '../types/lectio-core';
 
@@ -126,16 +127,7 @@ export default function SemesterFormScreen() {
         />
 
         <Text style={[styles.label, { color: theme.muted }]}>Start date (Monday of week 1)</Text>
-        <TextInput
-          style={[styles.input, { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text }]}
-          placeholder="YYYY-MM-DD"
-          placeholderTextColor={theme.muted}
-          autoCapitalize="none"
-          autoCorrect={false}
-          value={startDate}
-          onChangeText={setStartDate}
-          editable={!busy}
-        />
+        <DateField value={startDate} onChange={setStartDate} placeholder="YYYY-MM-DD" disabled={busy} />
 
         <Text style={[styles.label, { color: theme.muted }]}>Weeks</Text>
         <TextInput
