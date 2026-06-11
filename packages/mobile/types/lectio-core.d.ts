@@ -83,6 +83,35 @@ export function courseProgress(
   semester: Semester,
   studyMode?: boolean
 ): number;
+export interface CourseBreakdown {
+  readings: { done: number; total: number };
+  tasks: { done: number; total: number };
+}
+export type SortOrder =
+  | 'progress-asc'
+  | 'progress-desc'
+  | 'alpha-asc'
+  | 'alpha-desc'
+  | 'week-asc'
+  | 'week-desc';
+export const SORT_ORDERS: SortOrder[];
+export function courseBreakdown(
+  course: Course,
+  semester: Semester,
+  studyMode?: boolean
+): CourseBreakdown;
+export function sortedCourses(
+  courses: Course[],
+  semester: Semester,
+  sortOrder: SortOrder,
+  studyMode?: boolean
+): Course[];
+export function setItemStatus(
+  course: Course,
+  kind: 'reading' | 'task',
+  itemId: string,
+  tagId: string
+): PlannerItem | null;
 export function uid(prefix: string): string;
 export function addCourse(
   semester: Semester,
