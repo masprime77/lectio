@@ -10,12 +10,13 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { DEFAULT_READING_TAGS, DEFAULT_TASK_TAGS } from '@lectio/core/planner-core';
 import { storage } from '../src/storage';
 import { uniqueSemesterId } from '../src/lib/semester-id';
 import { useTheme } from '../src/theme';
 import { DateField } from '../src/components/DateField';
+import { SheetHeader } from '../src/components/SheetHeader';
 import { FormTabs } from '../src/components/FormTabs';
 import type { Semester } from '../types/lectio-core';
 
@@ -113,7 +114,7 @@ export default function SemesterFormScreen() {
       style={[styles.root, { backgroundColor: theme.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Stack.Screen options={{ title: id ? 'Edit Semester' : 'New Semester' }} />
+      <SheetHeader title={id ? 'Edit Semester' : 'New Semester'} />
       <View style={styles.form}>
         {!id && <FormTabs tabs={['Semester']} active="Semester" />}
         <Text style={[styles.label, { color: theme.muted }]}>Name</Text>
@@ -155,7 +156,7 @@ export default function SemesterFormScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, padding: 24 },
+  root: { flex: 1, paddingHorizontal: 24, paddingBottom: 24 },
   form: { gap: 8 },
   label: { fontSize: 13, fontWeight: '600', marginTop: 8 },
   input: {

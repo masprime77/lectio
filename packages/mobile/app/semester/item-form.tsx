@@ -12,12 +12,13 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { addItem, editItem, getCourses } from '@lectio/core/planner-core';
 import { storage } from '../../src/storage';
 import { useTheme } from '../../src/theme';
 import { DateField } from '../../src/components/DateField';
 import { FormTabs } from '../../src/components/FormTabs';
+import { SheetHeader } from '../../src/components/SheetHeader';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 function isValidDate(s: string): boolean {
@@ -133,7 +134,7 @@ export default function ItemFormScreen() {
       style={[styles.root, { backgroundColor: theme.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Stack.Screen options={{ title: itemId ? `Edit ${noun}` : `New ${noun}` }} />
+      <SheetHeader title={itemId ? `Edit ${noun}` : `New ${noun}`} />
       <View style={styles.form}>
         {!itemId && (
           <FormTabs
@@ -185,7 +186,7 @@ export default function ItemFormScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, padding: 24 },
+  root: { flex: 1, paddingHorizontal: 24, paddingBottom: 24 },
   form: { gap: 8 },
   label: { fontSize: 13, fontWeight: '600', marginTop: 8 },
   input: {
