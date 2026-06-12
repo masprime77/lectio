@@ -11,11 +11,12 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { addCourse, editCourseColor, editCourseName } from '@lectio/core/planner-core';
 import { storage } from '../../src/storage';
 import { useTheme } from '../../src/theme';
 import { FormTabs } from '../../src/components/FormTabs';
+import { SheetHeader } from '../../src/components/SheetHeader';
 
 const COURSE_COLORS = ['#4a90d9', '#22c55e', '#ef4444', '#f97316',
                        '#a855f7', '#eab308', '#14b8a6', '#ec4899'];
@@ -95,7 +96,7 @@ export default function CourseFormScreen() {
       style={[styles.root, { backgroundColor: theme.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Stack.Screen options={{ title: courseId ? 'Edit Course' : 'New Course' }} />
+      <SheetHeader title={courseId ? 'Edit Course' : 'New Course'} />
       <View style={styles.form}>
         {!courseId && <FormTabs tabs={['Course']} active="Course" />}
         <Text style={[styles.label, { color: theme.muted }]}>Name</Text>
@@ -138,7 +139,7 @@ export default function CourseFormScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, padding: 24 },
+  root: { flex: 1, paddingHorizontal: 24, paddingBottom: 24 },
   form: { gap: 8 },
   label: { fontSize: 13, fontWeight: '600', marginTop: 8 },
   input: {
