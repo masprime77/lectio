@@ -28,8 +28,8 @@ const OPTIONS: { value: SortOrder; label: string }[] = [
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-/** Bordered rounded-square ↑↓ header button that opens the SortMenu — its own
- *  control, visually distinct from the text header actions next to it. */
+/** Round ↑↓ header bubble that opens the SortMenu — same bordered bubble
+ *  treatment as HeaderBubble, sized for the glyph alone. */
 export function SortButton({ onPress }: { onPress: () => void }) {
   const theme = useTheme();
   return (
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
   sortBtn: {
     width: 32,
     height: 32,
-    borderRadius: 8,
+    borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
