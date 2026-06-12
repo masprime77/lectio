@@ -10,6 +10,7 @@ import {
   setItemStatus,
 } from '@lectio/core/planner-core';
 import { storage } from '../../../../src/storage';
+import { useStudyMode } from '../../../../src/study/StudyModeProvider';
 import { useTheme } from '../../../../src/theme';
 import { Fab } from '../../../../src/components/Fab';
 import { ProgressBar } from '../../../../src/components/ProgressBar';
@@ -22,6 +23,7 @@ type Kind = 'reading' | 'task';
 export default function CourseDetailScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const { studyMode } = useStudyMode();
   const { id, courseId } = useLocalSearchParams<{ id: string; courseId: string }>();
   const [semester, setSemester] = useState<Semester | null>(null);
   const [editing, setEditing] = useState(false);
@@ -153,7 +155,7 @@ export default function CourseDetailScreen() {
 
   const readingTags = getReadingTags(semester!);
   const taskTags = getTaskTags(semester!);
-  const progress = courseProgress(course, semester!, false);
+  const progress = courseProgress(course, semester!, studyMode);
   const hasItems = course.readings.length > 0 || course.tasks.length > 0;
 
   const renderItem = (kind: Kind, item: PlannerItem, tags: Tag[]) => {

@@ -4,15 +4,18 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 import { courseProgress, deleteCourse, getCourses, reorderCourses } from '@lectio/core/planner-core';
 import { storage } from '../../src/storage';
 import { prefs } from '../../src/lib/prefs';
+import { useStudyMode } from '../../src/study/StudyModeProvider';
 import { useTheme } from '../../src/theme';
 import { Fab } from '../../src/components/Fab';
 import { ProgressBar } from '../../src/components/ProgressBar';
+import { StudyFab } from '../../src/components/StudyFab';
 import { SwipeableRow } from '../../src/components/SwipeableRow';
 import type { Course, Semester } from '../../types/lectio-core';
 
 export default function CoursesScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const { studyMode, toggle } = useStudyMode();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [semester, setSemester] = useState<Semester | null>(null);
   const [editing, setEditing] = useState(false);
@@ -162,6 +165,13 @@ export default function CoursesScreen() {
         contentContainerStyle={styles.list}
         data={courses}
         keyExtractor={(c) => c.id}
+        ListHeaderComponent={
+          studyMode ? (
+            <Text style={[styles.studyBanner, { color: theme.muted }]}>
+              Study Mode — counting only Studied items
+            </Text>
+          ) : null
+        }
         ListEmptyComponent={
           semester ? (
             <View style={styles.emptyWrap}>
@@ -176,7 +186,7 @@ export default function CoursesScreen() {
           ) : null
         }
         renderItem={({ item }) => {
-          const progress = courseProgress(item, semester!, false);
+          const progress = courseProgress(item, semester!, studyMode);
           return (
             <SwipeableRow
               enabled={!editing}
@@ -222,6 +232,7 @@ export default function CoursesScreen() {
           );
         }}
       />
+      <StudyFab active={studyMode} onPress={toggle} />
       <Fab onPress={() => router.push(`/add?context=course&id=${id}`)} />
     </>
   );
@@ -239,6 +250,7 @@ const styles = StyleSheet.create({
   },
   emptyBtnText: { color: '#fff', fontWeight: '600', fontSize: 16 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 14, marginRight: 4 },
+  studyBanner: { fontSize: 12 },
   card: {
     padding: 16,
     borderRadius: 12,
