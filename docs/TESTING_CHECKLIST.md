@@ -78,11 +78,11 @@ npm run typecheck --workspace @lectio/mobile   # tsc --noEmit del móvil
 
 ### 05b — Menú de selección de tag por ítem (`05b-mobile-tag-pick-menu`)
 
-- [ ] **[CI]** Sin dependencias nuevas (usa `<Modal>` de RN).
-- [ ] **[M]** (móvil) Tocar un ítem abre el sheet con tags **agrupados Pending/Done**, con punto de color y nombre, y el tag actual marcado como activo.
-- [ ] **[M]** (móvil) Elegir un tag actualiza el punto/nombre y el % de progreso.
-- [ ] **[M]** (móvil/desktop) El `status` escrito coincide con el del desktop para la misma elección.
-- [ ] **[M]** (móvil) Long-press sigue permitiendo editar/borrar; el swipe y el batch-edit siguen funcionando.
+- [X] **[CI]** Sin dependencias nuevas (usa `<Modal>` de RN).
+- [X] **[M]** (móvil) Tocar un ítem abre el sheet con tags **agrupados Pending/Done**, con punto de color y nombre, y el tag actual marcado como activo.
+- [X] **[M]** (móvil) Elegir un tag actualiza el punto/nombre y el % de progreso.
+- [X] **[M]** (móvil/desktop) El `status` escrito coincide con el del desktop para la misma elección.
+- [X] **[M]** (móvil) Long-press sigue permitiendo editar/borrar; el swipe y el batch-edit siguen funcionando.
 
 ### 06 — Study Mode (`06-mobile-study-mode`)
 
