@@ -150,11 +150,18 @@ export default function CoursesScreen() {
                   <Text style={{ color: theme.accent, fontSize: 15 }}>Done</Text>
                 </Pressable>
               </View>
-            ) : courses.length > 0 ? (
-              <Pressable onPress={toggleEditing} style={{ marginRight: 4 }}>
-                <Text style={{ color: theme.accent, fontSize: 15 }}>Edit</Text>
-              </Pressable>
-            ) : null,
+            ) : (
+              <View style={styles.headerActions}>
+                <Pressable onPress={() => router.push(`/semester/tags?id=${id}`)}>
+                  <Text style={{ color: theme.accent, fontSize: 15 }}>Tags</Text>
+                </Pressable>
+                {courses.length > 0 && (
+                  <Pressable onPress={toggleEditing}>
+                    <Text style={{ color: theme.accent, fontSize: 15 }}>Edit</Text>
+                  </Pressable>
+                )}
+              </View>
+            ),
         }}
       />
       <FlatList

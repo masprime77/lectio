@@ -77,6 +77,27 @@ export const PROTECTED_TAG_IDS: Set<string>;
 export function isProtectedTag(id: string): boolean;
 export function getReadingTags(semester: Semester): Tag[];
 export function getTaskTags(semester: Semester): Tag[];
+export function addTag(
+  semester: Semester,
+  type: 'reading' | 'task',
+  tag: { name: string; color: string; section: TagSection }
+): Tag;
+export function editTag(
+  semester: Semester,
+  type: 'reading' | 'task',
+  tagId: string,
+  patch: { name?: string; color?: string }
+): boolean;
+export function deleteTag(
+  semester: Semester,
+  type: 'reading' | 'task',
+  tagId: string
+): boolean;
+export function reorderTags(
+  semester: Semester,
+  type: 'reading' | 'task',
+  orderedIds: string[]
+): void;
 export function getCourses(semester: Semester): Course[];
 export function courseProgress(
   course: Course,
