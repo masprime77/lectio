@@ -45,7 +45,7 @@ is **not** yet possible on mobile.
 
 ### Desktop features not yet ported
 
-- [ ] **Study Mode** toggle (narrow progress to "studied" items).
+- [x] **Study Mode** toggle (narrow progress to "studied" items).
 - [x] **Custom tag editor** — add / rename / delete / reorder / recolor reading
       and task tags (the "+" add-sheet's Tags tab, driven by the shared core
       tag functions).

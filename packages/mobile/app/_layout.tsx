@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ActivityIndicator, View, useColorScheme } from 'react-native';
 import { AuthProvider, useAuth } from '../src/auth/AuthProvider';
+import { StudyModeProvider } from '../src/study/StudyModeProvider';
 import { useTheme } from '../src/theme';
 
 function AppShell() {
@@ -63,7 +64,9 @@ function AppShell() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <AppShell />
+      <StudyModeProvider>
+        <AppShell />
+      </StudyModeProvider>
     </AuthProvider>
   );
 }
