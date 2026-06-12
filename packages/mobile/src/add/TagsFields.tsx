@@ -1,23 +1,19 @@
-// Per-semester tag editor. Modal screen at /semester/tags?id=<semesterId>.
+// Per-semester tag editor body, embedded in the add-sheet's Tags tab.
 // Mirrors the desktop's Tags tab: Readings/Tasks tags grouped by Pending/Done
 // section, with add / rename / recolor / delete / reorder going through the
 // shared @lectio/core tag functions so the semester JSON stays identical.
 // Protected tags (pending/studied) can be recolored but not renamed, deleted,
-// or reordered.
+// or reordered. The host renders the surrounding sheet and scroll view.
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
 import {
   addTag,
   deleteTag,
@@ -27,9 +23,9 @@ import {
   isProtectedTag,
   reorderTags,
 } from '@lectio/core/planner-core';
-import { storage } from '../../src/storage';
-import { useTheme } from '../../src/theme';
-import { FormTabs } from '../../src/components/FormTabs';
+import { storage } from '../storage';
+import { useTheme } from '../theme';
+import { FormTabs } from '../components/FormTabs';
 import type { Semester, Tag, TagSection } from '../../types/lectio-core';
 
 type TagType = 'reading' | 'task';
@@ -123,9 +119,8 @@ function TagRow({
   );
 }
 
-export default function TagsScreen() {
+export function TagsFields({ semesterId }: { semesterId: string }) {
   const theme = useTheme();
-  const { id } = useLocalSearchParams<{ id: string }>();
   const [semester, setSemester] = useState<Semester | null>(null);
   const [type, setType] = useState<TagType>('reading');
   const [pickerFor, setPickerFor] = useState<string | null>(null);
@@ -135,20 +130,20 @@ export default function TagsScreen() {
 
   useEffect(() => {
     let active = true;
-    storage.get(id).then((s) => {
+    storage.get(semesterId).then((s) => {
       if (active) setSemester(s);
     });
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [semesterId]);
 
   const persist = useCallback(
     (next: Semester) => {
       setSemester(next);
-      storage.save(id, next).catch((err) => console.warn('save failed', err));
+      storage.save(semesterId, next).catch((err) => console.warn('save failed', err));
     },
-    [id]
+    [semesterId]
   );
 
   function switchType(tab: string) {
@@ -284,39 +279,29 @@ export default function TagsScreen() {
     </View>
   );
 
+  if (!semester) {
+    return <ActivityIndicator color={theme.accent} style={{ marginTop: 24 }} />;
+  }
+
   return (
-    <KeyboardAvoidingView
-      style={[styles.root, { backgroundColor: theme.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <Stack.Screen options={{ presentation: 'modal', title: 'Tags' }} />
-      {!semester ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={theme.accent} />
-        </View>
-      ) : (
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <FormTabs
-            tabs={['Readings', 'Tasks']}
-            active={type === 'reading' ? 'Readings' : 'Tasks'}
-            onSelect={switchType}
-          />
-          <Text style={[styles.hint, { color: theme.muted }]}>
-            Items wearing a Done tag count toward progress. Tap a color dot to recolor.
-          </Text>
-          {renderGroup('pending', 'Pending')}
-          {renderGroup('done', 'Done')}
-        </ScrollView>
-      )}
-    </KeyboardAvoidingView>
+    <View style={styles.root}>
+      <FormTabs
+        tabs={['Readings', 'Tasks']}
+        active={type === 'reading' ? 'Readings' : 'Tasks'}
+        onSelect={switchType}
+      />
+      <Text style={[styles.hint, { color: theme.muted }]}>
+        Items wearing a Done tag count toward progress. Tap a color dot to recolor.
+      </Text>
+      {renderGroup('pending', 'Pending')}
+      {renderGroup('done', 'Done')}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  content: { padding: 16, paddingBottom: 48 },
-  hint: { fontSize: 12, marginTop: 8 },
+  root: { marginTop: 16 },
+  hint: { fontSize: 12 },
   group: { marginTop: 20 },
   groupTitle: { fontSize: 20, fontWeight: '700', marginBottom: 8 },
   row: {

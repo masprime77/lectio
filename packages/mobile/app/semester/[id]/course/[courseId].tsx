@@ -293,7 +293,9 @@ export default function CourseDetailScreen() {
           course.tasks.map((t) => renderItem('task', t, taskTags))
         )}
       </ScrollView>
-      <Fab onPress={() => pushAddItem('reading')} />
+      {/* The "+" opens the add-sheet on the Tags tab; readings/tasks are added
+          from the per-section "+ Add" controls next to the Readings/Tasks headers. */}
+      <Fab onPress={() => router.push(`/add?context=tags&id=${id}`)} />
     </>
   );
 }
