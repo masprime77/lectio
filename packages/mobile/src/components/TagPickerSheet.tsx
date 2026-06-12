@@ -1,8 +1,11 @@
 // Bottom-sheet for picking an item's tag directly, mirroring the desktop's
 // tag dropdown: options grouped into Pending/Done sections with the current
 // tag highlighted. Uses RN's <Modal> (no extra dependency); tapping the
-// dimmed backdrop dismisses without changes.
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+// dimmed backdrop dismisses without changes. The modal fades so the backdrop
+// dims in place; only the sheet itself slides up (Modal's "slide" animation
+// would drag the backdrop up from the bottom along with it).
+import { useEffect, useRef } from 'react';
+import { Animated, Easing, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme';
 import type { Tag, TagSection } from '../../types/lectio-core';
@@ -21,6 +24,8 @@ const SECTIONS: { key: TagSection; label: string }[] = [
   { key: 'done', label: 'Done' },
 ];
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 export function TagPickerSheet({
   visible,
   title,
@@ -31,14 +36,28 @@ export function TagPickerSheet({
 }: TagPickerSheetProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const slide = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (visible) {
+      slide.setValue(0);
+      Animated.timing(slide, {
+        toValue: 1,
+        duration: 260,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [visible, slide]);
+  const translateY = slide.interpolate({ inputRange: [0, 1], outputRange: [420, 0] });
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         {/* Stop backdrop presses from closing when tapping the sheet itself. */}
-        <Pressable
+        <AnimatedPressable
           style={[
             styles.sheet,
             { backgroundColor: theme.surface, paddingBottom: insets.bottom + 16 },
+            { transform: [{ translateY }] },
           ]}
           onPress={(e) => e.stopPropagation()}
         >
@@ -85,7 +104,7 @@ export function TagPickerSheet({
               </View>
             );
           })}
-        </Pressable>
+        </AnimatedPressable>
       </Pressable>
     </Modal>
   );
