@@ -215,7 +215,7 @@ export default function SemestersScreen() {
           )}
         />
       )}
-      <Fab onPress={() => router.push('/semester-form')} />
+      <Fab onPress={() => router.push('/add?context=semester')} />
     </>
   );
 }
