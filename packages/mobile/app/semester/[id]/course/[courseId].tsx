@@ -10,15 +10,28 @@ import {
   setItemStatus,
 } from '@lectio/core/planner-core';
 import { storage } from '../../../../src/storage';
+import { useSortOrder } from '../../../../src/lib/use-sort-order';
 import { useStudyMode } from '../../../../src/study/StudyModeProvider';
 import { useTheme } from '../../../../src/theme';
 import { Fab } from '../../../../src/components/Fab';
 import { ProgressBar } from '../../../../src/components/ProgressBar';
+import { SortButton, SortMenu } from '../../../../src/components/SortMenu';
 import { SwipeableRow } from '../../../../src/components/SwipeableRow';
 import { TagPickerSheet } from '../../../../src/components/TagPickerSheet';
-import type { PlannerItem, Semester, Tag } from '../../../../types/lectio-core';
+import type { PlannerItem, Semester, SortOrder, Tag } from '../../../../types/lectio-core';
 
 type Kind = 'reading' | 'task';
+
+// Week orders sort the readings/tasks by their week (display-only: returns a
+// new array, the on-disk item order is untouched). The other orders affect
+// the courses list, not item ordering, so items keep their stored order.
+function sortedItems(items: PlannerItem[], order: SortOrder): PlannerItem[] {
+  if (order !== 'week-asc' && order !== 'week-desc') return items;
+  const dir = order === 'week-desc' ? -1 : 1;
+  const week = (it: PlannerItem) =>
+    typeof it.week === 'number' ? it.week : Number.MAX_SAFE_INTEGER;
+  return [...items].sort((a, b) => (week(a) - week(b)) * dir);
+}
 
 export default function CourseDetailScreen() {
   const theme = useTheme();
@@ -29,6 +42,8 @@ export default function CourseDetailScreen() {
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [picker, setPicker] = useState<{ kind: Kind; item: PlannerItem } | null>(null);
+  const [sortOrder, pickSortOrder] = useSortOrder();
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -242,9 +257,12 @@ export default function CourseDetailScreen() {
                 </Pressable>
               </View>
             ) : hasItems ? (
-              <Pressable onPress={toggleEditing} style={{ marginRight: 4 }}>
-                <Text style={{ color: theme.accent, fontSize: 15 }}>Edit</Text>
-              </Pressable>
+              <View style={styles.headerActions}>
+                <SortButton onPress={() => setSortMenuOpen(true)} />
+                <Pressable onPress={toggleEditing}>
+                  <Text style={{ color: theme.accent, fontSize: 15 }}>Edit</Text>
+                </Pressable>
+              </View>
             ) : null,
         }}
       />
@@ -277,7 +295,7 @@ export default function CourseDetailScreen() {
             </Text>
           </Pressable>
         ) : (
-          course.readings.map((r) => renderItem('reading', r, readingTags))
+          sortedItems(course.readings, sortOrder).map((r) => renderItem('reading', r, readingTags))
         )}
 
         <View style={[styles.sectionHeader, { marginTop: 24 }]}>
@@ -291,12 +309,18 @@ export default function CourseDetailScreen() {
             <Text style={[styles.empty, { color: theme.muted }]}>No tasks. Tap to add one.</Text>
           </Pressable>
         ) : (
-          course.tasks.map((t) => renderItem('task', t, taskTags))
+          sortedItems(course.tasks, sortOrder).map((t) => renderItem('task', t, taskTags))
         )}
       </ScrollView>
       {/* The "+" opens the add-sheet on the Tags tab; readings/tasks are added
           from the per-section "+ Add" controls next to the Readings/Tasks headers. */}
       <Fab onPress={() => router.push(`/add?context=tags&id=${id}`)} />
+      <SortMenu
+        visible={sortMenuOpen}
+        current={sortOrder}
+        onPick={pickSortOrder}
+        onClose={() => setSortMenuOpen(false)}
+      />
       <TagPickerSheet
         visible={!!picker}
         title={picker?.item.title ?? 'Item'}
