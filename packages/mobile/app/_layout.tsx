@@ -49,10 +49,10 @@ function AppShell() {
         >
           <Stack.Screen name="sign-in" options={{ headerShown: false }} />
           <Stack.Screen name="index" options={{ title: 'Semesters' }} />
-          <Stack.Screen name="semester-form" options={{ presentation: 'modal', title: 'New Semester' }} />
+          <Stack.Screen name="semester-form" options={{ presentation: 'modal', title: 'New Semester', headerShown: false }} />
           <Stack.Screen name="profile" options={{ title: 'Profile' }} />
-          <Stack.Screen name="semester/course-form" options={{ presentation: 'modal', title: 'Course' }} />
-          <Stack.Screen name="semester/item-form" options={{ presentation: 'modal', title: 'Item' }} />
+          <Stack.Screen name="semester/course-form" options={{ presentation: 'modal', title: 'Course', headerShown: false }} />
+          <Stack.Screen name="semester/item-form" options={{ presentation: 'modal', title: 'Item', headerShown: false }} />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>

@@ -61,8 +61,8 @@ npm run typecheck --workspace @lectio/mobile   # tsc --noEmit del móvil
 
 ### 04 — Barra de arrastre en los modales del "+" (`04-modal-grabber`)
 
-- [ ] **[M]** (móvil) Al tocar "+" en las tres pantallas aparece la barra (grabber) centrada arriba del sheet.
-- [ ] **[M]** (móvil) En iOS el sheet sigue arrastrándose para cerrar.
+- [X] **[M]** (móvil) Al tocar "+" en las tres pantallas aparece la barra (grabber) centrada arriba del sheet.
+- [X] **[M]** (móvil) En iOS el sheet sigue arrastrándose para cerrar.
 - [ ] **[M]** (móvil) En Android la barra se muestra y el formulario funciona normal.
 
 ### 05a — Editor de tags por semestre (`05a-mobile-tags-editor`)
