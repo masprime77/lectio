@@ -54,7 +54,6 @@ function AppShell() {
           <Stack.Screen name="profile" options={{ title: 'Profile' }} />
           <Stack.Screen name="semester/course-form" options={{ presentation: 'modal', title: 'Course', headerShown: false }} />
           <Stack.Screen name="semester/item-form" options={{ presentation: 'modal', title: 'Item', headerShown: false }} />
-          <Stack.Screen name="semester/tags" options={{ presentation: 'modal', title: 'Tags' }} />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>

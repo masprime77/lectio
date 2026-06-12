@@ -47,8 +47,8 @@ is **not** yet possible on mobile.
 
 - [ ] **Study Mode** toggle (narrow progress to "studied" items).
 - [x] **Custom tag editor** — add / rename / delete / reorder / recolor reading
-      and task tags (a "Tags" modal screen, opened from the semester header,
-      driven by the shared core tag functions).
+      and task tags (the "+" add-sheet's Tags tab, driven by the shared core
+      tag functions).
 - [ ] **Weekly view** (collapsible week sections); mobile has only the
       semester → courses → course-detail flow.
 - [ ] **Dashboard / Breakdown** panel (readings vs tasks mini-bars, totals).

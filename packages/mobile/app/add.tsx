@@ -3,8 +3,9 @@
 // available from every screen; `context` only picks the initial tab and `id`
 // preselects the semester of the screen the sheet was opened from. The Course
 // and Tags tabs carry a semester picker (defaulting to that semester, else the
-// first one). The "+" never adds individual readings/tasks — those stay on the
-// per-section "+ Add" controls of the course-detail screen.
+// first one); Tags embeds the tag editor directly. The "+" never adds
+// individual readings/tasks — those stay on the per-section "+ Add" controls
+// of the course-detail screen.
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -16,13 +17,14 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { storage } from '../src/storage';
 import { useTheme } from '../src/theme';
 import { SheetHeader } from '../src/components/SheetHeader';
 import { FormTabs } from '../src/components/FormTabs';
 import { SemesterFields } from '../src/add/SemesterFields';
 import { CourseFields } from '../src/add/CourseFields';
+import { TagsFields } from '../src/add/TagsFields';
 import type { SemesterSummary } from '../types/lectio-core';
 
 const TABS = ['Semester', 'Course', 'Tags'];
@@ -66,7 +68,6 @@ function SemesterPicker({
 
 export default function AddScreen() {
   const theme = useTheme();
-  const router = useRouter();
   const { context, id } = useLocalSearchParams<{ context?: string; id?: string }>();
 
   const [active, setActive] = useState(
@@ -114,24 +115,14 @@ export default function AddScreen() {
         ) : (
           <>
             <SemesterPicker semesters={semesters} selected={semesterId} onSelect={setSemesterId} />
-            {active === 'Course' ? (
-              semesterId ? (
+            {semesterId ? (
+              active === 'Course' ? (
                 <CourseFields mode="create" semesterId={semesterId} />
-              ) : null
-            ) : (
-              <>
-                <Text style={[styles.hint, { color: theme.muted }]}>
-                  Add, rename, recolor, delete and reorder this semester's reading and task tags.
-                </Text>
-                <Pressable
-                  style={[styles.btn, { backgroundColor: theme.accent }]}
-                  disabled={!semesterId}
-                  onPress={() => router.replace(`/semester/tags?id=${semesterId}`)}
-                >
-                  <Text style={styles.btnText}>Open tag editor</Text>
-                </Pressable>
-              </>
-            )}
+              ) : (
+                // Keyed by semester so the editor reloads when the pick changes.
+                <TagsFields key={semesterId} semesterId={semesterId} />
+              )
+            ) : null}
           </>
         )}
       </ScrollView>
@@ -151,12 +142,4 @@ const styles = StyleSheet.create({
   },
   pillText: { fontSize: 14, fontWeight: '600' },
   hint: { fontSize: 13, marginTop: 12 },
-  btn: {
-    height: 48,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 16,
-  },
-  btnText: { color: '#fff', fontWeight: '600', fontSize: 16 },
 });
