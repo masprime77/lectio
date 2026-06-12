@@ -126,36 +126,43 @@ export default function SemestersScreen() {
       <Stack.Screen
         options={{
           title: 'Semesters',
-          headerLeft: () =>
-            (semesters?.length ?? 0) > 0 ? (
-              <Pressable onPress={toggleEditing} style={{ marginLeft: 4 }}>
-                <Text style={{ color: theme.accent, fontSize: 15 }}>
-                  {editing ? 'Done' : 'Edit'}
-                </Text>
-              </Pressable>
-            ) : null,
+          // Profile lives top-left as a drawn person glyph (no emoji, no icon
+          // library); Edit/Done sits top-right like the other list screens.
+          headerLeft: () => (
+            <Pressable
+              onPress={() => router.push('/profile')}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Profile"
+              style={styles.profileBtn}
+            >
+              <View style={[styles.profileHead, { backgroundColor: theme.accent }]} />
+              <View style={[styles.profileShoulders, { backgroundColor: theme.accent }]} />
+            </Pressable>
+          ),
           headerRight: () =>
             editing ? (
-              <Pressable
-                onPress={batchDelete}
-                disabled={selected.size === 0}
-                style={{ marginRight: 4 }}
-              >
-                <Text
-                  style={{
-                    color: selected.size === 0 ? theme.muted : '#ef4444',
-                    fontSize: 15,
-                    fontWeight: '600',
-                  }}
-                >
-                  Delete{selected.size > 0 ? ` (${selected.size})` : ''}
-                </Text>
+              <View style={styles.headerActions}>
+                <Pressable onPress={batchDelete} disabled={selected.size === 0}>
+                  <Text
+                    style={{
+                      color: selected.size === 0 ? theme.muted : '#ef4444',
+                      fontSize: 15,
+                      fontWeight: '600',
+                    }}
+                  >
+                    Delete{selected.size > 0 ? ` (${selected.size})` : ''}
+                  </Text>
+                </Pressable>
+                <Pressable onPress={toggleEditing}>
+                  <Text style={{ color: theme.accent, fontSize: 15 }}>Done</Text>
+                </Pressable>
+              </View>
+            ) : (semesters?.length ?? 0) > 0 ? (
+              <Pressable onPress={toggleEditing} style={{ marginRight: 4 }}>
+                <Text style={{ color: theme.accent, fontSize: 15 }}>Edit</Text>
               </Pressable>
-            ) : (
-              <Pressable onPress={() => router.push('/profile')} style={{ marginRight: 4 }}>
-                <Text style={{ color: theme.accent, fontSize: 15 }}>Profile</Text>
-              </Pressable>
-            ),
+            ) : null,
         }}
       />
       {semesters !== null && semesters.length === 0 ? (
@@ -235,6 +242,16 @@ const styles = StyleSheet.create({
   selectCircle: { width: 20, height: 20, borderRadius: 10, borderWidth: 2 },
   rowTitle: { fontSize: 17, fontWeight: '600' },
   chevron: { fontSize: 22 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 14, marginRight: 4 },
+  profileBtn: { marginLeft: 4, alignItems: 'center' },
+  profileHead: { width: 9, height: 9, borderRadius: 4.5 },
+  profileShoulders: {
+    width: 17,
+    height: 8,
+    borderTopLeftRadius: 8.5,
+    borderTopRightRadius: 8.5,
+    marginTop: 1.5,
+  },
   emptyBtn: {
     height: 48,
     borderRadius: 10,
