@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import {
-  SORT_ORDERS,
   courseProgress,
   deleteCourse,
   getCourses,
@@ -11,14 +10,15 @@ import {
 } from '@lectio/core/planner-core';
 import { storage } from '../../src/storage';
 import { prefs } from '../../src/lib/prefs';
+import { useSortOrder } from '../../src/lib/use-sort-order';
 import { useStudyMode } from '../../src/study/StudyModeProvider';
 import { useTheme } from '../../src/theme';
 import { Fab } from '../../src/components/Fab';
 import { ProgressBar } from '../../src/components/ProgressBar';
-import { SortMenu } from '../../src/components/SortMenu';
+import { SortButton, SortMenu } from '../../src/components/SortMenu';
 import { StudyFab } from '../../src/components/StudyFab';
 import { SwipeableRow } from '../../src/components/SwipeableRow';
-import type { Course, Semester, SortOrder } from '../../types/lectio-core';
+import type { Course, Semester } from '../../types/lectio-core';
 
 export default function CoursesScreen() {
   const theme = useTheme();
@@ -28,20 +28,8 @@ export default function CoursesScreen() {
   const [semester, setSemester] = useState<Semester | null>(null);
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [sortOrder, setSortOrder] = useState<SortOrder>('alpha-asc');
+  const [sortOrder, pickSortOrder] = useSortOrder();
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
-
-  // Restore the persisted sort order (kept only if it's a known core value).
-  useEffect(() => {
-    prefs.getSortOrder().then((saved) => {
-      if (saved && (SORT_ORDERS as string[]).includes(saved)) setSortOrder(saved as SortOrder);
-    });
-  }, []);
-
-  function pickSortOrder(order: SortOrder) {
-    setSortOrder(order);
-    prefs.setSortOrder(order);
-  }
 
   const reload = useCallback(() => {
     return storage
@@ -180,13 +168,7 @@ export default function CoursesScreen() {
               </View>
             ) : courses.length > 0 ? (
               <View style={styles.headerActions}>
-                <Pressable
-                  onPress={() => setSortMenuOpen(true)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Sort courses"
-                >
-                  <Text style={{ color: theme.accent, fontSize: 15, fontWeight: '600' }}>↑↓</Text>
-                </Pressable>
+                <SortButton onPress={() => setSortMenuOpen(true)} />
                 <Pressable onPress={toggleEditing}>
                   <Text style={{ color: theme.accent, fontSize: 15 }}>Edit</Text>
                 </Pressable>

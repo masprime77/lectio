@@ -28,6 +28,26 @@ const OPTIONS: { value: SortOrder; label: string }[] = [
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
+/** Bordered rounded-square ↑↓ header button that opens the SortMenu — its own
+ *  control, visually distinct from the text header actions next to it. */
+export function SortButton({ onPress }: { onPress: () => void }) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel="Sort"
+      style={({ pressed }) => [
+        styles.sortBtn,
+        { backgroundColor: theme.surface, borderColor: theme.border },
+        pressed && { opacity: 0.6 },
+      ]}
+    >
+      <Text style={[styles.sortBtnGlyph, { color: theme.text }]}>↑↓</Text>
+    </Pressable>
+  );
+}
+
 export function SortMenu({ visible, current, onPick, onClose }: SortMenuProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -115,4 +135,13 @@ const styles = StyleSheet.create({
   optionName: { flex: 1, fontSize: 15 },
   optionNameActive: { fontWeight: '600' },
   check: { fontSize: 15, fontWeight: '600' },
+  sortBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sortBtnGlyph: { fontSize: 14, fontWeight: '600' },
 });
