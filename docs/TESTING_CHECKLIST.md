@@ -63,18 +63,18 @@ npm run typecheck --workspace @lectio/mobile   # tsc --noEmit del móvil
 
 - [X] **[M]** (móvil) Al tocar "+" en las tres pantallas aparece la barra (grabber) centrada arriba del sheet.
 - [X] **[M]** (móvil) En iOS el sheet sigue arrastrándose para cerrar.
-- [ ] **[M]** (móvil) En Android la barra se muestra y el formulario funciona normal.
+- [X] **[M]** (móvil) En Android la barra se muestra y el formulario funciona normal.
 
 ### 05a — Editor de tags por semestre (`05a-mobile-tags-editor`)
 
-- [ ] **[CI]** Las declaraciones de `addTag/editTag/deleteTag/reorderTags/isProtectedTag` están en `lectio-core.d.ts`.
-- [ ] **[CI]** `planner-core.js` **no** se modificó (el modelo de tags ya estaba completo).
-- [ ] **[M]** (móvil) Abrir "Tags" desde un semestre → secciones **Pending** y **Done** por tipo (Readings/Tasks).
-- [ ] **[M]** (móvil) Agregar un tag custom de lectura en "Done" → aparece y **cuenta** para el progreso de ítems con ese tag.
-- [ ] **[M]** (móvil) Renombrar y recolorear un tag custom.
-- [ ] **[M]** (móvil) Borrar un tag custom → los ítems que lo llevaban se vuelven **ghosts** pero el progreso se mantiene estable.
-- [ ] **[M]** (móvil) Tags **protegidos** (pending/studied): se pueden recolorear pero **no** renombrar/borrar/reordenar.
-- [ ] **[M]** (móvil/desktop) Round-trip: reabrir el semestre en desktop (o inspeccionar el JSON) → `readingTags`/`taskTags` coinciden exactamente con el esquema del desktop.
+- [X] **[CI]** Las declaraciones de `addTag/editTag/deleteTag/reorderTags/isProtectedTag` están en `lectio-core.d.ts`.
+- [X] **[CI]** `planner-core.js` **no** se modificó (el modelo de tags ya estaba completo).
+- [X] **[M]** (móvil) Abrir "Tags" desde un semestre → secciones **Pending** y **Done** por tipo (Readings/Tasks).
+- [X] **[M]** (móvil) Agregar un tag custom de lectura en "Done" → aparece y **cuenta** para el progreso de ítems con ese tag.
+- [X] **[M]** (móvil) Renombrar y recolorear un tag custom.
+- [X] **[M]** (móvil) Borrar un tag custom → los ítems que lo llevaban se vuelven **ghosts** pero el progreso se mantiene estable.
+- [X] **[M]** (móvil) Tags **protegidos** (pending/studied): se pueden recolorear pero **no** renombrar/borrar/reordenar.
+- [X] **[M]** (móvil/desktop) Round-trip: reabrir el semestre en desktop (o inspeccionar el JSON) → `readingTags`/`taskTags` coinciden exactamente con el esquema del desktop.
 
 ### 05b — Menú de selección de tag por ítem (`05b-mobile-tag-pick-menu`)
 
