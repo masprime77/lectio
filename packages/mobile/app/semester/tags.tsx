@@ -91,10 +91,7 @@ function TagRow({
           style={[styles.colorDot, { backgroundColor: tag.color }]}
         />
         {isProtected ? (
-          <View style={styles.nameWrap}>
-            <Text style={[styles.name, { color: theme.text }]}>{tag.name}</Text>
-            <Text style={[styles.protectedNote, { color: theme.muted }]}>🔒 Protected</Text>
-          </View>
+          <Text style={[styles.name, { color: theme.text }]}>{tag.name}</Text>
         ) : (
           <TextInput
             style={[styles.nameInput, { color: theme.text }]}
@@ -116,7 +113,7 @@ function TagRow({
               <Text style={[styles.actionGlyph, { color: theme.muted }]}>↓</Text>
             </Pressable>
             <Pressable onPress={onDelete} hitSlop={6} accessibilityLabel="Delete tag">
-              <Text style={styles.actionGlyph}>🗑</Text>
+              <Text style={[styles.actionGlyph, { color: '#ef4444' }]}>✕</Text>
             </Pressable>
           </View>
         )}
@@ -331,9 +328,7 @@ const styles = StyleSheet.create({
   },
   rowMain: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   colorDot: { width: 24, height: 24, borderRadius: 12 },
-  nameWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  name: { fontSize: 15, fontWeight: '500' },
-  protectedNote: { fontSize: 12 },
+  name: { flex: 1, fontSize: 15, fontWeight: '500' },
   nameInput: { flex: 1, fontSize: 15, fontWeight: '500', padding: 0 },
   rowActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   actionGlyph: { fontSize: 16 },
