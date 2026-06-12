@@ -28,8 +28,8 @@ const OPTIONS: { value: SortOrder; label: string }[] = [
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-/** Round ↑↓ header bubble that opens the SortMenu — same bordered bubble
- *  treatment as HeaderBubble, sized for the glyph alone. */
+/** Plain ↑↓ header action that opens the SortMenu, styled like the text
+ *  header actions (e.g. Edit) it sits beside. */
 export function SortButton({ onPress }: { onPress: () => void }) {
   const theme = useTheme();
   return (
@@ -37,13 +37,9 @@ export function SortButton({ onPress }: { onPress: () => void }) {
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel="Sort"
-      style={({ pressed }) => [
-        styles.sortBtn,
-        { backgroundColor: theme.surface, borderColor: theme.border },
-        pressed && { opacity: 0.6 },
-      ]}
+      style={({ pressed }) => pressed && { opacity: 0.6 }}
     >
-      <Text style={[styles.sortBtnGlyph, { color: theme.text }]}>↑↓</Text>
+      <Text style={[styles.sortBtnGlyph, { color: theme.accent }]}>↑↓</Text>
     </Pressable>
   );
 }
@@ -135,13 +131,5 @@ const styles = StyleSheet.create({
   optionName: { flex: 1, fontSize: 15 },
   optionNameActive: { fontWeight: '600' },
   check: { fontSize: 15, fontWeight: '600' },
-  sortBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sortBtnGlyph: { fontSize: 14, fontWeight: '600' },
+  sortBtnGlyph: { fontSize: 15, fontWeight: '600' },
 });

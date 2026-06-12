@@ -14,7 +14,6 @@ import { useSortOrder } from '../../src/lib/use-sort-order';
 import { useStudyMode } from '../../src/study/StudyModeProvider';
 import { useTheme } from '../../src/theme';
 import { Fab } from '../../src/components/Fab';
-import { HeaderBubble } from '../../src/components/HeaderBubble';
 import { ProgressBar } from '../../src/components/ProgressBar';
 import { SortButton, SortMenu } from '../../src/components/SortMenu';
 import { StudyFab } from '../../src/components/StudyFab';
@@ -170,7 +169,9 @@ export default function CoursesScreen() {
             ) : courses.length > 0 ? (
               <View style={styles.headerActions}>
                 <SortButton onPress={() => setSortMenuOpen(true)} />
-                <HeaderBubble label="Edit" onPress={toggleEditing} />
+                <Pressable onPress={toggleEditing}>
+                  <Text style={{ color: theme.accent, fontSize: 15 }}>Edit</Text>
+                </Pressable>
               </View>
             ) : null,
         }}
