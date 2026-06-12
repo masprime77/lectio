@@ -7,12 +7,14 @@ import {
   getCourses,
   getReadingTags,
   getTaskTags,
+  setItemStatus,
 } from '@lectio/core/planner-core';
 import { storage } from '../../../../src/storage';
 import { useTheme } from '../../../../src/theme';
 import { Fab } from '../../../../src/components/Fab';
 import { ProgressBar } from '../../../../src/components/ProgressBar';
 import { SwipeableRow } from '../../../../src/components/SwipeableRow';
+import { TagPickerSheet } from '../../../../src/components/TagPickerSheet';
 import type { PlannerItem, Semester, Tag } from '../../../../types/lectio-core';
 
 type Kind = 'reading' | 'task';
@@ -24,6 +26,7 @@ export default function CourseDetailScreen() {
   const [semester, setSemester] = useState<Semester | null>(null);
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [picker, setPicker] = useState<{ kind: Kind; item: PlannerItem } | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -47,22 +50,18 @@ export default function CourseDetailScreen() {
     [id]
   );
 
-  // Advance an item to the next tag of its kind, persist, and re-render.
-  const cycleTag = useCallback(
-    (kind: Kind, itemId: string | undefined) => {
-      if (!semester) return;
+  // Set an item's tag to the one picked in the sheet, persist, and re-render.
+  // Writes the same item.status id the desktop's tag menu writes. Study Mode
+  // (future) can reuse this directly — picking the Studied tag is just a pick.
+  const applyStatus = useCallback(
+    (kind: Kind, itemId: string | undefined, tagId: string) => {
+      if (!semester || !itemId) return;
       const next: Semester = JSON.parse(JSON.stringify(semester));
       const c = getCourses(next).find((x) => x.id === courseId);
       if (!c) return;
-      const items = kind === 'reading' ? c.readings : c.tasks;
-      const item = items.find((it) => it.id === itemId);
-      if (!item) return;
-      const tags = kind === 'reading' ? getReadingTags(next) : getTaskTags(next);
-      if (tags.length === 0) return;
-      const idx = tags.findIndex((t) => t.id === item.status);
-      item.status = tags[(idx + 1) % tags.length].id;
-      delete item._ghostSection;
+      setItemStatus(c, kind, itemId, tagId);
       persist(next);
+      setPicker(null);
     },
     [semester, courseId, persist]
   );
@@ -177,7 +176,7 @@ export default function CourseDetailScreen() {
       >
         <Pressable
           onPress={() =>
-            editing ? item.id && toggleSelect(item.id) : cycleTag(kind, item.id)
+            editing ? item.id && toggleSelect(item.id) : setPicker({ kind, item })
           }
           onLongPress={editing ? undefined : () => showItemActions(kind, item)}
           style={[styles.item, { backgroundColor: theme.surface, borderColor: theme.border }]}
@@ -259,7 +258,7 @@ export default function CourseDetailScreen() {
           <Text style={[styles.hint, { color: theme.muted }]}>
             {editing
               ? 'Tap items to select them, then delete.'
-              : 'Tap an item to advance its tag. Long-press to edit or delete.'}
+              : 'Tap an item to set its tag. Long-press to edit or delete.'}
           </Text>
         </View>
 
@@ -293,7 +292,17 @@ export default function CourseDetailScreen() {
           course.tasks.map((t) => renderItem('task', t, taskTags))
         )}
       </ScrollView>
-      <Fab onPress={() => pushAddItem('reading')} />
+      {/* The "+" opens the add-sheet on the Tags tab; readings/tasks are added
+          from the per-section "+ Add" controls next to the Readings/Tasks headers. */}
+      <Fab onPress={() => router.push(`/add?context=tags&id=${id}`)} />
+      <TagPickerSheet
+        visible={!!picker}
+        title={picker?.item.title ?? 'Item'}
+        tags={picker?.kind === 'reading' ? readingTags : taskTags}
+        currentStatus={picker?.item.status ?? ''}
+        onPick={(tagId) => applyStatus(picker!.kind, picker!.item.id, tagId)}
+        onClose={() => setPicker(null)}
+      />
     </>
   );
 }
