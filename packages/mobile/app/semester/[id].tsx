@@ -8,6 +8,7 @@ import { useStudyMode } from '../../src/study/StudyModeProvider';
 import { useTheme } from '../../src/theme';
 import { Fab } from '../../src/components/Fab';
 import { ProgressBar } from '../../src/components/ProgressBar';
+import { StudyFab } from '../../src/components/StudyFab';
 import { SwipeableRow } from '../../src/components/SwipeableRow';
 import type { Course, Semester } from '../../types/lectio-core';
 
@@ -152,26 +153,11 @@ export default function CoursesScreen() {
                   <Text style={{ color: theme.accent, fontSize: 15 }}>Done</Text>
                 </Pressable>
               </View>
-            ) : (
-              <View style={styles.headerActions}>
-                <Pressable onPress={toggle}>
-                  <Text
-                    style={{
-                      color: studyMode ? theme.accent : theme.muted,
-                      fontSize: 15,
-                      fontWeight: studyMode ? '600' : '400',
-                    }}
-                  >
-                    Study: {studyMode ? 'On' : 'Off'}
-                  </Text>
-                </Pressable>
-                {courses.length > 0 && (
-                  <Pressable onPress={toggleEditing}>
-                    <Text style={{ color: theme.accent, fontSize: 15 }}>Edit</Text>
-                  </Pressable>
-                )}
-              </View>
-            ),
+            ) : courses.length > 0 ? (
+              <Pressable onPress={toggleEditing} style={{ marginRight: 4 }}>
+                <Text style={{ color: theme.accent, fontSize: 15 }}>Edit</Text>
+              </Pressable>
+            ) : null,
         }}
       />
       <FlatList
@@ -246,6 +232,7 @@ export default function CoursesScreen() {
           );
         }}
       />
+      <StudyFab active={studyMode} onPress={toggle} />
       <Fab onPress={() => router.push(`/add?context=course&id=${id}`)} />
     </>
   );
