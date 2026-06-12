@@ -86,11 +86,11 @@ npm run typecheck --workspace @lectio/mobile   # tsc --noEmit del móvil
 
 ### 06 — Study Mode (`06-mobile-study-mode`)
 
-- [ ] **[CI]** Sin dependencias nuevas; core intacto.
-- [ ] **[M]** (móvil) Activar Study Mode → las barras de la lista y el % del detalle bajan a contar **solo** ítems Studied.
-- [ ] **[M]** (móvil) Desactivar → los números vuelven.
-- [ ] **[M]** (móvil) El ajuste **sobrevive** a forzar cierre y relanzar.
-- [ ] **[M]** (móvil/desktop) Alternar Study Mode **no** cambia ningún tag ni el JSON (exportar antes/después → idéntico).
+- [X] **[CI]** Sin dependencias nuevas; core intacto.
+- [X] **[M]** (móvil) Activar Study Mode → las barras de la lista y el % del detalle bajan a contar **solo** ítems Studied.
+- [X] **[M]** (móvil) Desactivar → los números vuelven.
+- [X] **[M]** (móvil) El ajuste **sobrevive** a forzar cierre y relanzar.
+- [X] **[M]** (móvil/desktop) Alternar Study Mode **no** cambia ningún tag ni el JSON (exportar antes/después → idéntico).
 
 ### 07 — Controles de ordenación (`07-mobile-sort`)
 
