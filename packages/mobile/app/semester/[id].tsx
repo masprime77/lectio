@@ -222,7 +222,7 @@ export default function CoursesScreen() {
           );
         }}
       />
-      <Fab onPress={() => router.push(`/semester/course-form?id=${id}`)} />
+      <Fab onPress={() => router.push(`/add?context=course&id=${id}`)} />
     </>
   );
 }
