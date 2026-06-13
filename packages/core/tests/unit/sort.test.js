@@ -27,7 +27,6 @@ describe('SORT_ORDERS', () => {
       'progress-asc',
       'progress-desc',
       'alpha-asc',
-      'alpha-desc',
       'week-asc',
       'week-desc',
     ]);
@@ -75,11 +74,12 @@ describe('sortedCourses', () => {
     ]);
   });
 
-  it('alpha-desc orders by name Z → A', () => {
+  it('falls back to A → Z for an unknown order', () => {
+    // A removed/stale order (e.g. 'alpha-desc') degrades gracefully to A → Z.
     expect(names(core.sortedCourses(courses(), semester(), 'alpha-desc'))).toEqual([
-      'Zeta',
-      'Mid',
       'Alpha',
+      'Mid',
+      'Zeta',
     ]);
   });
 
@@ -133,10 +133,11 @@ describe('setItemStatus', () => {
 describe('CommonJS surface (desktop main-process path)', () => {
   it('exposes SORT_ORDERS and sortedCourses', () => {
     expect(cjsCore.SORT_ORDERS).toEqual(core.SORT_ORDERS);
+    // Unknown/removed orders fall back to A → Z through the CJS surface too.
     expect(names(cjsCore.sortedCourses(courses(), semester(), 'alpha-desc'))).toEqual([
-      'Zeta',
-      'Mid',
       'Alpha',
+      'Mid',
+      'Zeta',
     ]);
   });
 
