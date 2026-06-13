@@ -50,7 +50,7 @@ function restoreSort() {
   const v = readPref('lastSortOrder');
   const valid = [
     'progress-desc', 'progress-asc',
-    'alpha-asc', 'alpha-desc',
+    'alpha-asc',
     'week-asc', 'week-desc',
   ];
   return valid.includes(v) ? v : 'progress-desc';
@@ -325,9 +325,8 @@ function sortedCourses(courses) {
         courseProgress(b, state.semester, state.studyMode) -
         courseProgress(a, state.semester, state.studyMode)
     );
-  if (state.sortOrder === 'alpha-desc')
-    return copy.sort((a, b) => b.name.localeCompare(a.name));
   // alpha-asc, week-asc and week-desc all use alphabetical (A → Z) order.
+  // Any unknown/removed order (e.g. a stale 'alpha-desc') also lands here.
   return copy.sort((a, b) => a.name.localeCompare(b.name));
 }
 
