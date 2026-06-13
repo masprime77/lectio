@@ -94,12 +94,12 @@ npm run typecheck --workspace @lectio/mobile   # tsc --noEmit del móvil
 
 ### 07 — Controles de ordenación (`07-mobile-sort`)
 
-- [ ] **[M]** (móvil) Cada orden reordena la lista de cursos igual que el desktop.
-- [ ] **[M]** (móvil) Los órdenes por progreso respetan Study Mode cuando está activo.
-- [ ] **[M]** (móvil) La elección **persiste** entre relanzamientos.
-- [ ] **[M]** (móvil/desktop) Ordenar **no** modifica el JSON (exportar antes/después → idéntico).
-- [ ] **[M]** (móvil) `week-asc/desc` caen a alfabético para el orden de cursos (no hay vista semanal en móvil aún).
-- [ ] **[CI]** `PENDING_FEATURES.md`: Sort marcado, **Focus mode** sigue sin marcar.
+- [X] **[M]** (móvil) Cada orden reordena la lista de cursos igual que el desktop.
+- [X] **[M]** (móvil) Los órdenes por progreso respetan Study Mode cuando está activo.
+- [X] **[M]** (móvil) La elección **persiste** entre relanzamientos.
+- [X] **[M]** (móvil/desktop) Ordenar **no** modifica el JSON (exportar antes/después → idéntico).
+- [X] **[M]** (móvil) `week-asc/desc` caen a alfabético para el orden de cursos (no hay vista semanal en móvil aún).
+- [X] **[CI]** `PENDING_FEATURES.md`: Sort marcado, **Focus mode** sigue sin marcar.
 
 ### 08 — Breakdown readings vs tasks (`08-mobile-breakdown`)
 
