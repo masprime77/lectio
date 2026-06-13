@@ -16,14 +16,13 @@ interface SortMenuProps {
   onClose: () => void;
 }
 
-// Same wording as the desktop's #sort-select options, in the same order.
+// Same wording and order as the desktop's #sort-select options.
 const OPTIONS: { value: SortOrder; label: string }[] = [
-  { value: 'progress-desc', label: 'Progress ↓' },
-  { value: 'progress-asc', label: 'Progress ↑' },
-  { value: 'alpha-asc', label: 'A → Z' },
-  { value: 'alpha-desc', label: 'Z → A' },
-  { value: 'week-asc', label: 'Week ↑' },
-  { value: 'week-desc', label: 'Week ↓' },
+  { value: 'week-desc', label: 'Weeks: high to low' },
+  { value: 'week-asc', label: 'Weeks: low to high' },
+  { value: 'progress-desc', label: 'Progress: high % first' },
+  { value: 'progress-asc', label: 'Progress: low % first' },
+  { value: 'alpha-asc', label: 'A-Z' },
 ];
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
