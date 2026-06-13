@@ -52,7 +52,8 @@ is **not** yet possible on mobile.
 - [ ] **Weekly view** (collapsible week sections); mobile has only the
       semester → courses → course-detail flow.
 - [ ] **Dashboard / Breakdown** panel (readings vs tasks mini-bars, totals).
-- [ ] **Sort controls** (by progress / alphabetical / week) and **focus mode**.
+- [x] **Sort controls** (by progress / alphabetical / week).
+- [ ] **Focus mode**.
 - [ ] **Onboarding tour**.
 - [ ] **Import / export** of semester data.
 - [ ] **In-app feedback**.

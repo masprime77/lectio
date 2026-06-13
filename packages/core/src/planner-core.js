@@ -123,7 +123,6 @@
     'progress-asc',
     'progress-desc',
     'alpha-asc',
-    'alpha-desc',
     'week-asc',
     'week-desc',
   ];
@@ -141,8 +140,8 @@
       return copy.sort(
         (a, b) => courseProgress(b, semester, studyMode) - courseProgress(a, semester, studyMode)
       );
-    if (sortOrder === 'alpha-desc') return copy.sort((a, b) => b.name.localeCompare(a.name));
     // alpha-asc, week-asc and week-desc all use alphabetical (A → Z) order.
+    // Any unknown/removed order (e.g. a stale 'alpha-desc') also lands here.
     return copy.sort((a, b) => a.name.localeCompare(b.name));
   }
 

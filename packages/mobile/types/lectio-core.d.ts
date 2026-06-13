@@ -112,7 +112,6 @@ export type SortOrder =
   | 'progress-asc'
   | 'progress-desc'
   | 'alpha-asc'
-  | 'alpha-desc'
   | 'week-asc'
   | 'week-desc';
 export const SORT_ORDERS: SortOrder[];

@@ -1,13 +1,21 @@
 import { useCallback, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { courseProgress, deleteCourse, getCourses, reorderCourses } from '@lectio/core/planner-core';
+import {
+  courseProgress,
+  deleteCourse,
+  getCourses,
+  reorderCourses,
+  sortedCourses,
+} from '@lectio/core/planner-core';
 import { storage } from '../../src/storage';
 import { prefs } from '../../src/lib/prefs';
+import { useSortOrder } from '../../src/lib/use-sort-order';
 import { useStudyMode } from '../../src/study/StudyModeProvider';
 import { useTheme } from '../../src/theme';
 import { Fab } from '../../src/components/Fab';
 import { ProgressBar } from '../../src/components/ProgressBar';
+import { SortButton, SortMenu } from '../../src/components/SortMenu';
 import { StudyFab } from '../../src/components/StudyFab';
 import { SwipeableRow } from '../../src/components/SwipeableRow';
 import type { Course, Semester } from '../../types/lectio-core';
@@ -20,6 +28,8 @@ export default function CoursesScreen() {
   const [semester, setSemester] = useState<Semester | null>(null);
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [sortOrder, pickSortOrder] = useSortOrder();
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
 
   const reload = useCallback(() => {
     return storage
@@ -129,6 +139,9 @@ export default function CoursesScreen() {
   }
 
   const courses = semester ? getCourses(semester) : [];
+  // Display-only ordering: sortedCourses returns a new array, so the
+  // semester JSON's on-disk course order is never touched.
+  const visibleCourses = semester ? sortedCourses(courses, semester, sortOrder, studyMode) : [];
 
   return (
     <>
@@ -154,16 +167,19 @@ export default function CoursesScreen() {
                 </Pressable>
               </View>
             ) : courses.length > 0 ? (
-              <Pressable onPress={toggleEditing} style={{ marginRight: 4 }}>
-                <Text style={{ color: theme.accent, fontSize: 15 }}>Edit</Text>
-              </Pressable>
+              <View style={styles.headerActions}>
+                <SortButton onPress={() => setSortMenuOpen(true)} />
+                <Pressable onPress={toggleEditing}>
+                  <Text style={{ color: theme.accent, fontSize: 15 }}>Edit</Text>
+                </Pressable>
+              </View>
             ) : null,
         }}
       />
       <FlatList
         style={{ backgroundColor: theme.background }}
         contentContainerStyle={styles.list}
-        data={courses}
+        data={visibleCourses}
         keyExtractor={(c) => c.id}
         ListHeaderComponent={
           studyMode ? (
@@ -231,6 +247,12 @@ export default function CoursesScreen() {
             </SwipeableRow>
           );
         }}
+      />
+      <SortMenu
+        visible={sortMenuOpen}
+        current={sortOrder}
+        onPick={pickSortOrder}
+        onClose={() => setSortMenuOpen(false)}
       />
       <StudyFab active={studyMode} onPress={toggle} />
       <Fab onPress={() => router.push(`/add?context=course&id=${id}`)} />
