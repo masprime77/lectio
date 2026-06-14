@@ -58,11 +58,14 @@ is **not** yet possible on mobile.
 - [ ] **Focus mode**.
 - [ ] **Onboarding tour**.
 - [ ] **Import / export** of semester data.
-- [ ] **In-app feedback**.
+- [x] **In-app feedback** — a Feedback screen (`app/feedback.tsx`) reachable
+      from Settings posts to the same Vercel endpoint the desktop uses (which
+      files a GitHub issue), with the same `{ type, title, body, version }` body
+      and Bug/Feature toggle. No GitHub account needed; no secrets in the app.
 - [x] **Settings screen** — a gear in the Semesters header opens a Settings hub
       (`app/settings.tsx`) holding the Profile section (signed-in account +
-      sign-out). Feedback and a tutorial entry land in later prompts; theme still
-      follows the OS automatically (no in-app choice yet).
+      sign-out) and a "Send feedback" entry. A tutorial entry lands in a later
+      prompt; theme still follows the OS automatically (no in-app choice yet).
 - [ ] **Auto-update** (e.g. Expo OTA / EAS Update).
 
 ### Platform polish
