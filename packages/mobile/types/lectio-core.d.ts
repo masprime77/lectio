@@ -5,9 +5,10 @@
 // file is a normal declaration *module*, and tsconfig.json maps the core import
 // specifiers to it via `paths` (see "@lectio/core*"). One file backs every
 // subpath the app imports — `@lectio/core`, `@lectio/core/planner-core`,
-// `@lectio/core/storage/migrate`, `@lectio/core/storage/contract`. It
-// deliberately omits the Node-only subpaths (`semester-store`, `ipc-handlers`,
-// `storage/fs`) so they stay unimportable from the RN bundle.
+// `@lectio/core/storage/migrate`, `@lectio/core/storage/contract`,
+// `@lectio/core/integrations/lectio-file`. It deliberately omits the Node-only
+// subpaths (`semester-store`, `ipc-handlers`, `storage/fs`) so they stay
+// unimportable from the RN bundle.
 
 // ---------------------------------------------------------------------------
 // Data shapes (mirrors planner-core + the storage contract)
@@ -174,6 +175,38 @@ export function migrateStatusToTagId(semester: Semester): Semester;
 
 export const STORAGE_METHODS: string[];
 export function assertStorage<T>(impl: T): T;
+
+// ---------------------------------------------------------------------------
+// integrations/lectio-file surface (the `.lectio.json` interchange helpers)
+// ---------------------------------------------------------------------------
+
+export interface LectioSemesterFile {
+  _lectioType: 'semester';
+  _version: number;
+  semester: Semester;
+}
+export interface LectioCourseFile {
+  _lectioType: 'course';
+  _version: number;
+  course: Course;
+}
+
+export const LECTIO_FILE_VERSION: number;
+export function buildSemesterFile(semester: Semester): LectioSemesterFile;
+export function buildCourseFile(course: Course): LectioCourseFile;
+export function cleanCourse(course: Course): Course;
+export function parseSemesterFile(payload: unknown): Semester;
+export function parseCourseFile(payload: unknown): Course;
+export function withResetStatuses(semester: Semester): Semester;
+export function slugify(s: string): string;
+export function uniqueSemesterId(
+  name: string,
+  existingIds?: string[] | Set<string>
+): string;
+export function prepareImportedCourse(
+  course: Course,
+  makeId?: (prefix: string) => string
+): Course;
 
 // planner-core's "." export is a CommonJS object; expose it as a default too.
 declare const core: {

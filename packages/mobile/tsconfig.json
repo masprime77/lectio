@@ -14,6 +14,9 @@
       ],
       "@lectio/core/storage/contract": [
         "./types/lectio-core.d.ts"
+      ],
+      "@lectio/core/integrations/lectio-file": [
+        "./types/lectio-core.d.ts"
       ]
     }
   },
