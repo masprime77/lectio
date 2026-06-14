@@ -19,6 +19,7 @@ import { ProgressBar } from '../../src/components/ProgressBar';
 import { SortButton, SortMenu } from '../../src/components/SortMenu';
 import { StudyFab } from '../../src/components/StudyFab';
 import { SwipeableRow } from '../../src/components/SwipeableRow';
+import * as transfer from '../../src/lib/transfer';
 import type { Course, Semester } from '../../types/lectio-core';
 
 /**
@@ -34,6 +35,17 @@ function BreakdownIcon({ color }: { color: string }) {
           <View style={[styles.bdIconDot, { backgroundColor: color }]} />
           <View style={[styles.bdIconLine, { backgroundColor: color }]} />
         </View>
+      ))}
+    </View>
+  );
+}
+
+/** A vertical three-dot "more" glyph drawn from plain Views (no icon library). */
+function MoreIcon({ color }: { color: string }) {
+  return (
+    <View style={styles.moreIcon}>
+      {[0, 1, 2].map((i) => (
+        <View key={i} style={[styles.moreDot, { backgroundColor: color }]} />
       ))}
     </View>
   );
@@ -160,6 +172,35 @@ export default function CoursesScreen() {
     );
   }
 
+  // Export this whole semester via the system share sheet.
+  function handleExportSemester() {
+    transfer.exportSemester(id).catch((err) => {
+      if (err) Alert.alert('Export failed', err instanceof Error ? err.message : String(err));
+    });
+  }
+
+  // Pick a .lectio.json course file and add it to this semester with fresh ids
+  // (it can never collide with or overwrite an existing course).
+  async function handleImportCourse() {
+    try {
+      const course = await transfer.pickCourseFile();
+      if (!course) return; // cancelled
+      const res = await transfer.saveImportedCourse(id, course);
+      reload();
+      Alert.alert('Course imported', `"${res.name}" was added to this semester.`);
+    } catch (err) {
+      Alert.alert('Import failed', err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  function openSemesterMenu() {
+    Alert.alert(semester?.name ?? 'Semester', undefined, [
+      { text: 'Export semester', onPress: handleExportSemester },
+      { text: 'Import course', onPress: handleImportCourse },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
+
   const courses = semester ? getCourses(semester) : [];
   // Display-only ordering: sortedCourses returns a new array, so the
   // semester JSON's on-disk course order is never touched.
@@ -188,23 +229,36 @@ export default function CoursesScreen() {
                   <Text style={{ color: theme.accent, fontSize: 15 }}>Done</Text>
                 </Pressable>
               </View>
-            ) : courses.length > 0 ? (
+            ) : (
               <View style={styles.headerActions}>
                 <Pressable
-                  onPress={() => setBreakdownOpen((o) => !o)}
+                  onPress={openSemesterMenu}
                   accessibilityRole="button"
-                  accessibilityLabel="Breakdown"
-                  accessibilityState={{ expanded: breakdownOpen }}
+                  accessibilityLabel="Semester actions"
+                  hitSlop={8}
                   style={({ pressed }) => pressed && { opacity: 0.6 }}
                 >
-                  <BreakdownIcon color={breakdownOpen ? theme.accent : theme.muted} />
+                  <MoreIcon color={theme.muted} />
                 </Pressable>
-                <SortButton onPress={() => setSortMenuOpen(true)} />
-                <Pressable onPress={toggleEditing}>
-                  <Text style={{ color: theme.accent, fontSize: 15 }}>Edit</Text>
-                </Pressable>
+                {courses.length > 0 && (
+                  <>
+                    <Pressable
+                      onPress={() => setBreakdownOpen((o) => !o)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Breakdown"
+                      accessibilityState={{ expanded: breakdownOpen }}
+                      style={({ pressed }) => pressed && { opacity: 0.6 }}
+                    >
+                      <BreakdownIcon color={breakdownOpen ? theme.accent : theme.muted} />
+                    </Pressable>
+                    <SortButton onPress={() => setSortMenuOpen(true)} />
+                    <Pressable onPress={toggleEditing}>
+                      <Text style={{ color: theme.accent, fontSize: 15 }}>Edit</Text>
+                    </Pressable>
+                  </>
+                )}
               </View>
-            ) : null,
+            ),
         }}
       />
       <FlatList
@@ -323,4 +377,6 @@ const styles = StyleSheet.create({
   bdIconRowIndent: { marginLeft: 5 },
   bdIconDot: { width: 3, height: 3, borderRadius: 1.5 },
   bdIconLine: { width: 11, height: 2, borderRadius: 1 },
+  moreIcon: { gap: 2, paddingVertical: 2, alignItems: 'center' },
+  moreDot: { width: 4, height: 4, borderRadius: 2 },
 });
