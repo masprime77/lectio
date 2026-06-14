@@ -5,6 +5,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { Stack, useRouter } from 'expo-router';
 import { useAuth } from '../src/auth/AuthProvider';
 import { useTheme } from '../src/theme';
+import { appVersion } from '../src/lib/feedback';
 
 export default function SettingsScreen() {
   const theme = useTheme();
@@ -50,6 +51,8 @@ export default function SettingsScreen() {
         <Text style={[styles.rowText, { color: theme.text }]}>Send feedback</Text>
         <Text style={[styles.chevron, { color: theme.muted }]}>›</Text>
       </Pressable>
+
+      <Text style={[styles.version, { color: theme.muted }]}>Lectio v{appVersion}</Text>
     </ScrollView>
   );
 }
@@ -81,6 +84,7 @@ const styles = StyleSheet.create({
   },
   rowText: { fontSize: 16, fontWeight: '600' },
   chevron: { fontSize: 20, fontWeight: '600' },
+  version: { fontSize: 12, textAlign: 'center', marginTop: 16 },
   signOutBtn: {
     height: 48,
     borderRadius: 10,
