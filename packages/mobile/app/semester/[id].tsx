@@ -14,6 +14,7 @@ import { useSortOrder } from '../../src/lib/use-sort-order';
 import { useStudyMode } from '../../src/study/StudyModeProvider';
 import { useTheme } from '../../src/theme';
 import { CourseBreakdown } from '../../src/components/CourseBreakdown';
+import { ExportIcon } from '../../src/components/ExportIcon';
 import { Fab } from '../../src/components/Fab';
 import { ProgressBar } from '../../src/components/ProgressBar';
 import { SortButton, SortMenu } from '../../src/components/SortMenu';
@@ -35,17 +36,6 @@ function BreakdownIcon({ color }: { color: string }) {
           <View style={[styles.bdIconDot, { backgroundColor: color }]} />
           <View style={[styles.bdIconLine, { backgroundColor: color }]} />
         </View>
-      ))}
-    </View>
-  );
-}
-
-/** A vertical three-dot "more" glyph drawn from plain Views (no icon library). */
-function MoreIcon({ color }: { color: string }) {
-  return (
-    <View style={styles.moreIcon}>
-      {[0, 1, 2].map((i) => (
-        <View key={i} style={[styles.moreDot, { backgroundColor: color }]} />
       ))}
     </View>
   );
@@ -179,28 +169,6 @@ export default function CoursesScreen() {
     });
   }
 
-  // Pick a .lectio.json course file and add it to this semester with fresh ids
-  // (it can never collide with or overwrite an existing course).
-  async function handleImportCourse() {
-    try {
-      const course = await transfer.pickCourseFile();
-      if (!course) return; // cancelled
-      const res = await transfer.saveImportedCourse(id, course);
-      reload();
-      Alert.alert('Course imported', `"${res.name}" was added to this semester.`);
-    } catch (err) {
-      Alert.alert('Import failed', err instanceof Error ? err.message : String(err));
-    }
-  }
-
-  function openSemesterMenu() {
-    Alert.alert(semester?.name ?? 'Semester', undefined, [
-      { text: 'Export semester', onPress: handleExportSemester },
-      { text: 'Import course', onPress: handleImportCourse },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  }
-
   const courses = semester ? getCourses(semester) : [];
   // Display-only ordering: sortedCourses returns a new array, so the
   // semester JSON's on-disk course order is never touched.
@@ -232,13 +200,13 @@ export default function CoursesScreen() {
             ) : (
               <View style={styles.headerActions}>
                 <Pressable
-                  onPress={openSemesterMenu}
+                  onPress={handleExportSemester}
                   accessibilityRole="button"
-                  accessibilityLabel="Semester actions"
+                  accessibilityLabel="Export semester"
                   hitSlop={8}
                   style={({ pressed }) => pressed && { opacity: 0.6 }}
                 >
-                  <MoreIcon color={theme.muted} />
+                  <ExportIcon color={theme.accent} />
                 </Pressable>
                 {courses.length > 0 && (
                   <>
@@ -377,6 +345,4 @@ const styles = StyleSheet.create({
   bdIconRowIndent: { marginLeft: 5 },
   bdIconDot: { width: 3, height: 3, borderRadius: 1.5 },
   bdIconLine: { width: 11, height: 2, borderRadius: 1 },
-  moreIcon: { gap: 2, paddingVertical: 2, alignItems: 'center' },
-  moreDot: { width: 4, height: 4, borderRadius: 2 },
 });

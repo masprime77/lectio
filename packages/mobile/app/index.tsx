@@ -6,8 +6,7 @@ import { prefs } from '../src/lib/prefs';
 import { useTheme } from '../src/theme';
 import { Fab } from '../src/components/Fab';
 import { SwipeableRow } from '../src/components/SwipeableRow';
-import * as transfer from '../src/lib/transfer';
-import type { Semester, SemesterSummary } from '../types/lectio-core';
+import type { SemesterSummary } from '../types/lectio-core';
 
 // Reopen the last-opened semester only on the first list load after app
 // launch — never when the user deliberately navigates back to the list.
@@ -111,7 +110,6 @@ export default function SemestersScreen() {
   function showRowActions(item: SemesterSummary) {
     Alert.alert(item.name, undefined, [
       { text: 'Edit', onPress: () => router.push(`/semester-form?id=${item.id}`) },
-      { text: 'Export', onPress: () => handleExport(item) },
       { text: 'Delete', style: 'destructive', onPress: () => confirmDelete(item) },
       { text: 'Cancel', style: 'cancel' },
     ]);
@@ -121,45 +119,6 @@ export default function SemestersScreen() {
     ensureSeed(storage)
       .then(reload)
       .catch((err) => console.warn('seed failed', err));
-  }
-
-  // Export a single semester via the system share sheet.
-  function handleExport(item: SemesterSummary) {
-    transfer.exportSemester(item.id).catch((err) => {
-      if (err) Alert.alert('Export failed', err instanceof Error ? err.message : String(err));
-    });
-  }
-
-  // Persist a picked semester, then refresh the list and confirm.
-  function finishImport(sem: Semester, keepStatus: boolean) {
-    transfer
-      .saveImportedSemester(sem, keepStatus)
-      .then((res) => {
-        reload();
-        Alert.alert('Semester imported', `"${res.name}" was imported.`);
-      })
-      .catch((err) => Alert.alert('Import failed', err instanceof Error ? err.message : String(err)));
-  }
-
-  // Pick a .lectio.json semester file, then ask whether to keep or reset
-  // progress. A conflicting id is always imported as a new id (never overwrites).
-  async function handleImport() {
-    try {
-      const sem = await transfer.pickSemesterFile();
-      if (!sem) return; // cancelled
-      const n = sem.courses.length;
-      Alert.alert(
-        'Import semester',
-        `Import "${sem.name}" (${n} ${n === 1 ? 'course' : 'courses'})?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Reset progress', onPress: () => finishImport(sem, false) },
-          { text: 'Keep progress', onPress: () => finishImport(sem, true) },
-        ]
-      );
-    } catch (err) {
-      Alert.alert('Import failed', err instanceof Error ? err.message : String(err));
-    }
   }
 
   return (
@@ -203,18 +162,11 @@ export default function SemestersScreen() {
                   <Text style={{ color: theme.accent, fontSize: 15 }}>Done</Text>
                 </Pressable>
               </View>
-            ) : (
-              <View style={styles.headerActions}>
-                <Pressable onPress={handleImport}>
-                  <Text style={{ color: theme.accent, fontSize: 15 }}>Import</Text>
-                </Pressable>
-                {(semesters?.length ?? 0) > 0 && (
-                  <Pressable onPress={toggleEditing}>
-                    <Text style={{ color: theme.accent, fontSize: 15 }}>Edit</Text>
-                  </Pressable>
-                )}
-              </View>
-            ),
+            ) : (semesters?.length ?? 0) > 0 ? (
+              <Pressable onPress={toggleEditing} style={{ marginRight: 4 }}>
+                <Text style={{ color: theme.accent, fontSize: 15 }}>Edit</Text>
+              </Pressable>
+            ) : null,
         }}
       />
       {semesters !== null && semesters.length === 0 ? (
@@ -231,12 +183,6 @@ export default function SemestersScreen() {
             onPress={handleAddSample}
           >
             <Text style={[styles.emptyBtnOutlineText, { color: theme.text }]}>Add sample semester</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.emptyBtnOutline, { borderColor: theme.border }]}
-            onPress={handleImport}
-          >
-            <Text style={[styles.emptyBtnOutlineText, { color: theme.text }]}>Import a semester</Text>
           </Pressable>
         </View>
       ) : (
