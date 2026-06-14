@@ -2,12 +2,13 @@
 // sign-out, moved here from app/profile.tsx). A Feedback section is wired in by
 // Prompt 10 and a "Start tutorial" entry by Prompt 11; this is the shell.
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useAuth } from '../src/auth/AuthProvider';
 import { useTheme } from '../src/theme';
 
 export default function SettingsScreen() {
   const theme = useTheme();
+  const router = useRouter();
   const { session, signOut } = useAuth();
 
   function handleSignOut() {
@@ -40,6 +41,15 @@ export default function SettingsScreen() {
       <Pressable style={styles.signOutBtn} onPress={handleSignOut}>
         <Text style={styles.signOutText}>Sign out</Text>
       </Pressable>
+
+      <Text style={[styles.sectionTitle, { color: theme.muted }]}>About</Text>
+      <Pressable
+        style={[styles.row, { backgroundColor: theme.surface, borderColor: theme.border }]}
+        onPress={() => router.push('/feedback')}
+      >
+        <Text style={[styles.rowText, { color: theme.text }]}>Send feedback</Text>
+        <Text style={[styles.chevron, { color: theme.muted }]}>›</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -61,6 +71,16 @@ const styles = StyleSheet.create({
   },
   label: { fontSize: 13 },
   email: { fontSize: 16, fontWeight: '600' },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  rowText: { fontSize: 16, fontWeight: '600' },
+  chevron: { fontSize: 20, fontWeight: '600' },
   signOutBtn: {
     height: 48,
     borderRadius: 10,
