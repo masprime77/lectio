@@ -9,6 +9,7 @@
     "./planner-core": "./src/planner-core.js",
     "./semester-store": "./src/semester-store.js",
     "./ipc-handlers": "./src/ipc-handlers.js",
+    "./integrations/lectio-file": "./src/integrations/lectio-file.js",
     "./storage/migrate": "./src/storage/migrate.js",
     "./storage/contract": "./src/storage/contract.js",
     "./storage/fs": "./src/storage/fs-storage.js"

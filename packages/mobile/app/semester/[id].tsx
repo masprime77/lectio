@@ -14,11 +14,13 @@ import { useSortOrder } from '../../src/lib/use-sort-order';
 import { useStudyMode } from '../../src/study/StudyModeProvider';
 import { useTheme } from '../../src/theme';
 import { CourseBreakdown } from '../../src/components/CourseBreakdown';
+import { ExportIcon } from '../../src/components/ExportIcon';
 import { Fab } from '../../src/components/Fab';
 import { ProgressBar } from '../../src/components/ProgressBar';
 import { SortButton, SortMenu } from '../../src/components/SortMenu';
 import { StudyFab } from '../../src/components/StudyFab';
 import { SwipeableRow } from '../../src/components/SwipeableRow';
+import * as transfer from '../../src/lib/transfer';
 import type { Course, Semester } from '../../types/lectio-core';
 
 /**
@@ -160,6 +162,13 @@ export default function CoursesScreen() {
     );
   }
 
+  // Export this whole semester via the system share sheet.
+  function handleExportSemester() {
+    transfer.exportSemester(id).catch((err) => {
+      if (err) Alert.alert('Export failed', err instanceof Error ? err.message : String(err));
+    });
+  }
+
   const courses = semester ? getCourses(semester) : [];
   // Display-only ordering: sortedCourses returns a new array, so the
   // semester JSON's on-disk course order is never touched.
@@ -188,23 +197,36 @@ export default function CoursesScreen() {
                   <Text style={{ color: theme.accent, fontSize: 15 }}>Done</Text>
                 </Pressable>
               </View>
-            ) : courses.length > 0 ? (
+            ) : (
               <View style={styles.headerActions}>
                 <Pressable
-                  onPress={() => setBreakdownOpen((o) => !o)}
+                  onPress={handleExportSemester}
                   accessibilityRole="button"
-                  accessibilityLabel="Breakdown"
-                  accessibilityState={{ expanded: breakdownOpen }}
+                  accessibilityLabel="Export semester"
+                  hitSlop={8}
                   style={({ pressed }) => pressed && { opacity: 0.6 }}
                 >
-                  <BreakdownIcon color={breakdownOpen ? theme.accent : theme.muted} />
+                  <ExportIcon color={theme.accent} />
                 </Pressable>
-                <SortButton onPress={() => setSortMenuOpen(true)} />
-                <Pressable onPress={toggleEditing}>
-                  <Text style={{ color: theme.accent, fontSize: 15 }}>Edit</Text>
-                </Pressable>
+                {courses.length > 0 && (
+                  <>
+                    <Pressable
+                      onPress={() => setBreakdownOpen((o) => !o)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Breakdown"
+                      accessibilityState={{ expanded: breakdownOpen }}
+                      style={({ pressed }) => pressed && { opacity: 0.6 }}
+                    >
+                      <BreakdownIcon color={breakdownOpen ? theme.accent : theme.muted} />
+                    </Pressable>
+                    <SortButton onPress={() => setSortMenuOpen(true)} />
+                    <Pressable onPress={toggleEditing}>
+                      <Text style={{ color: theme.accent, fontSize: 15 }}>Edit</Text>
+                    </Pressable>
+                  </>
+                )}
               </View>
-            ) : null,
+            ),
         }}
       />
       <FlatList
