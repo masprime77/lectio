@@ -52,6 +52,7 @@ function AppShell() {
           <Stack.Screen name="index" options={{ title: 'Semesters' }} />
           <Stack.Screen name="add" options={{ presentation: 'modal', title: 'Add', headerShown: false }} />
           <Stack.Screen name="semester-form" options={{ presentation: 'modal', title: 'New Semester', headerShown: false }} />
+          <Stack.Screen name="settings" options={{ title: 'Settings' }} />
           <Stack.Screen name="profile" options={{ title: 'Profile' }} />
           <Stack.Screen name="semester/course-form" options={{ presentation: 'modal', title: 'Course', headerShown: false }} />
           <Stack.Screen name="semester/item-form" options={{ presentation: 'modal', title: 'Item', headerShown: false }} />
