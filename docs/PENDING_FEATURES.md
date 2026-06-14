@@ -59,7 +59,10 @@ is **not** yet possible on mobile.
 - [ ] **Onboarding tour**.
 - [ ] **Import / export** of semester data.
 - [ ] **In-app feedback**.
-- [ ] **Settings screen** (theme follows the OS automatically; no in-app choice).
+- [x] **Settings screen** — a gear in the Semesters header opens a Settings hub
+      (`app/settings.tsx`) holding the Profile section (signed-in account +
+      sign-out). Feedback and a tutorial entry land in later prompts; theme still
+      follows the OS automatically (no in-app choice yet).
 - [ ] **Auto-update** (e.g. Expo OTA / EAS Update).
 
 ### Platform polish
