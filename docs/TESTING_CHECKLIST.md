@@ -103,24 +103,24 @@ npm run typecheck --workspace @lectio/mobile   # tsc --noEmit del móvil
 
 ### 08 — Breakdown readings vs tasks (`08-mobile-breakdown`)
 
-- [ ] **[M]** (móvil) Activar "Breakdown" muestra mini-barras de Readings y Tasks con done/total correctos por curso.
-- [ ] **[M]** (móvil/desktop) Los números coinciden con el panel del desktop para el mismo semestre.
-- [ ] **[M]** (móvil) Study Mode (cuando está activo) reduce los conteos del breakdown a ítems Studied.
-- [ ] **[M]** (móvil) El toggle es por-pantalla y la vista por defecto sigue siendo la lista limpia.
+- [X] **[M]** (móvil) Activar "Breakdown" muestra mini-barras de Readings y Tasks con done/total correctos por curso.
+- [X] **[M]** (móvil/desktop) Los números coinciden con el panel del desktop para el mismo semestre.
+- [X] **[M]** (móvil) Study Mode (cuando está activo) reduce los conteos del breakdown a ítems Studied.
+- [X] **[M]** (móvil) El toggle es por-pantalla y la vista por defecto sigue siendo la lista limpia.
 
 ### 09 — Settings (tuerca) con Profile (`09-mobile-settings`)
 
-- [ ] **[M]** (móvil) El header de Semestres muestra una **tuerca** en vez de "Profile".
-- [ ] **[M]** (móvil) Tocar la tuerca abre **Settings**.
-- [ ] **[M]** (móvil) La fila **Profile** abre la pantalla de cuenta y el **sign-out** sigue funcionando.
-- [ ] **[M]** (móvil) (Confirmar decisión del PR) la fila de Feedback apunta a `/feedback` (la pantalla llega en el prompt 10).
+- [X] **[M]** (móvil) El header de Semestres muestra una **tuerca** en vez de "Profile".
+- [X] **[M]** (móvil) Tocar la tuerca abre **Settings**.
+- [X] **[M]** (móvil) La fila **Profile** abre la pantalla de cuenta y el **sign-out** sigue funcionando.
+- [X] **[M]** (móvil) (Confirmar decisión del PR) la fila de Feedback apunta a `/feedback` (la pantalla llega en el prompt 10).
 
 ### 10 — Feedback in-app (endpoint de Vercel) (`10-mobile-feedback`)
 
-- [ ] **[CI]** Sin dependencias nuevas (`expo-constants` ya estaba).
-- [ ] **[M]** (móvil, con red) Enviar un **Bug** y un **Feature** → aparece un issue en `masprime77/lectio` con la etiqueta correcta y el pie "Lectio v\<version\>", igual que desde el desktop.
-- [ ] **[M]** (móvil) Validación de campos requeridos (título y cuerpo) funciona.
-- [ ] **[M]** (móvil) La ruta de error muestra el mensaje sin crash.
+- [X] **[CI]** Sin dependencias nuevas (`expo-constants` ya estaba).
+- [X] **[M]** (móvil, con red) Enviar un **Bug** y un **Feature** → aparece un issue en `masprime77/lectio` con la etiqueta correcta y el pie "Lectio v\<version\>", igual que desde el desktop.
+- [X] **[M]** (móvil) Validación de campos requeridos (título y cuerpo) funciona.
+- [X] **[M]** (móvil) La ruta de error muestra el mensaje sin crash.
 
 ### 11 — Tutorial / onboarding (`11-mobile-tutorial`)
 
