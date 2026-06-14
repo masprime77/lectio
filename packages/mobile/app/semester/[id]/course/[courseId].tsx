@@ -18,6 +18,7 @@ import { ProgressBar } from '../../../../src/components/ProgressBar';
 import { SortButton, SortMenu } from '../../../../src/components/SortMenu';
 import { SwipeableRow } from '../../../../src/components/SwipeableRow';
 import { TagPickerSheet } from '../../../../src/components/TagPickerSheet';
+import * as transfer from '../../../../src/lib/transfer';
 import type { PlannerItem, Semester, SortOrder, Tag } from '../../../../types/lectio-core';
 
 type Kind = 'reading' | 'task';
@@ -159,6 +160,15 @@ export default function CourseDetailScreen() {
     );
   }
 
+  // Export this course via the system share sheet (fresh ids are assigned on
+  // import, so the exported ids are just a snapshot).
+  function handleExportCourse() {
+    if (!course) return;
+    transfer.exportCourse(course).catch((err) => {
+      if (err) Alert.alert('Export failed', err instanceof Error ? err.message : String(err));
+    });
+  }
+
   if (!course) {
     return (
       <View style={[styles.center, { backgroundColor: theme.background }]}>
@@ -256,14 +266,21 @@ export default function CourseDetailScreen() {
                   <Text style={{ color: theme.accent, fontSize: 15 }}>Done</Text>
                 </Pressable>
               </View>
-            ) : hasItems ? (
+            ) : (
               <View style={styles.headerActions}>
-                <SortButton onPress={() => setSortMenuOpen(true)} />
-                <Pressable onPress={toggleEditing}>
-                  <Text style={{ color: theme.accent, fontSize: 15 }}>Edit</Text>
+                <Pressable onPress={handleExportCourse}>
+                  <Text style={{ color: theme.accent, fontSize: 15 }}>Export</Text>
                 </Pressable>
+                {hasItems && (
+                  <>
+                    <SortButton onPress={() => setSortMenuOpen(true)} />
+                    <Pressable onPress={toggleEditing}>
+                      <Text style={{ color: theme.accent, fontSize: 15 }}>Edit</Text>
+                    </Pressable>
+                  </>
+                )}
               </View>
-            ) : null,
+            ),
         }}
       />
       <ScrollView

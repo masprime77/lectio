@@ -58,7 +58,12 @@ is **not** yet possible on mobile.
 - [ ] **Focus mode**.
 - [x] **Onboarding tour** — a first-run paged walkthrough (`src/tutorial/`)
       shown once after sign-in and replayable from Settings → "Start tutorial".
-- [ ] **Import / export** of semester data.
+- [x] **Import / export** of semester data — share a semester or course as a
+      `.lectio.json` file (system share sheet) and import one back (document
+      picker), using the shared `@lectio/core` envelope so files interchange with
+      the desktop. Semester import offers Keep/Reset progress and never
+      overwrites (a conflicting id imports as a new id); imported courses get
+      fresh ids.
 - [x] **In-app feedback** — a Feedback screen (`app/feedback.tsx`) reachable
       from Settings posts to the same Vercel endpoint the desktop uses (which
       files a GitHub issue), with the same `{ type, title, body, version }` body
