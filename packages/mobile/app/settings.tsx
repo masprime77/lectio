@@ -4,6 +4,7 @@
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { useAuth } from '../src/auth/AuthProvider';
+import { useTutorial } from '../src/tutorial/TutorialProvider';
 import { useTheme } from '../src/theme';
 import { appVersion } from '../src/lib/feedback';
 
@@ -11,6 +12,14 @@ export default function SettingsScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { session, signOut } = useAuth();
+  const { start } = useTutorial();
+
+  function handleStartTutorial() {
+    // Replay on demand — this does not clear the tutorial-seen pref. Return to
+    // the semesters list so the overlay floats over the main UI, not Settings.
+    start();
+    router.back();
+  }
 
   function handleSignOut() {
     Alert.alert('Sign out', 'Sign out of Lectio?', [
@@ -49,6 +58,13 @@ export default function SettingsScreen() {
         onPress={() => router.push('/feedback')}
       >
         <Text style={[styles.rowText, { color: theme.text }]}>Send feedback</Text>
+        <Text style={[styles.chevron, { color: theme.muted }]}>›</Text>
+      </Pressable>
+      <Pressable
+        style={[styles.row, { backgroundColor: theme.surface, borderColor: theme.border }]}
+        onPress={handleStartTutorial}
+      >
+        <Text style={[styles.rowText, { color: theme.text }]}>Start tutorial</Text>
         <Text style={[styles.chevron, { color: theme.muted }]}>›</Text>
       </Pressable>
 

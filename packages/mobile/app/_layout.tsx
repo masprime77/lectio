@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -6,6 +6,9 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ActivityIndicator, View, useColorScheme } from 'react-native';
 import { AuthProvider, useAuth } from '../src/auth/AuthProvider';
 import { StudyModeProvider } from '../src/study/StudyModeProvider';
+import { TutorialProvider, useTutorial } from '../src/tutorial/TutorialProvider';
+import { TutorialOverlay } from '../src/tutorial/TutorialOverlay';
+import { prefs } from '../src/lib/prefs';
 import { useTheme } from '../src/theme';
 
 function AppShell() {
@@ -14,6 +17,8 @@ function AppShell() {
   const { session, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const { start } = useTutorial();
+  const firstRunChecked = useRef(false);
 
   // Redirect to /sign-in when not authenticated, back to / when authenticated.
   useEffect(() => {
@@ -25,6 +30,17 @@ function AppShell() {
       router.replace('/');
     }
   }, [session, loading, segments]);
+
+  // First-run trigger: once authenticated and not loading, show the tutorial
+  // if it hasn't been seen. Guarded to fire only once per launch and only when
+  // a session exists (so it never appears over the sign-in screen).
+  useEffect(() => {
+    if (loading || !session || firstRunChecked.current) return;
+    firstRunChecked.current = true;
+    prefs.getTutorialSeen().then((seen) => {
+      if (!seen) start();
+    });
+  }, [session, loading]);
 
   if (loading) {
     return (
@@ -58,6 +74,7 @@ function AppShell() {
           <Stack.Screen name="semester/course-form" options={{ presentation: 'modal', title: 'Course', headerShown: false }} />
           <Stack.Screen name="semester/item-form" options={{ presentation: 'modal', title: 'Item', headerShown: false }} />
         </Stack>
+        <TutorialOverlay />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
@@ -67,7 +84,9 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <StudyModeProvider>
-        <AppShell />
+        <TutorialProvider>
+          <AppShell />
+        </TutorialProvider>
       </StudyModeProvider>
     </AuthProvider>
   );
