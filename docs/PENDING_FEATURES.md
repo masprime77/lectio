@@ -56,7 +56,8 @@ is **not** yet possible on mobile.
       the mobile courses screen.
 - [x] **Sort controls** (by progress / alphabetical / week).
 - [ ] **Focus mode**.
-- [ ] **Onboarding tour**.
+- [x] **Onboarding tour** — a first-run paged walkthrough (`src/tutorial/`)
+      shown once after sign-in and replayable from Settings → "Start tutorial".
 - [ ] **Import / export** of semester data.
 - [x] **In-app feedback** — a Feedback screen (`app/feedback.tsx`) reachable
       from Settings posts to the same Vercel endpoint the desktop uses (which
