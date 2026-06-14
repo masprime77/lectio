@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -17,7 +18,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { storage } from '../src/storage';
 import { useTheme } from '../src/theme';
 import { SheetHeader } from '../src/components/SheetHeader';
@@ -25,7 +26,8 @@ import { FormTabs } from '../src/components/FormTabs';
 import { SemesterFields } from '../src/add/SemesterFields';
 import { CourseFields } from '../src/add/CourseFields';
 import { TagsFields } from '../src/add/TagsFields';
-import type { SemesterSummary } from '../types/lectio-core';
+import * as transfer from '../src/lib/transfer';
+import type { Semester, SemesterSummary } from '../types/lectio-core';
 
 const TABS = ['Semester', 'Course', 'Tags'];
 
@@ -66,8 +68,20 @@ function SemesterPicker({
   );
 }
 
+// A low-key "or import from a file" action shown at the end of the Semester and
+// Course tabs (the "+" sheet is where all importing lives).
+function ImportRow({ label, onPress }: { label: string; onPress: () => void }) {
+  const theme = useTheme();
+  return (
+    <Pressable onPress={onPress} style={[styles.importBtn, { borderColor: theme.border }]}>
+      <Text style={[styles.importBtnText, { color: theme.text }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 export default function AddScreen() {
   const theme = useTheme();
+  const router = useRouter();
   const { context, id } = useLocalSearchParams<{ context?: string; id?: string }>();
 
   const [active, setActive] = useState(
@@ -92,6 +106,47 @@ export default function AddScreen() {
     };
   }, []);
 
+  // Save a picked semester (Keep/Reset progress; never overwrites — a colliding
+  // id imports as a new id) then dismiss the sheet; the list refreshes on focus.
+  function finishImportSemester(sem: Semester, keepStatus: boolean) {
+    transfer
+      .saveImportedSemester(sem, keepStatus)
+      .then(() => router.back())
+      .catch((err) => Alert.alert('Import failed', err instanceof Error ? err.message : String(err)));
+  }
+
+  function handleImportSemester() {
+    transfer
+      .pickSemesterFile()
+      .then((sem) => {
+        if (!sem) return; // cancelled
+        const n = sem.courses.length;
+        Alert.alert(
+          'Import semester',
+          `Import "${sem.name}" (${n} ${n === 1 ? 'course' : 'courses'})?`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Reset progress', onPress: () => finishImportSemester(sem, false) },
+            { text: 'Keep progress', onPress: () => finishImportSemester(sem, true) },
+          ]
+        );
+      })
+      .catch((err) => Alert.alert('Import failed', err instanceof Error ? err.message : String(err)));
+  }
+
+  // Pick a course file and add it to the selected semester with fresh ids
+  // (never collides), then dismiss the sheet.
+  function handleImportCourse(targetId: string) {
+    transfer
+      .pickCourseFile()
+      .then(async (course) => {
+        if (!course) return; // cancelled
+        await transfer.saveImportedCourse(targetId, course);
+        router.back();
+      })
+      .catch((err) => Alert.alert('Import failed', err instanceof Error ? err.message : String(err)));
+  }
+
   const needsSemester = active !== 'Semester';
 
   return (
@@ -104,7 +159,10 @@ export default function AddScreen() {
       <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <FormTabs tabs={TABS} active={active} onSelect={setActive} />
         {!needsSemester ? (
-          <SemesterFields mode="create" />
+          <>
+            <SemesterFields mode="create" />
+            <ImportRow label="Import a semester from a file" onPress={handleImportSemester} />
+          </>
         ) : semesters === null ? (
           <ActivityIndicator color={theme.accent} style={{ marginTop: 24 }} />
         ) : semesters.length === 0 ? (
@@ -117,7 +175,13 @@ export default function AddScreen() {
             <SemesterPicker semesters={semesters} selected={semesterId} onSelect={setSemesterId} />
             {semesterId ? (
               active === 'Course' ? (
-                <CourseFields mode="create" semesterId={semesterId} />
+                <>
+                  <CourseFields mode="create" semesterId={semesterId} />
+                  <ImportRow
+                    label="Import a course from a file"
+                    onPress={() => handleImportCourse(semesterId)}
+                  />
+                </>
               ) : (
                 // Keyed by semester so the editor reloads when the pick changes.
                 <TagsFields key={semesterId} semesterId={semesterId} />
@@ -142,4 +206,13 @@ const styles = StyleSheet.create({
   },
   pillText: { fontSize: 14, fontWeight: '600' },
   hint: { fontSize: 13, marginTop: 12 },
+  importBtn: {
+    height: 48,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+  },
+  importBtnText: { fontSize: 16, fontWeight: '600' },
 });
