@@ -126,18 +126,22 @@ export default function SemestersScreen() {
       <Stack.Screen
         options={{
           title: 'Semesters',
-          // Profile lives top-left as a drawn person glyph (no emoji, no icon
-          // library); Edit/Done sits top-right like the other list screens.
+          // Settings lives top-left as a drawn gear (no emoji, no icon library):
+          // an 8-tooth star from two rotated squares with a center hole; Edit/Done
+          // sits top-right like the other list screens.
           headerLeft: () => (
             <Pressable
-              onPress={() => router.push('/profile')}
+              onPress={() => router.push('/settings')}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="Profile"
-              style={styles.profileBtn}
+              accessibilityLabel="Settings"
+              style={styles.gearBtn}
             >
-              <View style={[styles.profileHead, { backgroundColor: theme.accent }]} />
-              <View style={[styles.profileShoulders, { backgroundColor: theme.accent }]} />
+              <View style={[styles.gearTooth, { backgroundColor: theme.accent }]} />
+              <View
+                style={[styles.gearTooth, styles.gearToothRotated, { backgroundColor: theme.accent }]}
+              />
+              <View style={[styles.gearHole, { backgroundColor: theme.surface }]} />
             </Pressable>
           ),
           headerRight: () =>
@@ -243,15 +247,10 @@ const styles = StyleSheet.create({
   rowTitle: { fontSize: 17, fontWeight: '600' },
   chevron: { fontSize: 22 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 14, marginRight: 4 },
-  profileBtn: { marginLeft: 4, alignItems: 'center' },
-  profileHead: { width: 9, height: 9, borderRadius: 4.5 },
-  profileShoulders: {
-    width: 17,
-    height: 8,
-    borderTopLeftRadius: 8.5,
-    borderTopRightRadius: 8.5,
-    marginTop: 1.5,
-  },
+  gearBtn: { marginLeft: 4, width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
+  gearTooth: { position: 'absolute', width: 18, height: 18, borderRadius: 4 },
+  gearToothRotated: { transform: [{ rotate: '45deg' }] },
+  gearHole: { width: 8, height: 8, borderRadius: 4 },
   emptyBtn: {
     height: 48,
     borderRadius: 10,
