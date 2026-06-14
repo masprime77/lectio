@@ -51,7 +51,9 @@ is **not** yet possible on mobile.
       tag functions).
 - [ ] **Weekly view** (collapsible week sections); mobile has only the
       semester → courses → course-detail flow.
-- [ ] **Dashboard / Breakdown** panel (readings vs tasks mini-bars, totals).
+- [x] **Dashboard / Breakdown** panel (readings vs tasks mini-bars, totals) —
+      per-course Readings/Tasks mini-bars behind a header "Breakdown" toggle on
+      the mobile courses screen.
 - [x] **Sort controls** (by progress / alphabetical / week).
 - [ ] **Focus mode**.
 - [ ] **Onboarding tour**.

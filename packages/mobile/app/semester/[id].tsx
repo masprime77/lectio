@@ -13,12 +13,31 @@ import { prefs } from '../../src/lib/prefs';
 import { useSortOrder } from '../../src/lib/use-sort-order';
 import { useStudyMode } from '../../src/study/StudyModeProvider';
 import { useTheme } from '../../src/theme';
+import { CourseBreakdown } from '../../src/components/CourseBreakdown';
 import { Fab } from '../../src/components/Fab';
 import { ProgressBar } from '../../src/components/ProgressBar';
 import { SortButton, SortMenu } from '../../src/components/SortMenu';
 import { StudyFab } from '../../src/components/StudyFab';
 import { SwipeableRow } from '../../src/components/SwipeableRow';
 import type { Course, Semester } from '../../types/lectio-core';
+
+/**
+ * A small `list.bullet.indent`-style glyph drawn from plain Views (no icon
+ * library): three bullet+line rows, the lower two indented, evoking an
+ * indented bullet list. Used as the header Breakdown toggle.
+ */
+function BreakdownIcon({ color }: { color: string }) {
+  return (
+    <View style={styles.bdIcon}>
+      {[0, 1, 1].map((indent, i) => (
+        <View key={i} style={[styles.bdIconRow, indent ? styles.bdIconRowIndent : null]}>
+          <View style={[styles.bdIconDot, { backgroundColor: color }]} />
+          <View style={[styles.bdIconLine, { backgroundColor: color }]} />
+        </View>
+      ))}
+    </View>
+  );
+}
 
 export default function CoursesScreen() {
   const theme = useTheme();
@@ -30,6 +49,9 @@ export default function CoursesScreen() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sortOrder, pickSortOrder] = useSortOrder();
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  // Per-screen toggle (need not persist); default closed so the list stays
+  // clean, mirroring the desktop's state.breakdownOpen.
+  const [breakdownOpen, setBreakdownOpen] = useState(false);
 
   const reload = useCallback(() => {
     return storage
@@ -168,6 +190,15 @@ export default function CoursesScreen() {
               </View>
             ) : courses.length > 0 ? (
               <View style={styles.headerActions}>
+                <Pressable
+                  onPress={() => setBreakdownOpen((o) => !o)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Breakdown"
+                  accessibilityState={{ expanded: breakdownOpen }}
+                  style={({ pressed }) => pressed && { opacity: 0.6 }}
+                >
+                  <BreakdownIcon color={breakdownOpen ? theme.accent : theme.muted} />
+                </Pressable>
                 <SortButton onPress={() => setSortMenuOpen(true)} />
                 <Pressable onPress={toggleEditing}>
                   <Text style={{ color: theme.accent, fontSize: 15 }}>Edit</Text>
@@ -243,6 +274,9 @@ export default function CoursesScreen() {
                 <Text style={[styles.meta, { color: theme.muted }]}>
                   {progress}% · {item.readings.length} readings · {item.tasks.length} tasks
                 </Text>
+                {breakdownOpen && (
+                  <CourseBreakdown course={item} semester={semester!} studyMode={studyMode} />
+                )}
               </Pressable>
             </SwipeableRow>
           );
@@ -284,4 +318,9 @@ const styles = StyleSheet.create({
   dot: { width: 12, height: 12, borderRadius: 6 },
   cardTitle: { fontSize: 17, fontWeight: '600', flexShrink: 1 },
   meta: { fontSize: 13 },
+  bdIcon: { gap: 3, paddingVertical: 2 },
+  bdIconRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  bdIconRowIndent: { marginLeft: 5 },
+  bdIconDot: { width: 3, height: 3, borderRadius: 1.5 },
+  bdIconLine: { width: 11, height: 2, borderRadius: 1 },
 });
