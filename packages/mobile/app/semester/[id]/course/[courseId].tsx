@@ -13,6 +13,7 @@ import { storage } from '../../../../src/storage';
 import { useSortOrder } from '../../../../src/lib/use-sort-order';
 import { useStudyMode } from '../../../../src/study/StudyModeProvider';
 import { useTheme } from '../../../../src/theme';
+import { ExportIcon } from '../../../../src/components/ExportIcon';
 import { Fab } from '../../../../src/components/Fab';
 import { ProgressBar } from '../../../../src/components/ProgressBar';
 import { SortButton, SortMenu } from '../../../../src/components/SortMenu';
@@ -268,8 +269,14 @@ export default function CourseDetailScreen() {
               </View>
             ) : (
               <View style={styles.headerActions}>
-                <Pressable onPress={handleExportCourse}>
-                  <Text style={{ color: theme.accent, fontSize: 15 }}>Export</Text>
+                <Pressable
+                  onPress={handleExportCourse}
+                  accessibilityRole="button"
+                  accessibilityLabel="Export course"
+                  hitSlop={8}
+                  style={({ pressed }) => pressed && { opacity: 0.6 }}
+                >
+                  <ExportIcon color={theme.accent} />
                 </Pressable>
                 {hasItems && (
                   <>
