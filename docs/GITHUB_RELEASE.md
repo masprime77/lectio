@@ -1,10 +1,11 @@
 ---
-## What's new in v1.8.8
+## What's new in v1.9.0
 
-A test release with no functional changes. It exists purely to verify the macOS auto-update fix from v1.8.7 end-to-end: it's a newer **self-signed** build to update *into* from v1.8.7. Because both are signed with the same persistent certificate, they share the same designated requirement, so Squirrel.Mac should now install the update and relaunch cleanly.
+All Courses view gets two improvements for adding readings and tasks.
 
-### Notes
-- No features or fixes ship here. If you're running the manually-installed **v1.8.7**, updating to v1.8.8 and pressing **Install & Relaunch** should, on macOS, download and relaunch into v1.8.8 — the behaviour that was broken on the ad-hoc path.
+### Improvements
+- **Add to any week.** Each course column now has **+ Reading** / **+ Task** buttons with a **to week** picker at the bottom, so you can add an item to *any* week — including weeks that don't have anything yet — without opening the "+ Add" dialog. Leave the picker on the dash (—) to use the current week.
+- **No more scroll jumps.** Adding a reading or task no longer snaps the list back to the top — your scroll position is kept right where it was.
 
 ---
 **Full changelog:** [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md)
@@ -25,12 +26,12 @@ After merging the PR into main:
 
   git checkout main
   git pull origin main
-  git tag v1.8.8
-  git push origin v1.8.8
+  git tag v1.9.0
+  git push origin v1.9.0
 
 The release.yml workflow will then run CI and, if it passes, build and
 publish the macOS (.dmg + .zip + latest-mac.yml) and Windows (.exe + .zip +
-latest.yml) assets to a new GitHub Release for the v1.8.8 tag. Once the
+latest.yml) assets to a new GitHub Release for the v1.9.0 tag. Once the
 draft release appears in GitHub, paste the content of docs/GITHUB_RELEASE.md
 into the description field and publish it to make the download links live.
 
