@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { createURL } from 'expo-linking';
 import { supabase } from '../supabase/client';
+import { isExpoGo } from './env';
+import { signInWithProvider } from './oauth';
 
 interface AuthContextValue {
   session: Session | null;
@@ -69,14 +71,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
   }
 
-  // OAuth stubs — 8.2 fills in the bodies. Exposed now so the sign-in screen and
-  // 8.2 only have to replace the implementation.
+  // Browser-based OAuth. onAuthStateChange picks up the new session and the layout
+  // redirect navigates to '/'. In Expo Go the redirect round-trip is unreliable, so
+  // we show a clear "installed app only" message instead of failing cryptically.
   async function signInWithGoogle() {
-    throw new Error('OAuth is available in the installed app, not in Expo Go.');
+    if (isExpoGo) throw new Error('Google sign-in needs the installed app (not Expo Go).');
+    await signInWithProvider('google');
   }
 
   async function signInWithApple() {
-    throw new Error('OAuth is available in the installed app, not in Expo Go.');
+    if (isExpoGo) throw new Error('Apple sign-in needs the installed app (not Expo Go).');
+    await signInWithProvider('apple');
   }
 
   async function updateEmail(newEmail: string) {
