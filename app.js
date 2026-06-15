@@ -1121,10 +1121,12 @@ function addToWeekControl(course, sem) {
     const cw = currentWeek(sem);
     select.value = String(cw || 1);
 
-    // When a week is chosen, swap the whole control for that week's add inputs.
+    // When a week is chosen, swap the picker for that week's add inputs. Note we
+    // replace `picker` (the node currently in the DOM), not `wrap` — `wrap` was
+    // already detached by the `wrap.replaceWith(picker)` below.
     const reveal = () => {
       const week = parseInt(select.value, 10);
-      wrap.replaceWith(addControls(course, week));
+      picker.replaceWith(addControls(course, week));
     };
 
     const go = document.createElement('button');
