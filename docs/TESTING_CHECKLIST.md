@@ -124,36 +124,36 @@ npm run typecheck --workspace @lectio/mobile   # tsc --noEmit del móvil
 
 ### 11 — Tutorial / onboarding (`11-mobile-tutorial`)
 
-- [ ] **[M]** (móvil) Instalación nueva (o tras limpiar la pref `tutorialSeen`) muestra el tour **una vez** tras el sign-in.
-- [ ] **[M]** (móvil) Completar o saltar pone `seen=true` y no reaparece en el siguiente lanzamiento.
-- [ ] **[M]** (móvil) Settings → **"Start tutorial"** lo reproduce a demanda.
-- [ ] **[M]** (móvil) El tour **nunca** aparece sobre la pantalla de sign-in.
-- [ ] **[M]** (móvil) Los botones Back (oculto en el primer paso), Skip y Next/Done y el contador funcionan.
+- [X] **[M]** (móvil) Instalación nueva (o tras limpiar la pref `tutorialSeen`) muestra el tour **una vez** tras el sign-in.
+- [X] **[M]** (móvil) Completar o saltar pone `seen=true` y no reaparece en el siguiente lanzamiento.
+- [X] **[M]** (móvil) Settings → **"Start tutorial"** lo reproduce a demanda.
+- [X] **[M]** (móvil) El tour **nunca** aparece sobre la pantalla de sign-in.
+- [X] **[M]** (móvil) Los botones Back (oculto en el primer paso), Skip y Next/Done y el contador funcionan.
 
 ### 12a — Core: helpers de envelope import/export (`12a-core-import-export`)
 
-- [ ] **[CI]** `lectio-file.test.js` pasa: `build*` produce el envelope exacto (`_lectioType`/`_version` + proyección); el export de curso descarta tags y campos extra de ítems.
-- [ ] **[CI]** Round-trip `buildSemesterExport`→`parseSemesterImport` devuelve el semestre.
-- [ ] **[CI]** `parse*` rechaza `_lectioType` incorrecto/ausente y payloads corruptos con el mensaje correcto.
-- [ ] **[CI]** `resetSemesterStatuses` pone readings a `r-pending` y tasks a `t-pending`.
-- [ ] **[CI]** `prepareImportedCourse` asigna ids frescos (uid stub) y preserva el resto de campos.
-- [ ] **[CI]** `require('@lectio/core/integrations/lectio-file')` funciona en Node; `ipc-handlers.js` del desktop sin cambios.
+- [X] **[CI]** `lectio-file.test.js` pasa: `build*` produce el envelope exacto (`_lectioType`/`_version` + proyección); el export de curso descarta tags y campos extra de ítems.
+- [X] **[CI]** Round-trip `buildSemesterExport`→`parseSemesterImport` devuelve el semestre.
+- [X] **[CI]** `parse*` rechaza `_lectioType` incorrecto/ausente y payloads corruptos con el mensaje correcto.
+- [X] **[CI]** `resetSemesterStatuses` pone readings a `r-pending` y tasks a `t-pending`.
+- [X] **[CI]** `prepareImportedCourse` asigna ids frescos (uid stub) y preserva el resto de campos.
+- [X] **[CI]** `require('@lectio/core/integrations/lectio-file')` funciona en Node; `ipc-handlers.js` del desktop sin cambios.
 
 ### 12b — Import/export en móvil (share sheet + document picker) (`12b-mobile-import-export`)
 
-- [ ] **[CI]** Exactamente **tres** deps nuevas: `expo-file-system`, `expo-sharing`, `expo-document-picker`, fijadas por `expo install` a SDK 56.
-- [ ] **[M]** (móvil→desktop) Exportar un semestre en móvil → el `.lectio.json` se importa en el **desktop** sin cambios.
-- [ ] **[M]** (desktop→móvil) Exportar un semestre en desktop → importarlo en móvil (Keep vs Reset de estados ambos funcionan).
-- [ ] **[M]** (móvil) Importar con id en conflicto → entra como **id nuevo**, nunca sobrescribe en silencio.
-- [ ] **[M]** (móvil↔desktop) Exportar un curso en móvil → importar en otro semestre del desktop y viceversa; los cursos importados reciben **ids frescos** y no colisionan.
-- [ ] **[M]** Los archivos son byte-compatibles con el envelope del desktop (`_lectioType`/`_version` + proyección).
+- [X] **[CI]** Exactamente **tres** deps nuevas: `expo-file-system`, `expo-sharing`, `expo-document-picker`, fijadas por `expo install` a SDK 56.
+- [X] **[M]** (móvil→desktop) Exportar un semestre en móvil → el `.lectio.json` se importa en el **desktop** sin cambios.
+- [X] **[M]** (desktop→móvil) Exportar un semestre en desktop → importarlo en móvil (Keep vs Reset de estados ambos funcionan).
+- [X] **[M]** (móvil) Importar con id en conflicto → entra como **id nuevo**, nunca sobrescribe en silencio.
+- [X] **[M]** (móvil↔desktop) Exportar un curso en móvil → importar en otro semestre del desktop y viceversa; los cursos importados reciben **ids frescos** y no colisionan.
+- [X] **[M]** Los archivos son byte-compatibles con el envelope del desktop (`_lectioType`/`_version` + proyección).
 
 ---
 
 ## Pruebas de regresión cruzada (correr al final de toda la serie)
 
-- [ ] **[M]** (móvil↔desktop) Un semestre creado en móvil se ve correcto en desktop y al revés (mismo JSON).
-- [ ] **[M]** (móvil) Flujo completo de cuenta nueva: sign-in → tutorial → crear semestre (calendario) → cursos → ítems con tags → Study Mode → Sort → Breakdown → exportar → feedback.
-- [ ] **[M]** (móvil) Tags custom + ghosting + Study Mode conviven sin romper el progreso.
-- [ ] **[M]** (móvil) Reabrir la app aterriza en el último semestre, con Study Mode y Sort recordados.
-- [ ] **[CI]** Suite completa de Vitest verde y typecheck del móvil en 0 tras integrar todo en `dev`.
+- [X] **[M]** (móvil↔desktop) Un semestre creado en móvil se ve correcto en desktop y al revés (mismo JSON).
+- [X] **[M]** (móvil) Flujo completo de cuenta nueva: sign-in → tutorial → crear semestre (calendario) → cursos → ítems con tags → Study Mode → Sort → Breakdown → exportar → feedback.
+- [X] **[M]** (móvil) Tags custom + ghosting + Study Mode conviven sin romper el progreso.
+- [X] **[M]** (móvil) Reabrir la app aterriza en el último semestre, con Study Mode y Sort recordados.
+- [X] **[CI]** Suite completa de Vitest verde y typecheck del móvil en 0 tras integrar todo en `dev`.
