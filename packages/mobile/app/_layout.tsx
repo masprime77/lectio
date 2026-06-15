@@ -65,6 +65,7 @@ function AppShell() {
           }}
         >
           <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+          <Stack.Screen name="forgot-password" options={{ title: 'Reset password' }} />
           <Stack.Screen name="index" options={{ title: 'Semesters' }} />
           <Stack.Screen name="add" options={{ presentation: 'modal', title: 'Add', headerShown: false }} />
           <Stack.Screen name="semester-form" options={{ presentation: 'modal', title: 'New Semester', headerShown: false }} />
