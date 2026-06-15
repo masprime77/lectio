@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/auth/AuthProvider';
-import { friendlyAuthError } from '../src/auth/auth-errors';
+import { friendlyAuthError, isConnectivityError } from '../src/auth/auth-errors';
 import { useTheme } from '../src/theme';
 
 export default function SignInScreen() {
@@ -41,7 +41,13 @@ export default function SignInScreen() {
         await signUp(email.trim(), password);
       }
     } catch (e) {
-      setError(friendlyAuthError(e));
+      // A paused free-tier project or an offline device surfaces as a fetch error;
+      // give it a clearer message than the generic one.
+      setError(
+        isConnectivityError(e)
+          ? "Can't reach the server — it may be paused or you're offline. Try again in a moment."
+          : friendlyAuthError(e)
+      );
     } finally {
       setBusy(false);
     }
