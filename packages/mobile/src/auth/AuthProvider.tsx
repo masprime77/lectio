@@ -4,10 +4,15 @@ import { createURL } from 'expo-linking';
 import { supabase } from '../supabase/client';
 import { isExpoGo } from './env';
 import { signInWithProvider } from './oauth';
+import { isConnectivityError } from './auth-errors';
+import { deleteAccount } from './account';
 
 interface AuthContextValue {
   session: Session | null;
   loading: boolean;
+  // True when the initial session load failed because the project is paused /
+  // unreachable (no cached session). The launch UI shows a retry state.
+  connectionError: boolean;
   // True after a signUp that requires email confirmation (no immediate session).
   // Stays false while confirmation is disabled in the Supabase console.
   lastSignUpNeedsConfirmation: boolean;
@@ -20,6 +25,8 @@ interface AuthContextValue {
   signInWithApple(): Promise<void>;
   updateEmail(newEmail: string): Promise<void>;
   updatePassword(newPassword: string): Promise<void>;
+  deleteAccount(): Promise<void>;
+  retryConnection(): void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -27,13 +34,31 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [connectionError, setConnectionError] = useState(false);
   const [lastSignUpNeedsConfirmation, setLastSignUpNeedsConfirmation] = useState(false);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+  // Load the cached/remote session. If the project is paused or the device is
+  // offline, getSession can reject — flag it instead of spinning forever.
+  async function loadSession() {
+    setConnectionError(false);
+    setLoading(true);
+    try {
+      const { data } = await supabase.auth.getSession();
       setSession(data.session);
+    } catch (e) {
+      if (isConnectivityError(e)) setConnectionError(true);
+      // Either way, stop blocking the launch on a hung request.
+    } finally {
       setLoading(false);
-    });
+    }
+  }
+
+  function retryConnection() {
+    void loadSession();
+  }
+
+  useEffect(() => {
+    void loadSession();
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
@@ -101,6 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         session,
         loading,
+        connectionError,
         lastSignUpNeedsConfirmation,
         signIn,
         signUp,
@@ -111,6 +137,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signInWithApple,
         updateEmail,
         updatePassword,
+        deleteAccount,
+        retryConnection,
       }}
     >
       {children}
