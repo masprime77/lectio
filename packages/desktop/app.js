@@ -306,6 +306,16 @@ function render() {
   renderPlanner();
 }
 
+// Run a re-render while preserving the scroll position of the main content
+// area. Used by in-place mutations (e.g. adding an item) so the user isn't
+// yanked back to the top when the planner subtree is rebuilt.
+function renderPreservingScroll() {
+  const main = document.querySelector('main.main');
+  const top = main ? main.scrollTop : 0;
+  render();
+  if (main) main.scrollTop = top;
+}
+
 // Return a sorted copy of `courses` per state.sortOrder. Pure: never mutates
 // the input array (callers pass sem.courses, which must stay in its on-disk
 // order). Progress sorts use courseProgress. Week sorts do NOT reorder courses
@@ -800,6 +810,7 @@ function renderCourseView() {
         body.appendChild(weekHeader);
         body.appendChild(weekBody);
       });
+      body.appendChild(addToWeekControl(course, sem));
     }
 
     col.appendChild(body);
@@ -1082,6 +1093,58 @@ function addControls(course, week) {
   return row;
 }
 
+// Course-view control to add a reading/task to ANY week of a course — including
+// weeks that have no items yet (those weeks aren't rendered as sections, so
+// their per-week "+ Reading/+ Task" buttons don't exist). Shows "+ Reading"
+// and "+ Task" buttons next to a week picker; the picker defaults to a dash
+// (no explicit pick → current week). Clicking a button reveals the standard
+// addRow() inputs for the selected week inline.
+function addToWeekControl(course, sem) {
+  const wrap = document.createElement('div');
+  wrap.className = 'add-to-week';
+
+  const select = document.createElement('select');
+  select.className = 'add-to-week-select';
+  const dash = document.createElement('option');
+  dash.value = '';
+  dash.textContent = '—';
+  select.appendChild(dash);
+  for (let w = 1; w <= sem.weeks; w++) {
+    const opt = document.createElement('option');
+    opt.value = String(w);
+    opt.textContent = 'Week ' + w;
+    select.appendChild(opt);
+  }
+
+  // Selected week, falling back to the current week when left on the dash.
+  const weekOf = () => parseInt(select.value, 10) || currentWeek(sem) || 1;
+
+  const mk = (type, label) => {
+    const btn = document.createElement('button');
+    btn.className = 'add-mini';
+    btn.textContent = label;
+    btn.addEventListener('click', () => {
+      const input = addRow(type, course, weekOf());
+      wrap.replaceWith(input);
+      const field = input.querySelector('input[type="text"]');
+      if (field) field.focus();
+    });
+    return btn;
+  };
+
+  wrap.appendChild(mk('reading', '+ Reading'));
+  wrap.appendChild(mk('task', '+ Task'));
+
+  const lbl = document.createElement('span');
+  lbl.className = 'add-to-week-label';
+  lbl.textContent = 'to week';
+  wrap.appendChild(lbl);
+
+  wrap.appendChild(select);
+
+  return wrap;
+}
+
 // A row of inputs to add a new reading or task to a course/week.
 function addRow(type, course, week) {
   const row = document.createElement('div');
@@ -1117,7 +1180,7 @@ function addRow(type, course, week) {
       });
     }
     persist();
-    render();
+    renderPreservingScroll();
   };
 
   btn.addEventListener('click', add);
