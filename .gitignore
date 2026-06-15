@@ -9,6 +9,12 @@ packages/desktop/assets/logo_raw/
 packages/desktop/semesters/dev-test-semester.json
 .idea/
 
+# Supabase CLI
+supabase/.branches
+supabase/.temp
+supabase/.env
+**/.env
+
 # Vendored copy of @lectio/core's planner-core for the renderer (see scripts/sync-core.js)
 packages/desktop/planner-core.js
 
