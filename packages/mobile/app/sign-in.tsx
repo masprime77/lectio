@@ -17,7 +17,14 @@ import { useTheme } from '../src/theme';
 export default function SignInScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { signIn, signUp, resendConfirmation, lastSignUpNeedsConfirmation } = useAuth();
+  const {
+    signIn,
+    signUp,
+    resendConfirmation,
+    lastSignUpNeedsConfirmation,
+    signInWithGoogle,
+    signInWithApple,
+  } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -46,6 +53,23 @@ export default function SignInScreen() {
     try {
       await resendConfirmation(email.trim());
     } catch (e) {
+      setError(friendlyAuthError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleProvider(provider: 'google' | 'apple') {
+    setError(null);
+    setBusy(true);
+    try {
+      if (provider === 'google') {
+        await signInWithGoogle();
+      } else {
+        await signInWithApple();
+      }
+    } catch (e) {
+      // In Expo Go this shows the "needs the installed app" message — expected.
       setError(friendlyAuthError(e));
     } finally {
       setBusy(false);
@@ -118,6 +142,27 @@ export default function SignInScreen() {
             >
               <Text style={[styles.btnOutlineText, { color: theme.accent }]}>Create account</Text>
             </Pressable>
+
+            <View style={styles.divider}>
+              <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+              <Text style={[styles.dividerText, { color: theme.muted }]}>or</Text>
+              <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+            </View>
+
+            <Pressable
+              style={[styles.btnProvider, { backgroundColor: theme.surface, borderColor: theme.border }]}
+              onPress={() => handleProvider('google')}
+            >
+              <Text style={[styles.btnProviderText, { color: theme.text }]}>Continue with Google</Text>
+            </Pressable>
+            {Platform.OS === 'ios' ? (
+              <Pressable
+                style={[styles.btnProvider, { backgroundColor: theme.surface, borderColor: theme.border }]}
+                onPress={() => handleProvider('apple')}
+              >
+                <Text style={[styles.btnProviderText, { color: theme.text }]}>Continue with Apple</Text>
+              </Pressable>
+            ) : null}
           </>
         )}
       </View>
@@ -162,4 +207,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   btnOutlineText: { fontWeight: '600', fontSize: 16 },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 4 },
+  dividerLine: { flex: 1, height: StyleSheet.hairlineWidth },
+  dividerText: { fontSize: 13 },
+  btnProvider: {
+    height: 48,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnProviderText: { fontWeight: '600', fontSize: 16 },
 });
