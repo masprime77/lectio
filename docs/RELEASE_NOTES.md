@@ -1,3 +1,10 @@
+## v1.9.0
+
+_Released: 2026-06-15_
+
+- All Courses view: adding a reading or task no longer jumps the list back to the top — the scroll position is preserved across the re-render.
+- All Courses view: each course column now has "+ Reading" / "+ Task" buttons with a "to week" picker at the bottom, so you can add a reading or task to any week (including weeks that have no items yet) without using the "+ Add" modal.
+
 ## v1.8.8
 
 _Released: 2026-06-04_
