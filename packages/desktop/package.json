@@ -1,6 +1,6 @@
 {
   "name": "@lectio/desktop",
-  "version": "1.8.8",
+  "version": "1.9.0",
   "description": "Lectio desktop app (Electron) for planning a university semester",
   "main": "main.js",
   "license": "MIT",

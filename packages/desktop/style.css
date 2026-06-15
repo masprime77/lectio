@@ -778,6 +778,24 @@ body.electron-app .header-inner { padding-left: 80px; }
 }
 .add-mini:hover { background: var(--hover); color: var(--text); }
 
+/* "+ Reading / + Task to week …" control in All Courses columns */
+.add-to-week {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+.add-to-week-label {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.add-to-week-select {
+  flex: 1;
+  min-width: 0;
+}
+
 /* Course view: horizontal columns */
 .course-board {
   display: flex;
