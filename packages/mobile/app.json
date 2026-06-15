@@ -18,7 +18,9 @@
     "plugins": [
       "expo-router",
       "@react-native-community/datetimepicker",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-web-browser",
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": false
