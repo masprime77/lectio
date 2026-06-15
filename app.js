@@ -1096,51 +1096,53 @@ function addControls(course, week) {
 
 // Course-view control to add a reading/task to ANY week of a course — including
 // weeks that have no items yet (those weeks aren't rendered as sections, so
-// their per-week "+ Reading/+ Task" buttons don't exist). Shows a week picker;
-// choosing a week reveals the standard addRow() inputs for that week inline.
+// their per-week "+ Reading/+ Task" buttons don't exist). Shows "+ Reading"
+// and "+ Task" buttons next to a week picker; the picker defaults to a dash
+// (no explicit pick → current week). Clicking a button reveals the standard
+// addRow() inputs for the selected week inline.
 function addToWeekControl(course, sem) {
   const wrap = document.createElement('div');
   wrap.className = 'add-to-week';
 
-  const btn = document.createElement('button');
-  btn.className = 'add-mini';
-  btn.textContent = '+ Add to week…';
+  const select = document.createElement('select');
+  select.className = 'add-to-week-select';
+  const dash = document.createElement('option');
+  dash.value = '';
+  dash.textContent = '—';
+  select.appendChild(dash);
+  for (let w = 1; w <= sem.weeks; w++) {
+    const opt = document.createElement('option');
+    opt.value = String(w);
+    opt.textContent = 'Week ' + w;
+    select.appendChild(opt);
+  }
 
-  btn.addEventListener('click', () => {
-    const picker = document.createElement('div');
-    picker.className = 'add-to-week-picker';
+  // Selected week, falling back to the current week when left on the dash.
+  const weekOf = () => parseInt(select.value, 10) || currentWeek(sem) || 1;
 
-    const select = document.createElement('select');
-    select.className = 'add-to-week-select';
-    for (let w = 1; w <= sem.weeks; w++) {
-      const opt = document.createElement('option');
-      opt.value = String(w);
-      opt.textContent = 'Week ' + w;
-      select.appendChild(opt);
-    }
-    const cw = currentWeek(sem);
-    select.value = String(cw || 1);
+  const mk = (type, label) => {
+    const btn = document.createElement('button');
+    btn.className = 'add-mini';
+    btn.textContent = label;
+    btn.addEventListener('click', () => {
+      const input = addRow(type, course, weekOf());
+      wrap.replaceWith(input);
+      const field = input.querySelector('input[type="text"]');
+      if (field) field.focus();
+    });
+    return btn;
+  };
 
-    // When a week is chosen, swap the picker for that week's add inputs. Note we
-    // replace `picker` (the node currently in the DOM), not `wrap` — `wrap` was
-    // already detached by the `wrap.replaceWith(picker)` below.
-    const reveal = () => {
-      const week = parseInt(select.value, 10);
-      picker.replaceWith(addControls(course, week));
-    };
+  wrap.appendChild(mk('reading', '+ Reading'));
+  wrap.appendChild(mk('task', '+ Task'));
 
-    const go = document.createElement('button');
-    go.className = 'add-mini';
-    go.textContent = 'Add';
-    go.addEventListener('click', reveal);
+  const lbl = document.createElement('span');
+  lbl.className = 'add-to-week-label';
+  lbl.textContent = 'to week';
+  wrap.appendChild(lbl);
 
-    picker.appendChild(select);
-    picker.appendChild(go);
-    wrap.replaceWith(picker);
-    select.focus();
-  });
+  wrap.appendChild(select);
 
-  wrap.appendChild(btn);
   return wrap;
 }
 
