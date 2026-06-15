@@ -9,12 +9,22 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useAuth } from '../src/auth/AuthProvider';
+import { friendlyAuthError, isConnectivityError } from '../src/auth/auth-errors';
 import { useTheme } from '../src/theme';
 
 export default function SignInScreen() {
   const theme = useTheme();
-  const { signIn, signUp } = useAuth();
+  const router = useRouter();
+  const {
+    signIn,
+    signUp,
+    resendConfirmation,
+    lastSignUpNeedsConfirmation,
+    signInWithGoogle,
+    signInWithApple,
+  } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,8 +40,43 @@ export default function SignInScreen() {
       } else {
         await signUp(email.trim(), password);
       }
-    } catch (e: any) {
-      setError(e?.message ?? 'Something went wrong.');
+    } catch (e) {
+      // A paused free-tier project or an offline device surfaces as a fetch error;
+      // give it a clearer message than the generic one.
+      setError(
+        isConnectivityError(e)
+          ? "Can't reach the server — it may be paused or you're offline. Try again in a moment."
+          : friendlyAuthError(e)
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleResend() {
+    setError(null);
+    setBusy(true);
+    try {
+      await resendConfirmation(email.trim());
+    } catch (e) {
+      setError(friendlyAuthError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleProvider(provider: 'google' | 'apple') {
+    setError(null);
+    setBusy(true);
+    try {
+      if (provider === 'google') {
+        await signInWithGoogle();
+      } else {
+        await signInWithApple();
+      }
+    } catch (e) {
+      // In Expo Go this shows the "needs the installed app" message — expected.
+      setError(friendlyAuthError(e));
     } finally {
       setBusy(false);
     }
@@ -66,6 +111,25 @@ export default function SignInScreen() {
           editable={!busy}
         />
 
+        <Pressable onPress={() => router.push('/forgot-password')} hitSlop={8}>
+          <Text style={[styles.link, { color: theme.accent }]}>Forgot password?</Text>
+        </Pressable>
+
+        {/* Latent email-confirmation seam: appears only once confirmation is enabled
+            in the Supabase console (signUp then returns no session). With confirmation
+            OFF — today's default — signUp logs the user straight in and the layout
+            redirect leaves this screen, so this notice stays dormant. */}
+        {lastSignUpNeedsConfirmation ? (
+          <View style={[styles.notice, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <Text style={[styles.noticeText, { color: theme.text }]}>
+              Check your inbox to confirm your email, then sign in.
+            </Text>
+            <Pressable onPress={handleResend} disabled={busy} hitSlop={8}>
+              <Text style={[styles.link, { color: theme.accent }]}>Resend email</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         {busy ? (
@@ -84,6 +148,27 @@ export default function SignInScreen() {
             >
               <Text style={[styles.btnOutlineText, { color: theme.accent }]}>Create account</Text>
             </Pressable>
+
+            <View style={styles.divider}>
+              <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+              <Text style={[styles.dividerText, { color: theme.muted }]}>or</Text>
+              <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+            </View>
+
+            <Pressable
+              style={[styles.btnProvider, { backgroundColor: theme.surface, borderColor: theme.border }]}
+              onPress={() => handleProvider('google')}
+            >
+              <Text style={[styles.btnProviderText, { color: theme.text }]}>Continue with Google</Text>
+            </Pressable>
+            {Platform.OS === 'ios' ? (
+              <Pressable
+                style={[styles.btnProvider, { backgroundColor: theme.surface, borderColor: theme.border }]}
+                onPress={() => handleProvider('apple')}
+              >
+                <Text style={[styles.btnProviderText, { color: theme.text }]}>Continue with Apple</Text>
+              </Pressable>
+            ) : null}
           </>
         )}
       </View>
@@ -104,6 +189,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   error: { color: '#e53e3e', fontSize: 13, textAlign: 'center' },
+  link: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  notice: {
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 12,
+    gap: 8,
+  },
+  noticeText: { fontSize: 13, textAlign: 'center' },
   btn: {
     height: 48,
     borderRadius: 10,
@@ -120,4 +213,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   btnOutlineText: { fontWeight: '600', fontSize: 16 },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 4 },
+  dividerLine: { flex: 1, height: StyleSheet.hairlineWidth },
+  dividerText: { fontSize: 13 },
+  btnProvider: {
+    height: 48,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnProviderText: { fontWeight: '600', fontSize: 16 },
 });
