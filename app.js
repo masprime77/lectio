@@ -811,6 +811,7 @@ function renderCourseView() {
         body.appendChild(weekHeader);
         body.appendChild(weekBody);
       });
+      body.appendChild(addToWeekControl(course, sem));
     }
 
     col.appendChild(body);
@@ -1091,6 +1092,54 @@ function addControls(course, week) {
   row.appendChild(mk('reading', '+ Reading'));
   row.appendChild(mk('task', '+ Task'));
   return row;
+}
+
+// Course-view control to add a reading/task to ANY week of a course — including
+// weeks that have no items yet (those weeks aren't rendered as sections, so
+// their per-week "+ Reading/+ Task" buttons don't exist). Shows a week picker;
+// choosing a week reveals the standard addRow() inputs for that week inline.
+function addToWeekControl(course, sem) {
+  const wrap = document.createElement('div');
+  wrap.className = 'add-to-week';
+
+  const btn = document.createElement('button');
+  btn.className = 'add-mini';
+  btn.textContent = '+ Add to week…';
+
+  btn.addEventListener('click', () => {
+    const picker = document.createElement('div');
+    picker.className = 'add-to-week-picker';
+
+    const select = document.createElement('select');
+    select.className = 'add-to-week-select';
+    for (let w = 1; w <= sem.weeks; w++) {
+      const opt = document.createElement('option');
+      opt.value = String(w);
+      opt.textContent = 'Week ' + w;
+      select.appendChild(opt);
+    }
+    const cw = currentWeek(sem);
+    select.value = String(cw || 1);
+
+    // When a week is chosen, swap the whole control for that week's add inputs.
+    const reveal = () => {
+      const week = parseInt(select.value, 10);
+      wrap.replaceWith(addControls(course, week));
+    };
+
+    const go = document.createElement('button');
+    go.className = 'add-mini';
+    go.textContent = 'Add';
+    go.addEventListener('click', reveal);
+
+    picker.appendChild(select);
+    picker.appendChild(go);
+    wrap.replaceWith(picker);
+    select.focus();
+  });
+
+  wrap.appendChild(btn);
+  return wrap;
 }
 
 // A row of inputs to add a new reading or task to a course/week.

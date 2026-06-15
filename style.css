@@ -778,6 +778,25 @@ body.electron-app .header-inner { padding-left: 80px; }
 }
 .add-mini:hover { background: var(--hover); color: var(--text); }
 
+/* "+ Add to week…" picker in All Courses columns */
+.add-to-week {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+.add-to-week-picker {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+.add-to-week-select {
+  flex: 1;
+  min-width: 0;
+}
+
 /* Course view: horizontal columns */
 .course-board {
   display: flex;
