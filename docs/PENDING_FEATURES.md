@@ -38,10 +38,24 @@ is **not** yet possible on mobile.
 
 ### Account
 
-- [ ] Account management beyond sign-out — the profile screen
-      (`app/profile.tsx`) only offers sign out; no password reset, email
-      change, or account deletion (the auth surface is
-      `signIn`/`signUp`/`signOut` only).
+- [x] Account management beyond sign-out — the Profile screen
+      (`app/profile.tsx`) is now an account hub: **change email** (Supabase
+      emails a confirmation to the new address), **change password** (length +
+      match validated), **delete account** (via the `delete-account` Supabase
+      Edge Function — the anon key can't delete its own auth user), plus sign
+      out. Settings links to it rather than duplicating the email/sign-out.
+- [x] **Password reset** — a "Forgot password?" flow (`app/forgot-password.tsx`)
+      sends a reset email; in-app completion via deep link needs a dev build
+      (the email link completes it on web for now).
+- [ ] **Email confirmation** — prepared but **not enabled**: `signUp` already
+      sets `lastSignUpNeedsConfirmation` and the sign-in screen shows a "check
+      your inbox / resend" notice when it flips, but confirmation stays OFF in
+      the Supabase console, so the flow is dormant (enable it there to turn on).
+- [x] **Graceful free-tier pause / unreachable handling** — at launch a paused
+      or offline project shows a "Can't reach Lectio's servers" + Retry state
+      instead of an endless spinner (`app/_layout.tsx` + `AuthProvider`'s
+      `connectionError`/`retryConnection`), and sign-in shows a friendly
+      "server may be paused / you're offline" message.
 
 ### Desktop features not yet ported
 
@@ -69,9 +83,9 @@ is **not** yet possible on mobile.
       files a GitHub issue), with the same `{ type, title, body, version }` body
       and Bug/Feature toggle. No GitHub account needed; no secrets in the app.
 - [x] **Settings screen** — a gear in the Semesters header opens a Settings hub
-      (`app/settings.tsx`) holding the Profile section (signed-in account +
-      sign-out) and a "Send feedback" entry. A tutorial entry lands in a later
-      prompt; theme still follows the OS automatically (no in-app choice yet).
+      (`app/settings.tsx`) with an Account row linking to the Profile hub and an
+      About section ("Send feedback", "Start tutorial") plus the version line;
+      theme still follows the OS automatically (no in-app choice yet).
 - [ ] **Auto-update** (e.g. Expo OTA / EAS Update).
 
 ### Platform polish
