@@ -306,6 +306,16 @@ function render() {
   renderPlanner();
 }
 
+// Run a re-render while preserving the scroll position of the main content
+// area. Used by in-place mutations (e.g. adding an item) so the user isn't
+// yanked back to the top when the planner subtree is rebuilt.
+function renderPreservingScroll() {
+  const main = document.querySelector('main.main');
+  const top = main ? main.scrollTop : 0;
+  render();
+  if (main) main.scrollTop = top;
+}
+
 // Return a sorted copy of `courses` per state.sortOrder. Pure: never mutates
 // the input array (callers pass sem.courses, which must stay in its on-disk
 // order). Progress sorts use courseProgress. Week sorts do NOT reorder courses
@@ -1118,7 +1128,7 @@ function addRow(type, course, week) {
       });
     }
     persist();
-    render();
+    renderPreservingScroll();
   };
 
   btn.addEventListener('click', add);
