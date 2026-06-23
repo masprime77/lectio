@@ -68,3 +68,27 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
         run: npm run build:mac --workspace @lectio/desktop -- --publish never
+
+  # Gate the mobile package on a clean TypeScript typecheck. The mobile unit
+  # tests (device-storage + supabase-storage against the shared contract) are
+  # already run by the `test` matrix above via the root `npm test`, so this job
+  # only adds the typecheck the matrix doesn't cover. Ubuntu-only and fast — no
+  # native build here (the EAS build check is deferred to Phase 18).
+  mobile:
+    name: Mobile (typecheck)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck mobile
+        run: npm run typecheck --workspace @lectio/mobile
