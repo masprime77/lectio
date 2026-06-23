@@ -97,9 +97,11 @@ is **not** yet possible on mobile.
 
 ### Quality
 
-- [ ] Automated tests / CI for mobile. The `device-storage` and
-      `supabase-storage` adapters are **not** yet run against the reusable
-      storage-contract suite (`packages/core/tests/contract/storage-contract.js`).
+- [x] Automated tests / CI for mobile. The `device-storage` and
+      `supabase-storage` adapters now run against the reusable storage-contract
+      suite (`packages/core/tests/contract/storage-contract.js`) under Vitest, and
+      a `Mobile (typecheck)` CI job gates the package. (EAS build check deferred to
+      Phase 18.)
 
 ## Desktop (`@lectio/desktop`)
 
@@ -114,10 +116,12 @@ The gaps are all about the new cross-device direction:
 
 ## Cross-cutting / infra
 
-- [ ] **Mobile CI** — no typecheck / test / EAS pipeline for `@lectio/mobile`
-      yet (CI only runs the core Vitest suite and a macOS desktop build).
-- [ ] **Storage-contract coverage for the mobile adapters** — run
-      `device-storage` and `supabase-storage` against the shared contract suite.
+- [x] **Mobile CI** — `ci.yml` now typechecks `@lectio/mobile` (the
+      `Mobile (typecheck)` job) and runs its Vitest suite via the root `npm test`
+      matrix. EAS build pipeline still deferred to Phase 18.
+- [x] **Storage-contract coverage for the mobile adapters** — `device-storage`
+      and `supabase-storage` now run against the shared contract suite (via
+      in-memory AsyncStorage / Supabase-client fakes under Vitest).
 - [ ] **Realtime live-sync** — the Supabase adapter does plain reads/writes; no
       `realtime` subscriptions, so other devices update only on refocus/reload.
 - [ ] **Offline mode / conflict resolution** — `device-storage` exists as the
