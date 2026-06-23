@@ -17,7 +17,7 @@
     "mobile": "npm start --workspace @lectio/mobile",
     "mobile:ios": "npm run ios --workspace @lectio/mobile",
     "mobile:android": "npm run android --workspace @lectio/mobile",
-    "test": "npm test --workspace @lectio/core",
+    "test": "npm test --workspace @lectio/core && npm test --workspace @lectio/mobile",
     "test:watch": "npm run test:watch --workspace @lectio/core",
     "test:coverage": "npm run test:coverage --workspace @lectio/core"
   },
