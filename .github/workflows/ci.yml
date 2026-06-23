@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, mobile-prep]
+    branches: [main, dev, mobile-prep]
   pull_request:
-    branches: [main, mobile-prep]
+    branches: [main, dev, mobile-prep]
   # Allow other workflows (e.g. release) to require this one.
   workflow_call:
 
