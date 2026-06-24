@@ -2655,6 +2655,30 @@ function setupSettings() {
     if (e.target === overlay) closeSettingsModal();
   });
 
+  // Profile sub-window: the Account row opens it; back arrow / backdrop return
+  // to Settings (parity with the mobile Settings → Profile navigation).
+  const profileRow = document.getElementById('set-profile-row');
+  if (profileRow) {
+    profileRow.addEventListener('click', openProfileModal);
+    profileRow.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openProfileModal();
+      }
+    });
+  }
+  const profileClose = document.getElementById('profile-close');
+  if (profileClose) {
+    profileClose.innerHTML = icon('x');
+    profileClose.addEventListener('click', closeProfileModal);
+  }
+  const profileOverlay = document.getElementById('profile-overlay');
+  if (profileOverlay) {
+    profileOverlay.addEventListener('click', (e) => {
+      if (e.target === profileOverlay) closeProfileModal();
+    });
+  }
+
   // Autosave preference lives in localStorage.
   document.getElementById('set-autosave').addEventListener('change', (e) => {
     writePref('autosave', e.target.checked ? 'true' : 'false');
@@ -2730,9 +2754,12 @@ async function openSettingsModal() {
     });
   }
 
-  // Account / Profile section (Phase 11.4) — email + change email/password,
-  // sign out, delete account. Listeners are re-attached each open.
-  await populateAccountSection();
+  // Account row subtitle: the signed-in email. The row opens the Profile
+  // sub-window (which owns change email/password, sign out, delete account).
+  const session = await lectioAuth.getSession();
+  const accEmail = (session && session.user && session.user.email) || 'Not signed in';
+  const accEmailEl = document.getElementById('set-account-email');
+  if (accEmailEl) accEmailEl.textContent = accEmail;
 
   document.getElementById('settings-overlay').classList.remove('hidden');
 }
@@ -2774,10 +2801,27 @@ async function withBusy(btn, busyLabel, fn) {
   }
 }
 
-async function populateAccountSection() {
+// Hide both account windows (used by sign-out / delete, where the sign-in
+// overlay takes over and neither should linger).
+function hideAccountWindows() {
+  document.getElementById('profile-overlay').classList.add('hidden');
+  document.getElementById('settings-overlay').classList.add('hidden');
+}
+
+// Back from the Profile sub-window to Settings.
+function closeProfileModal() {
+  document.getElementById('profile-overlay').classList.add('hidden');
+  document.getElementById('settings-overlay').classList.remove('hidden');
+}
+
+// Open the Profile sub-window (parity with the mobile Profile hub): pops Settings,
+// populates the email, resets the fields, and re-attaches the action listeners.
+async function openProfileModal() {
+  closeSettingsModal(); // Profile replaces Settings; closeProfileModal pops back.
+
   const session = await lectioAuth.getSession();
   const email = (session && session.user && session.user.email) || 'Not signed in';
-  const emailEl = document.getElementById('set-account-email');
+  const emailEl = document.getElementById('profile-email');
   if (emailEl) emailEl.textContent = email;
 
   // Reset inputs + status on each open.
@@ -2828,9 +2872,10 @@ async function populateAccountSection() {
     });
   });
 
-  // Sign out: close Settings, then sign out — onAuthChange shows the sign-in overlay.
+  // Sign out: close the account windows, then sign out — onAuthChange shows the
+  // sign-in overlay.
   rewireButton('set-signout', async () => {
-    closeSettingsModal();
+    hideAccountWindows();
     try {
       await lectioAuth.signOut();
     } catch (e) {
@@ -2848,12 +2893,14 @@ async function populateAccountSection() {
     withBusy(btn, 'Deleting…', async () => {
       try {
         await lectioAuth.deleteAccount();
-        closeSettingsModal();
+        hideAccountWindows();
       } catch (e) {
         setAccountStatus(lectioAuth.friendlyAuthError(e), true);
       }
     });
   });
+
+  document.getElementById('profile-overlay').classList.remove('hidden');
 }
 
 // ---------------------------------------------------------------------------
