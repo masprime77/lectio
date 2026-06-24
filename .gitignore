@@ -18,6 +18,11 @@ supabase/.env
 # Vendored copy of @lectio/core's planner-core for the renderer (see scripts/sync-core.js)
 packages/desktop/planner-core.js
 
+# Vendored supabase-js UMD bundle + generated renderer config (see scripts/sync-supabase.js).
+# The config holds the publishable anon key, kept out of git like the mobile .env.
+packages/desktop/supabase.js
+packages/desktop/supabase-config.js
+
 
 # Secrets / credentials (defensive — none used today)
 .env

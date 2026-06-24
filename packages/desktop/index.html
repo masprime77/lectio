@@ -18,6 +18,34 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <!-- Sign-in overlay: gates the app until there is a Supabase session.
+       Same account as the Lectio mobile app. Storage still reads local fs in
+       this prompt — this only adds the auth gate (the storage switch is 11.2). -->
+  <div id="signin-overlay" class="modal-overlay hidden" role="dialog"
+       aria-modal="true" aria-labelledby="signin-title">
+    <div class="modal">
+      <h2 id="signin-title">Sign in to Lectio</h2>
+      <form id="signin-form">
+        <label>
+          Email
+          <input type="email" id="signin-email" autocomplete="username"
+                 placeholder="you@example.com" required />
+        </label>
+        <label>
+          Password
+          <input type="password" id="signin-password" autocomplete="current-password"
+                 placeholder="Password" required />
+        </label>
+        <span id="signin-error" class="hidden"
+              style="display:block;font-size:0.8rem;color:var(--danger);margin-top:0.4rem;"></span>
+        <div class="modal-actions">
+          <button type="button" id="signin-create" class="btn">Create account</button>
+          <button type="submit" id="signin-submit" class="btn btn-primary">Sign in</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Update dialog -->
   <div id="update-overlay" class="modal-overlay hidden" role="dialog"
        aria-modal="true" aria-labelledby="update-dialog-title">
@@ -92,6 +120,8 @@
         </button>
         <button id="feedback-btn" class="icon-btn" title="Feedback" aria-label="Feedback"></button>
         <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings"></button>
+        <!-- Temporary sign-out affordance (Phase 11.1); 11.4 formalizes this in Settings. -->
+        <button type="button" id="signout-btn" class="btn btn-small" title="Sign out">Sign out</button>
       </div>
     </div>
   </header>
@@ -409,6 +439,15 @@
       </div>
     </div>
   </div>
+
+  <!-- Supabase (renderer-side). supabase.js is the UMD bundle (window.supabase),
+       supabase-config.js carries the project URL + anon key — both vendored/generated
+       next to index.html by scripts/sync-supabase.js (git-ignored), like planner-core.
+       Order matters: bundle → config → client → auth, all before app.js. -->
+  <script src="supabase.js"></script>
+  <script src="supabase-config.js"></script>
+  <script src="supabase-client.js"></script>
+  <script src="auth.js"></script>
 
   <!-- Shared @lectio/core logic, vendored next to index.html by scripts/sync-core.js
        (and by electron-builder when packaged) so this relative path resolves both
