@@ -67,14 +67,80 @@ function hasTutorialBeenSeen() {
 }
 
 // ---------------------------------------------------------------------------
-// API helpers — backed by the Electron preload bridge (window.planner),
-// which forwards to the main process over IPC. No HTTP server involved.
+// API helpers — a switchable storage layer (Phase 11.2). When signed in, reads
+// and writes go to Supabase (window.lectioSupabaseStorage, the renderer adapter);
+// otherwise — and as an offline fallback — they use the local fs store behind the
+// window.planner.* IPC bridge (the pre-11 behavior). The public list/load/save/
+// remove signatures are unchanged, so the rest of app.js is untouched.
 // ---------------------------------------------------------------------------
-const api = {
+
+// Local fs store (main process, over IPC), shaped to the core storage contract
+// (list/get/save/delete) so it's interchangeable with the Supabase adapter.
+const fsStorage = {
   list: () => window.planner.listSemesters(),
-  load: (id) => window.planner.getSemester(id),
+  get: (id) => window.planner.getSemester(id),
   save: (id, data) => window.planner.saveSemester(id, data),
-  remove: (id) => window.planner.deleteSemester(id),
+  delete: (id) => window.planner.deleteSemester(id),
+};
+
+// Which adapter is active right now: Supabase when there's a session and the
+// renderer adapter exists; otherwise the local fs fallback. `signedIn` is owned
+// by the auth gate at the bottom of this file (set before any api call runs).
+function getActiveStorage() {
+  if (signedIn && window.lectioSupabaseStorage) return window.lectioSupabaseStorage;
+  return fsStorage;
+}
+
+// Mirror of the mobile isConnectivityError: tells "server unreachable / paused /
+// offline" apart from ordinary errors (not-found, invalid id), which must still
+// propagate rather than silently falling back.
+function isConnectivityError(err) {
+  const m = (err && err.message ? String(err.message) : '').toLowerCase();
+  return (
+    m.includes('network request failed') ||
+    m.includes('failed to fetch') ||
+    m.includes('fetch') ||
+    m.includes('timeout') ||
+    m.includes('econnrefused') ||
+    m.includes('service unavailable')
+  );
+}
+
+// Toggle the "Working offline" banner (idempotent).
+let storageOnline = true;
+function setStorageOnline(online) {
+  if (online === storageOnline) return;
+  storageOnline = online;
+  const b = document.getElementById('offline-banner');
+  if (b) b.classList.toggle('hidden', online);
+}
+
+// Run a storage op against the active adapter. If a Supabase call fails with a
+// connectivity error, show the offline banner and fall back to the local fs
+// store (best-effort and lossless: reads serve local data, writes persist
+// locally) so the app never crashes. Real errors (not-found / invalid id)
+// propagate. Full offline↔cloud merge is Phase 12; this is the minimal path.
+async function runStorage(op, args) {
+  const store = getActiveStorage();
+  if (store === fsStorage) return store[op](...args);
+  try {
+    const result = await store[op](...args);
+    setStorageOnline(true);
+    return result;
+  } catch (err) {
+    if (isConnectivityError(err)) {
+      setStorageOnline(false);
+      return fsStorage[op](...args);
+    }
+    throw err;
+  }
+}
+
+const api = {
+  list: () => runStorage('list', []),
+  load: (id) => runStorage('get', [id]),
+  save: (id, data) => runStorage('save', [id, data]),
+  remove: (id) => runStorage('delete', [id]),
 };
 
 // ---------------------------------------------------------------------------
@@ -1463,6 +1529,21 @@ function setupTutorial() {
   });
 }
 
+// Populate the selector and load the last-active (or first) semester, or render
+// the empty state. Used by init() and again when re-entering after a sign-out.
+async function loadInitialData() {
+  const list = await populateSelector();
+  if (list.length) {
+    // Restore the last active semester if it still exists, else fall back to
+    // the first one (which loadSemester then records as the new last active).
+    const savedId = readPref('lastActiveSemesterId');
+    const idToLoad = list.some((s) => s.id === savedId) ? savedId : list[0].id;
+    await loadSemester(idToLoad);
+  } else {
+    renderEmptyState();
+  }
+}
+
 async function init() {
   document.body.classList.add('electron-app');
 
@@ -1487,16 +1568,7 @@ async function init() {
   collapseAllBtn.addEventListener('click', () => setAllWeeksOpen('none'));
   expandCurrentBtn.addEventListener('click', () => setAllWeeksOpen('current'));
 
-  const list = await populateSelector();
-  if (list.length) {
-    // Restore the last active semester if it still exists, else fall back to
-    // the first one (which loadSemester then records as the new last active).
-    const savedId = readPref('lastActiveSemesterId');
-    const idToLoad = list.some((s) => s.id === savedId) ? savedId : list[0].id;
-    await loadSemester(idToLoad);
-  } else {
-    renderEmptyState();
-  }
+  await loadInitialData();
 
   document.getElementById('semester-select').addEventListener('change', (e) => {
     loadSemester(e.target.value);
@@ -2658,7 +2730,130 @@ async function openSettingsModal() {
     });
   }
 
+  // Account / Profile section (Phase 11.4) — email + change email/password,
+  // sign out, delete account. Listeners are re-attached each open.
+  await populateAccountSection();
+
   document.getElementById('settings-overlay').classList.remove('hidden');
+}
+
+// Inline status/error line in the Account section. isError tints it danger.
+function setAccountStatus(msg, isError) {
+  const el = document.getElementById('set-account-status');
+  if (!el) return;
+  if (!msg) {
+    el.classList.add('hidden');
+    el.textContent = '';
+    return;
+  }
+  el.textContent = msg;
+  el.style.color = isError ? 'var(--danger)' : 'var(--muted)';
+  el.classList.remove('hidden');
+}
+
+// Replace a button with a fresh clone (dropping any previous handler, like the
+// tutorial button) and bind a click handler that receives the fresh element.
+function rewireButton(id, onClick) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  const fresh = btn.cloneNode(true);
+  btn.replaceWith(fresh);
+  fresh.addEventListener('click', () => onClick(fresh));
+}
+
+// Run an async action with the button disabled + a busy label, restored after.
+async function withBusy(btn, busyLabel, fn) {
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = busyLabel;
+  try {
+    await fn();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+
+async function populateAccountSection() {
+  const session = await lectioAuth.getSession();
+  const email = (session && session.user && session.user.email) || 'Not signed in';
+  const emailEl = document.getElementById('set-account-email');
+  if (emailEl) emailEl.textContent = email;
+
+  // Reset inputs + status on each open.
+  document.getElementById('set-email-input').value = '';
+  document.getElementById('set-pass-new').value = '';
+  document.getElementById('set-pass-confirm').value = '';
+  setAccountStatus('');
+
+  // Change email: Supabase emails the new address; the change applies after confirm.
+  rewireButton('set-email-save', (btn) => {
+    const next = document.getElementById('set-email-input').value.trim();
+    if (!next) {
+      setAccountStatus('Please enter a new email.', true);
+      return;
+    }
+    withBusy(btn, 'Saving…', async () => {
+      try {
+        await lectioAuth.updateEmail(next);
+        document.getElementById('set-email-input').value = '';
+        setAccountStatus(`Confirmation sent to ${next}; the change applies after you confirm it.`, false);
+      } catch (e) {
+        setAccountStatus(lectioAuth.friendlyAuthError(e), true);
+      }
+    });
+  });
+
+  // Change password: validate length ≥ 6 and that both fields match.
+  rewireButton('set-pass-save', (btn) => {
+    const np = document.getElementById('set-pass-new').value;
+    const cp = document.getElementById('set-pass-confirm').value;
+    if (np.length < 6) {
+      setAccountStatus('Password is too short (minimum 6 characters).', true);
+      return;
+    }
+    if (np !== cp) {
+      setAccountStatus('Passwords do not match.', true);
+      return;
+    }
+    withBusy(btn, 'Saving…', async () => {
+      try {
+        await lectioAuth.updatePassword(np);
+        document.getElementById('set-pass-new').value = '';
+        document.getElementById('set-pass-confirm').value = '';
+        setAccountStatus('Password updated.', false);
+      } catch (e) {
+        setAccountStatus(lectioAuth.friendlyAuthError(e), true);
+      }
+    });
+  });
+
+  // Sign out: close Settings, then sign out — onAuthChange shows the sign-in overlay.
+  rewireButton('set-signout', async () => {
+    closeSettingsModal();
+    try {
+      await lectioAuth.signOut();
+    } catch (e) {
+      /* non-fatal */
+    }
+  });
+
+  // Delete account: strong confirm, then the delete-account Edge Function. On
+  // success the session clears (signed out) and the sign-in overlay returns.
+  rewireButton('set-delete-account', (btn) => {
+    const ok = confirm(
+      'Permanently delete your account and all your semesters? This cannot be undone.'
+    );
+    if (!ok) return;
+    withBusy(btn, 'Deleting…', async () => {
+      try {
+        await lectioAuth.deleteAccount();
+        closeSettingsModal();
+      } catch (e) {
+        setAccountStatus(lectioAuth.friendlyAuthError(e), true);
+      }
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -2875,4 +3070,243 @@ function closeAddItemModal() {
   document.getElementById('add-item-overlay').classList.add('hidden');
 }
 
-init();
+// ---------------------------------------------------------------------------
+// Auth gate (Phase 11.1). The app is held behind a Supabase session: with no
+// session the sign-in overlay blocks the planner; with one, init() runs as
+// before (still reading local fs — the storage switch is 11.2). Storage and the
+// `api` layer are untouched here; this only adds the gate + sign-in UI.
+// ---------------------------------------------------------------------------
+let appStarted = false;     // true once init() has run (its listeners bind once)
+let signedIn = null;        // tracks the current state so we only act on changes
+
+// Clear the in-memory planner + its DOM so a signed-out window shows nothing.
+function clearPlannerState() {
+  state.semesterId = null;
+  state.semester = null;
+  state.focusedCourseId = null;
+  state.openWeeks = new Set();
+  state.openCourseWeeks = {};
+  markDirty(false);
+  setStorageOnline(true); // fs fallback is always "online"; clear any notice
+  const sel = document.getElementById('semester-select');
+  if (sel) sel.innerHTML = '';
+  const planner = document.getElementById('planner');
+  if (planner) planner.innerHTML = '';
+  const dashboard = document.getElementById('dashboard');
+  if (dashboard) dashboard.innerHTML = '';
+}
+
+function showSignIn() {
+  clearPlannerState();
+  const errEl = document.getElementById('signin-error');
+  if (errEl) errEl.classList.add('hidden');
+  document.getElementById('signin-overlay').classList.remove('hidden');
+}
+
+async function showApp(session) {
+  document.getElementById('signin-overlay').classList.add('hidden');
+  if (!appStarted) {
+    appStarted = true;
+    await init();           // one-time: binds listeners and loads data
+  } else {
+    await loadInitialData(); // re-entry after a sign-out: just reload the data
+  }
+  // One-time local→cloud upload offer for this account (Phase 11.3).
+  await maybeOfferLocalUpload(session);
+}
+
+// Single place that reacts to auth state, ignoring no-op repeats (onAuthChange
+// fires an INITIAL_SESSION event that can duplicate the startup getSession()).
+function handleSession(session) {
+  const nowSignedIn = !!session;
+  if (nowSignedIn === signedIn) return;
+  signedIn = nowSignedIn;
+  if (nowSignedIn) {
+    showApp(session);
+  } else {
+    showSignIn();
+  }
+}
+
+// Wire the sign-in overlay's form, "Create account" button, busy + error states.
+function setupSignIn() {
+  const form = document.getElementById('signin-form');
+  const emailEl = document.getElementById('signin-email');
+  const pwEl = document.getElementById('signin-password');
+  const errEl = document.getElementById('signin-error');
+  const submitBtn = document.getElementById('signin-submit');
+  const createBtn = document.getElementById('signin-create');
+
+  function showError(msg) {
+    errEl.textContent = msg;
+    errEl.classList.remove('hidden');
+  }
+  function setBusy(busy) {
+    submitBtn.disabled = busy;
+    createBtn.disabled = busy;
+    emailEl.disabled = busy;
+    pwEl.disabled = busy;
+    submitBtn.textContent = busy ? 'Please wait…' : 'Sign in';
+  }
+
+  async function run(action) {
+    errEl.classList.add('hidden');
+    const email = emailEl.value.trim();
+    const password = pwEl.value;
+    if (!email || !password) {
+      showError('Enter your email and password.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await action(email, password);
+      // On success, onAuthChange → handleSession() hides the overlay and inits.
+      // (With email confirmation OFF — today's default — sign-up returns a
+      // session immediately; nothing more to do here.)
+      pwEl.value = '';
+    } catch (e) {
+      showError(lectioAuth.friendlyAuthError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    run(lectioAuth.signIn);
+  });
+  createBtn.addEventListener('click', () => run(lectioAuth.signUp));
+}
+
+// ---------------------------------------------------------------------------
+// One-time local→cloud upload (Phase 11.3). The first time an account signs in
+// with semesters in local fs-storage, offer to upload them to the cloud —
+// explicit, confirmed, idempotent, and non-destructive. The "handled" flag is
+// keyed BY USER in localStorage (`localUploadDone:<userId>`) so a different
+// account on the same machine still gets its own offer.
+// ---------------------------------------------------------------------------
+function isLocalUploadDone(userId) {
+  return readPref(`localUploadDone:${userId}`) === 'true';
+}
+function setLocalUploadDone(userId) {
+  writePref(`localUploadDone:${userId}`, 'true');
+}
+
+async function maybeOfferLocalUpload(session) {
+  const userId = session && session.user && session.user.id;
+  if (!userId) return;
+  const cloud = window.lectioSupabaseStorage;
+  if (!cloud || !window.LocalImport) return; // not signed into cloud storage
+  if (isLocalUploadDone(userId)) return;
+
+  let local;
+  try {
+    local = await window.LocalImport.getLocalSemesters();
+  } catch (e) {
+    return; // local fs unavailable — skip silently
+  }
+  if (!local.length) {
+    setLocalUploadDone(userId); // nothing to upload; don't offer again
+    return;
+  }
+  await openLocalImportModal(cloud, userId);
+}
+
+// Build one row of the upload list: name + New/Already-in-account badge, plus a
+// Skip / Upload-as-a-copy choice for ids that already exist in the cloud.
+function renderLocalImportRow(item) {
+  const exists = item.status === 'exists';
+  const el = document.createElement('div');
+  el.style.cssText =
+    'display:flex;align-items:center;justify-content:space-between;gap:0.75rem;' +
+    'padding:0.5rem 0;border-bottom:1px solid var(--border);';
+
+  const left = document.createElement('div');
+  const nameEl = document.createElement('div');
+  nameEl.textContent = item.semester.name || item.semester.id;
+  nameEl.style.cssText = 'font-size:0.9rem;color:var(--text);';
+  const badge = document.createElement('span');
+  badge.textContent = exists ? 'Already in your account' : 'New';
+  badge.style.cssText = `font-size:0.72rem;color:${exists ? 'var(--muted)' : 'var(--primary)'};`;
+  left.appendChild(nameEl);
+  left.appendChild(badge);
+  el.appendChild(left);
+
+  let getAction;
+  if (exists) {
+    const sel = document.createElement('select');
+    sel.style.cssText =
+      'padding:0.3rem 0.4rem;border:1px solid var(--border);border-radius:6px;' +
+      'font-size:0.8rem;color:var(--text);background:var(--surface);';
+    sel.innerHTML =
+      '<option value="skip">Skip</option>' +
+      '<option value="upload-as-new">Upload as a copy</option>';
+    el.appendChild(sel);
+    getAction = () => sel.value; // 'skip' | 'upload-as-new'
+  } else {
+    getAction = () => 'upload';
+  }
+  return { el, getAction };
+}
+
+async function openLocalImportModal(cloud, userId) {
+  const overlay = document.getElementById('local-import-overlay');
+  const listEl = document.getElementById('local-import-list');
+  const resultEl = document.getElementById('local-import-result');
+  const uploadBtn = document.getElementById('local-import-upload');
+  const skipBtn = document.getElementById('local-import-skip');
+
+  // Reset to the initial state (so a re-trigger looks fresh).
+  resultEl.classList.add('hidden');
+  resultEl.textContent = '';
+  uploadBtn.classList.remove('hidden');
+  uploadBtn.disabled = false;
+  uploadBtn.textContent = 'Upload';
+  skipBtn.textContent = 'Not now';
+  listEl.innerHTML = '';
+
+  const plan = await window.LocalImport.planUpload(cloud); // [{ semester, status }]
+  const rows = plan.map((item) => {
+    const row = renderLocalImportRow(item);
+    listEl.appendChild(row.el);
+    return { semester: item.semester, getAction: row.getAction };
+  });
+
+  // "Not now": close without setting the flag, so the offer can return later
+  // (and 11.4's Settings → Profile can re-open it).
+  skipBtn.onclick = () => overlay.classList.add('hidden');
+
+  uploadBtn.onclick = async () => {
+    const decisions = rows.map((r) => ({ semester: r.semester, action: r.getAction() }));
+    uploadBtn.disabled = true;
+    uploadBtn.textContent = 'Uploading…';
+    try {
+      const results = await window.LocalImport.runUpload(cloud, decisions);
+      const uploaded = results.filter((r) => r.uploaded).length;
+      const skipped = results.filter((r) => r.skipped).length;
+      resultEl.textContent = `Uploaded ${uploaded}, skipped ${skipped}.`;
+      resultEl.classList.remove('hidden');
+      setLocalUploadDone(userId); // a decision was made — don't offer again
+      uploadBtn.classList.add('hidden');
+      skipBtn.textContent = 'Done';
+      // Surface any newly-uploaded semesters in the selector.
+      await loadInitialData();
+    } catch (e) {
+      console.error('Local upload failed:', e);
+      resultEl.textContent = 'Upload failed. Please try again.';
+      resultEl.classList.remove('hidden');
+      uploadBtn.disabled = false;
+      uploadBtn.textContent = 'Upload';
+    }
+  };
+
+  overlay.classList.remove('hidden');
+}
+
+async function bootstrap() {
+  setupSignIn();
+  lectioAuth.onAuthChange((session) => handleSession(session));
+  handleSession(await lectioAuth.getSession());
+}
+
+bootstrap();
