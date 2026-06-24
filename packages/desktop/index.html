@@ -410,6 +410,15 @@
     </div>
   </div>
 
+  <!-- Supabase (renderer-side). supabase.js is the UMD bundle (window.supabase),
+       supabase-config.js carries the project URL + anon key — both vendored/generated
+       next to index.html by scripts/sync-supabase.js (git-ignored), like planner-core.
+       Order matters: bundle → config → client → auth, all before app.js. -->
+  <script src="supabase.js"></script>
+  <script src="supabase-config.js"></script>
+  <script src="supabase-client.js"></script>
+  <script src="auth.js"></script>
+
   <!-- Shared @lectio/core logic, vendored next to index.html by scripts/sync-core.js
        (and by electron-builder when packaged) so this relative path resolves both
        under `npm start` and inside the flattened app bundle. -->
