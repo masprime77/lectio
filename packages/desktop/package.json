@@ -92,6 +92,7 @@
       "auth.js",
       "supabase-client.js",
       "supabase-storage.js",
+      "local-import.js",
       "supabase.js",
       "supabase-config.js",
       "style.css",
