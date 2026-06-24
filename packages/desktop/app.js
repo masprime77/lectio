@@ -67,14 +67,80 @@ function hasTutorialBeenSeen() {
 }
 
 // ---------------------------------------------------------------------------
-// API helpers — backed by the Electron preload bridge (window.planner),
-// which forwards to the main process over IPC. No HTTP server involved.
+// API helpers — a switchable storage layer (Phase 11.2). When signed in, reads
+// and writes go to Supabase (window.lectioSupabaseStorage, the renderer adapter);
+// otherwise — and as an offline fallback — they use the local fs store behind the
+// window.planner.* IPC bridge (the pre-11 behavior). The public list/load/save/
+// remove signatures are unchanged, so the rest of app.js is untouched.
 // ---------------------------------------------------------------------------
-const api = {
+
+// Local fs store (main process, over IPC), shaped to the core storage contract
+// (list/get/save/delete) so it's interchangeable with the Supabase adapter.
+const fsStorage = {
   list: () => window.planner.listSemesters(),
-  load: (id) => window.planner.getSemester(id),
+  get: (id) => window.planner.getSemester(id),
   save: (id, data) => window.planner.saveSemester(id, data),
-  remove: (id) => window.planner.deleteSemester(id),
+  delete: (id) => window.planner.deleteSemester(id),
+};
+
+// Which adapter is active right now: Supabase when there's a session and the
+// renderer adapter exists; otherwise the local fs fallback. `signedIn` is owned
+// by the auth gate at the bottom of this file (set before any api call runs).
+function getActiveStorage() {
+  if (signedIn && window.lectioSupabaseStorage) return window.lectioSupabaseStorage;
+  return fsStorage;
+}
+
+// Mirror of the mobile isConnectivityError: tells "server unreachable / paused /
+// offline" apart from ordinary errors (not-found, invalid id), which must still
+// propagate rather than silently falling back.
+function isConnectivityError(err) {
+  const m = (err && err.message ? String(err.message) : '').toLowerCase();
+  return (
+    m.includes('network request failed') ||
+    m.includes('failed to fetch') ||
+    m.includes('fetch') ||
+    m.includes('timeout') ||
+    m.includes('econnrefused') ||
+    m.includes('service unavailable')
+  );
+}
+
+// Toggle the "Working offline" banner (idempotent).
+let storageOnline = true;
+function setStorageOnline(online) {
+  if (online === storageOnline) return;
+  storageOnline = online;
+  const b = document.getElementById('offline-banner');
+  if (b) b.classList.toggle('hidden', online);
+}
+
+// Run a storage op against the active adapter. If a Supabase call fails with a
+// connectivity error, show the offline banner and fall back to the local fs
+// store (best-effort and lossless: reads serve local data, writes persist
+// locally) so the app never crashes. Real errors (not-found / invalid id)
+// propagate. Full offline↔cloud merge is Phase 12; this is the minimal path.
+async function runStorage(op, args) {
+  const store = getActiveStorage();
+  if (store === fsStorage) return store[op](...args);
+  try {
+    const result = await store[op](...args);
+    setStorageOnline(true);
+    return result;
+  } catch (err) {
+    if (isConnectivityError(err)) {
+      setStorageOnline(false);
+      return fsStorage[op](...args);
+    }
+    throw err;
+  }
+}
+
+const api = {
+  list: () => runStorage('list', []),
+  load: (id) => runStorage('get', [id]),
+  save: (id, data) => runStorage('save', [id, data]),
+  remove: (id) => runStorage('delete', [id]),
 };
 
 // ---------------------------------------------------------------------------
@@ -2910,6 +2976,7 @@ function clearPlannerState() {
   state.openWeeks = new Set();
   state.openCourseWeeks = {};
   markDirty(false);
+  setStorageOnline(true); // fs fallback is always "online"; clear any notice
   const sel = document.getElementById('semester-select');
   if (sel) sel.innerHTML = '';
   const planner = document.getElementById('planner');

@@ -126,6 +126,15 @@
     </div>
   </header>
 
+  <!-- Offline notice: shown when a signed-in Supabase call hits a connectivity
+       error and the app falls back to local fs (Phase 11.2). -->
+  <div id="offline-banner" class="hidden" role="status" aria-live="polite"
+       style="text-align:center;padding:0.4rem 1rem;font-size:0.8rem;
+              background:var(--danger-bg);color:var(--danger);
+              border-bottom:1px solid var(--border);">
+    Working offline — changes may not sync.
+  </div>
+
   <main class="main">
     <section id="dashboard" class="dashboard"></section>
     <section id="planner" class="planner"></section>
@@ -451,8 +460,13 @@
 
   <!-- Shared @lectio/core logic, vendored next to index.html by scripts/sync-core.js
        (and by electron-builder when packaged) so this relative path resolves both
-       under `npm start` and inside the flattened app bundle. -->
+       under `npm start` and inside the flattened app bundle. migrate.js must follow
+       planner-core.js (it reads window.PlannerCore); supabase-storage.js follows both
+       migrate.js and supabase-client.js (it reads window.PlannerMigrate and builds
+       window.lectioSupabaseStorage from window.lectioSupabase). -->
   <script src="planner-core.js"></script>
+  <script src="migrate.js"></script>
+  <script src="supabase-storage.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
