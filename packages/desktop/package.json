@@ -91,10 +91,12 @@
       "app.js",
       "auth.js",
       "supabase-client.js",
+      "supabase-storage.js",
       "supabase.js",
       "supabase-config.js",
       "style.css",
       "planner-core.js",
+      "migrate.js",
       "semesters/",
       "assets/icon.png"
     ],
