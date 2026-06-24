@@ -287,40 +287,18 @@
         <button id="settings-close" class="icon-btn" aria-label="Close settings"></button>
       </div>
 
-      <!-- Account / Profile (Phase 11.4) — parity with the mobile Profile hub. -->
-      <div class="settings-row">
-        <span class="settings-label">Account</span>
-        <span class="settings-value" id="set-account-email">—</span>
-      </div>
-
-      <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:0.4rem;">
-        <span class="settings-label">Change email</span>
-        <input type="email" id="set-email-input" placeholder="New email" autocomplete="email"
-               style="width:100%;padding:0.45rem;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;color:var(--text);background:var(--surface);" />
-        <button type="button" id="set-email-save" class="btn btn-small" style="align-self:flex-end;">Save email</button>
-      </div>
-
-      <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:0.4rem;">
-        <span class="settings-label">Change password</span>
-        <input type="password" id="set-pass-new" placeholder="New password" autocomplete="new-password"
-               style="width:100%;padding:0.45rem;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;color:var(--text);background:var(--surface);" />
-        <input type="password" id="set-pass-confirm" placeholder="Confirm new password" autocomplete="new-password"
-               style="width:100%;padding:0.45rem;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;color:var(--text);background:var(--surface);" />
-        <button type="button" id="set-pass-save" class="btn btn-small" style="align-self:flex-end;">Save password</button>
-      </div>
-
-      <div class="settings-row" style="padding-top:0;">
-        <span id="set-account-status" class="hidden" style="font-size:0.8rem;color:var(--muted);"></span>
-      </div>
-
-      <div class="settings-row">
-        <span class="settings-label">Session</span>
-        <button type="button" id="set-signout" class="btn btn-small">Sign out</button>
-      </div>
-
-      <div class="settings-row">
-        <span class="settings-label">Delete account</span>
-        <button type="button" id="set-delete-account" class="btn btn-small btn-danger">Delete account</button>
+      <!-- Account → Profile sub-window (parity with mobile Settings → Profile):
+           this row shows the signed-in email and opens #profile-overlay, which owns
+           change email / change password / sign out / delete account. -->
+      <div class="settings-row" id="set-profile-row" role="button" tabindex="0"
+           aria-label="Open profile settings" style="cursor:pointer;">
+        <span class="settings-label">Profile</span>
+        <span style="display:flex;align-items:center;gap:0.4rem;">
+          <span class="settings-value" id="set-account-email">—</span>
+          <svg class="ti" xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+               viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6l-6 6" /></svg>
+        </span>
       </div>
 
       <div class="settings-row">
@@ -356,6 +334,52 @@
       <div class="settings-row">
         <span class="settings-label">Version</span>
         <span class="settings-value" id="set-version">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Profile sub-window: opened from Settings → Profile (parity with the mobile
+       Profile hub). Closing it (back arrow / backdrop) returns to Settings. -->
+  <div id="profile-overlay" class="modal-overlay hidden">
+    <div class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="profile-title">
+      <div class="settings-header">
+        <h2 id="profile-title">Profile</h2>
+        <button id="profile-close" class="icon-btn" aria-label="Back to settings"></button>
+      </div>
+
+      <div class="settings-row">
+        <span class="settings-label">Signed in as</span>
+        <span class="settings-value" id="profile-email">—</span>
+      </div>
+
+      <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:0.4rem;">
+        <span class="settings-label">Change email</span>
+        <input type="email" id="set-email-input" placeholder="New email" autocomplete="email"
+               style="width:100%;padding:0.45rem;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;color:var(--text);background:var(--surface);" />
+        <button type="button" id="set-email-save" class="btn btn-small" style="align-self:flex-end;">Save email</button>
+      </div>
+
+      <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:0.4rem;">
+        <span class="settings-label">Change password</span>
+        <input type="password" id="set-pass-new" placeholder="New password" autocomplete="new-password"
+               style="width:100%;padding:0.45rem;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;color:var(--text);background:var(--surface);" />
+        <input type="password" id="set-pass-confirm" placeholder="Confirm new password" autocomplete="new-password"
+               style="width:100%;padding:0.45rem;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;color:var(--text);background:var(--surface);" />
+        <button type="button" id="set-pass-save" class="btn btn-small" style="align-self:flex-end;">Save password</button>
+      </div>
+
+      <div class="settings-row" style="padding-top:0;">
+        <span id="set-account-status" class="hidden" style="font-size:0.8rem;color:var(--muted);"></span>
+      </div>
+
+      <div class="settings-row">
+        <span class="settings-label">Session</span>
+        <button type="button" id="set-signout" class="btn btn-small">Sign out</button>
+      </div>
+
+      <div class="settings-row">
+        <span class="settings-label">Delete account</span>
+        <button type="button" id="set-delete-account" class="btn btn-small btn-danger">Delete account</button>
       </div>
     </div>
   </div>
