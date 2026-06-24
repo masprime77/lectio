@@ -112,7 +112,11 @@ The gaps are all about the new cross-device direction:
 - [ ] **Not wired to Supabase.** Desktop uses `fs-storage` only, so it does not
       sync with the mobile app or across machines. (Cross-device sync currently
       works mobile↔mobile.)
-- [ ] **No auth/account concept** on desktop — data is local, per-machine.
+- [x] **Auth/account on desktop** — the renderer now signs in against the same
+      Supabase project as mobile, and **Settings has a Profile/account section**
+      (parity with the mobile Profile hub): signed-in email, change email, change
+      password (length + match validation), sign out, and **delete account** via
+      the shared `delete-account` Edge Function.
 
 ## Cross-cutting / infra
 

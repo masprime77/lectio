@@ -120,8 +120,6 @@
         </button>
         <button id="feedback-btn" class="icon-btn" title="Feedback" aria-label="Feedback"></button>
         <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings"></button>
-        <!-- Temporary sign-out affordance (Phase 11.1); 11.4 formalizes this in Settings. -->
-        <button type="button" id="signout-btn" class="btn btn-small" title="Sign out">Sign out</button>
       </div>
     </div>
   </header>
@@ -287,6 +285,42 @@
       <div class="settings-header">
         <h2 id="settings-title">Settings</h2>
         <button id="settings-close" class="icon-btn" aria-label="Close settings"></button>
+      </div>
+
+      <!-- Account / Profile (Phase 11.4) — parity with the mobile Profile hub. -->
+      <div class="settings-row">
+        <span class="settings-label">Account</span>
+        <span class="settings-value" id="set-account-email">—</span>
+      </div>
+
+      <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:0.4rem;">
+        <span class="settings-label">Change email</span>
+        <input type="email" id="set-email-input" placeholder="New email" autocomplete="email"
+               style="width:100%;padding:0.45rem;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;color:var(--text);background:var(--surface);" />
+        <button type="button" id="set-email-save" class="btn btn-small" style="align-self:flex-end;">Save email</button>
+      </div>
+
+      <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:0.4rem;">
+        <span class="settings-label">Change password</span>
+        <input type="password" id="set-pass-new" placeholder="New password" autocomplete="new-password"
+               style="width:100%;padding:0.45rem;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;color:var(--text);background:var(--surface);" />
+        <input type="password" id="set-pass-confirm" placeholder="Confirm new password" autocomplete="new-password"
+               style="width:100%;padding:0.45rem;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;color:var(--text);background:var(--surface);" />
+        <button type="button" id="set-pass-save" class="btn btn-small" style="align-self:flex-end;">Save password</button>
+      </div>
+
+      <div class="settings-row" style="padding-top:0;">
+        <span id="set-account-status" class="hidden" style="font-size:0.8rem;color:var(--muted);"></span>
+      </div>
+
+      <div class="settings-row">
+        <span class="settings-label">Session</span>
+        <button type="button" id="set-signout" class="btn btn-small">Sign out</button>
+      </div>
+
+      <div class="settings-row">
+        <span class="settings-label">Delete account</span>
+        <button type="button" id="set-delete-account" class="btn btn-small btn-danger">Delete account</button>
       </div>
 
       <div class="settings-row">
