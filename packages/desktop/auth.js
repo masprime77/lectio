@@ -52,6 +52,37 @@
     if (error) throw error;
   }
 
+  // Mirror of the mobile AuthProvider account methods (same Supabase calls).
+  // Supabase emails the new address; the change applies after the user confirms.
+  async function updateEmail(newEmail) {
+    const c = client();
+    if (!c) throw new Error('Cannot reach the server. Check your connection and try again.');
+    const { error } = await c.auth.updateUser({ email: newEmail });
+    if (error) throw error;
+  }
+
+  // Requires an active session — used from Settings while already signed in.
+  async function updatePassword(newPassword) {
+    const c = client();
+    if (!c) throw new Error('Cannot reach the server. Check your connection and try again.');
+    const { error } = await c.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+  }
+
+  // Account deletion. The anon key can't delete its own auth user (that needs the
+  // service_role key, which never ships), so this runs through the SAME server-side
+  // `delete-account` Edge Function the mobile app uses (it holds the service_role
+  // key in its own env, verifies the caller's JWT, and deletes that user — their
+  // semesters cascade away via the table FK). On success, sign out locally to
+  // clear the now-stale session. Mirrors packages/mobile/src/auth/account.ts.
+  async function deleteAccount() {
+    const c = client();
+    if (!c) throw new Error('Cannot reach the server. Check your connection and try again.');
+    const { error } = await c.functions.invoke('delete-account');
+    if (error) throw error;
+    await c.auth.signOut();
+  }
+
   // Mirror of packages/mobile/src/auth/auth-errors.ts — kept identical by hand so
   // the two apps say the same thing (the desktop must not import from mobile).
   function friendlyAuthError(err) {
@@ -78,5 +109,15 @@
     return msg || 'Something went wrong. Please try again.';
   }
 
-  window.lectioAuth = { getSession, onAuthChange, signIn, signUp, signOut, friendlyAuthError };
+  window.lectioAuth = {
+    getSession,
+    onAuthChange,
+    signIn,
+    signUp,
+    signOut,
+    updateEmail,
+    updatePassword,
+    deleteAccount,
+    friendlyAuthError,
+  };
 })();
