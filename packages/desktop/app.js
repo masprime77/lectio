@@ -1463,6 +1463,21 @@ function setupTutorial() {
   });
 }
 
+// Populate the selector and load the last-active (or first) semester, or render
+// the empty state. Used by init() and again when re-entering after a sign-out.
+async function loadInitialData() {
+  const list = await populateSelector();
+  if (list.length) {
+    // Restore the last active semester if it still exists, else fall back to
+    // the first one (which loadSemester then records as the new last active).
+    const savedId = readPref('lastActiveSemesterId');
+    const idToLoad = list.some((s) => s.id === savedId) ? savedId : list[0].id;
+    await loadSemester(idToLoad);
+  } else {
+    renderEmptyState();
+  }
+}
+
 async function init() {
   document.body.classList.add('electron-app');
 
@@ -1487,15 +1502,18 @@ async function init() {
   collapseAllBtn.addEventListener('click', () => setAllWeeksOpen('none'));
   expandCurrentBtn.addEventListener('click', () => setAllWeeksOpen('current'));
 
-  const list = await populateSelector();
-  if (list.length) {
-    // Restore the last active semester if it still exists, else fall back to
-    // the first one (which loadSemester then records as the new last active).
-    const savedId = readPref('lastActiveSemesterId');
-    const idToLoad = list.some((s) => s.id === savedId) ? savedId : list[0].id;
-    await loadSemester(idToLoad);
-  } else {
-    renderEmptyState();
+  await loadInitialData();
+
+  const signoutBtn = document.getElementById('signout-btn');
+  if (signoutBtn) {
+    signoutBtn.addEventListener('click', async () => {
+      // onAuthChange → handleSession() shows the gate and clears state.
+      try {
+        await lectioAuth.signOut();
+      } catch (e) {
+        /* sign-out failing is non-fatal here */
+      }
+    });
   }
 
   document.getElementById('semester-select').addEventListener('change', (e) => {
@@ -2875,4 +2893,115 @@ function closeAddItemModal() {
   document.getElementById('add-item-overlay').classList.add('hidden');
 }
 
-init();
+// ---------------------------------------------------------------------------
+// Auth gate (Phase 11.1). The app is held behind a Supabase session: with no
+// session the sign-in overlay blocks the planner; with one, init() runs as
+// before (still reading local fs — the storage switch is 11.2). Storage and the
+// `api` layer are untouched here; this only adds the gate + sign-in UI.
+// ---------------------------------------------------------------------------
+let appStarted = false;     // true once init() has run (its listeners bind once)
+let signedIn = null;        // tracks the current state so we only act on changes
+
+// Clear the in-memory planner + its DOM so a signed-out window shows nothing.
+function clearPlannerState() {
+  state.semesterId = null;
+  state.semester = null;
+  state.focusedCourseId = null;
+  state.openWeeks = new Set();
+  state.openCourseWeeks = {};
+  markDirty(false);
+  const sel = document.getElementById('semester-select');
+  if (sel) sel.innerHTML = '';
+  const planner = document.getElementById('planner');
+  if (planner) planner.innerHTML = '';
+  const dashboard = document.getElementById('dashboard');
+  if (dashboard) dashboard.innerHTML = '';
+}
+
+function showSignIn() {
+  clearPlannerState();
+  const errEl = document.getElementById('signin-error');
+  if (errEl) errEl.classList.add('hidden');
+  document.getElementById('signin-overlay').classList.remove('hidden');
+}
+
+async function showApp() {
+  document.getElementById('signin-overlay').classList.add('hidden');
+  if (!appStarted) {
+    appStarted = true;
+    await init();           // one-time: binds listeners and loads data
+  } else {
+    await loadInitialData(); // re-entry after a sign-out: just reload the data
+  }
+}
+
+// Single place that reacts to auth state, ignoring no-op repeats (onAuthChange
+// fires an INITIAL_SESSION event that can duplicate the startup getSession()).
+function handleSession(session) {
+  const nowSignedIn = !!session;
+  if (nowSignedIn === signedIn) return;
+  signedIn = nowSignedIn;
+  if (nowSignedIn) {
+    showApp();
+  } else {
+    showSignIn();
+  }
+}
+
+// Wire the sign-in overlay's form, "Create account" button, busy + error states.
+function setupSignIn() {
+  const form = document.getElementById('signin-form');
+  const emailEl = document.getElementById('signin-email');
+  const pwEl = document.getElementById('signin-password');
+  const errEl = document.getElementById('signin-error');
+  const submitBtn = document.getElementById('signin-submit');
+  const createBtn = document.getElementById('signin-create');
+
+  function showError(msg) {
+    errEl.textContent = msg;
+    errEl.classList.remove('hidden');
+  }
+  function setBusy(busy) {
+    submitBtn.disabled = busy;
+    createBtn.disabled = busy;
+    emailEl.disabled = busy;
+    pwEl.disabled = busy;
+    submitBtn.textContent = busy ? 'Please wait…' : 'Sign in';
+  }
+
+  async function run(action) {
+    errEl.classList.add('hidden');
+    const email = emailEl.value.trim();
+    const password = pwEl.value;
+    if (!email || !password) {
+      showError('Enter your email and password.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await action(email, password);
+      // On success, onAuthChange → handleSession() hides the overlay and inits.
+      // (With email confirmation OFF — today's default — sign-up returns a
+      // session immediately; nothing more to do here.)
+      pwEl.value = '';
+    } catch (e) {
+      showError(lectioAuth.friendlyAuthError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    run(lectioAuth.signIn);
+  });
+  createBtn.addEventListener('click', () => run(lectioAuth.signUp));
+}
+
+async function bootstrap() {
+  setupSignIn();
+  lectioAuth.onAuthChange((session) => handleSession(session));
+  handleSession(await lectioAuth.getSession());
+}
+
+bootstrap();
