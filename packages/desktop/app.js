@@ -1570,18 +1570,6 @@ async function init() {
 
   await loadInitialData();
 
-  const signoutBtn = document.getElementById('signout-btn');
-  if (signoutBtn) {
-    signoutBtn.addEventListener('click', async () => {
-      // onAuthChange → handleSession() shows the gate and clears state.
-      try {
-        await lectioAuth.signOut();
-      } catch (e) {
-        /* sign-out failing is non-fatal here */
-      }
-    });
-  }
-
   document.getElementById('semester-select').addEventListener('change', (e) => {
     loadSemester(e.target.value);
   });
@@ -2742,7 +2730,130 @@ async function openSettingsModal() {
     });
   }
 
+  // Account / Profile section (Phase 11.4) — email + change email/password,
+  // sign out, delete account. Listeners are re-attached each open.
+  await populateAccountSection();
+
   document.getElementById('settings-overlay').classList.remove('hidden');
+}
+
+// Inline status/error line in the Account section. isError tints it danger.
+function setAccountStatus(msg, isError) {
+  const el = document.getElementById('set-account-status');
+  if (!el) return;
+  if (!msg) {
+    el.classList.add('hidden');
+    el.textContent = '';
+    return;
+  }
+  el.textContent = msg;
+  el.style.color = isError ? 'var(--danger)' : 'var(--muted)';
+  el.classList.remove('hidden');
+}
+
+// Replace a button with a fresh clone (dropping any previous handler, like the
+// tutorial button) and bind a click handler that receives the fresh element.
+function rewireButton(id, onClick) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  const fresh = btn.cloneNode(true);
+  btn.replaceWith(fresh);
+  fresh.addEventListener('click', () => onClick(fresh));
+}
+
+// Run an async action with the button disabled + a busy label, restored after.
+async function withBusy(btn, busyLabel, fn) {
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = busyLabel;
+  try {
+    await fn();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+
+async function populateAccountSection() {
+  const session = await lectioAuth.getSession();
+  const email = (session && session.user && session.user.email) || 'Not signed in';
+  const emailEl = document.getElementById('set-account-email');
+  if (emailEl) emailEl.textContent = email;
+
+  // Reset inputs + status on each open.
+  document.getElementById('set-email-input').value = '';
+  document.getElementById('set-pass-new').value = '';
+  document.getElementById('set-pass-confirm').value = '';
+  setAccountStatus('');
+
+  // Change email: Supabase emails the new address; the change applies after confirm.
+  rewireButton('set-email-save', (btn) => {
+    const next = document.getElementById('set-email-input').value.trim();
+    if (!next) {
+      setAccountStatus('Please enter a new email.', true);
+      return;
+    }
+    withBusy(btn, 'Saving…', async () => {
+      try {
+        await lectioAuth.updateEmail(next);
+        document.getElementById('set-email-input').value = '';
+        setAccountStatus(`Confirmation sent to ${next}; the change applies after you confirm it.`, false);
+      } catch (e) {
+        setAccountStatus(lectioAuth.friendlyAuthError(e), true);
+      }
+    });
+  });
+
+  // Change password: validate length ≥ 6 and that both fields match.
+  rewireButton('set-pass-save', (btn) => {
+    const np = document.getElementById('set-pass-new').value;
+    const cp = document.getElementById('set-pass-confirm').value;
+    if (np.length < 6) {
+      setAccountStatus('Password is too short (minimum 6 characters).', true);
+      return;
+    }
+    if (np !== cp) {
+      setAccountStatus('Passwords do not match.', true);
+      return;
+    }
+    withBusy(btn, 'Saving…', async () => {
+      try {
+        await lectioAuth.updatePassword(np);
+        document.getElementById('set-pass-new').value = '';
+        document.getElementById('set-pass-confirm').value = '';
+        setAccountStatus('Password updated.', false);
+      } catch (e) {
+        setAccountStatus(lectioAuth.friendlyAuthError(e), true);
+      }
+    });
+  });
+
+  // Sign out: close Settings, then sign out — onAuthChange shows the sign-in overlay.
+  rewireButton('set-signout', async () => {
+    closeSettingsModal();
+    try {
+      await lectioAuth.signOut();
+    } catch (e) {
+      /* non-fatal */
+    }
+  });
+
+  // Delete account: strong confirm, then the delete-account Edge Function. On
+  // success the session clears (signed out) and the sign-in overlay returns.
+  rewireButton('set-delete-account', (btn) => {
+    const ok = confirm(
+      'Permanently delete your account and all your semesters? This cannot be undone.'
+    );
+    if (!ok) return;
+    withBusy(btn, 'Deleting…', async () => {
+      try {
+        await lectioAuth.deleteAccount();
+        closeSettingsModal();
+      } catch (e) {
+        setAccountStatus(lectioAuth.friendlyAuthError(e), true);
+      }
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------
