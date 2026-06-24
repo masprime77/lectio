@@ -18,6 +18,34 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <!-- Sign-in overlay: gates the app until there is a Supabase session.
+       Same account as the Lectio mobile app. Storage still reads local fs in
+       this prompt — this only adds the auth gate (the storage switch is 11.2). -->
+  <div id="signin-overlay" class="modal-overlay hidden" role="dialog"
+       aria-modal="true" aria-labelledby="signin-title">
+    <div class="modal">
+      <h2 id="signin-title">Sign in to Lectio</h2>
+      <form id="signin-form">
+        <label>
+          Email
+          <input type="email" id="signin-email" autocomplete="username"
+                 placeholder="you@example.com" required />
+        </label>
+        <label>
+          Password
+          <input type="password" id="signin-password" autocomplete="current-password"
+                 placeholder="Password" required />
+        </label>
+        <span id="signin-error" class="hidden"
+              style="display:block;font-size:0.8rem;color:var(--danger);margin-top:0.4rem;"></span>
+        <div class="modal-actions">
+          <button type="button" id="signin-create" class="btn">Create account</button>
+          <button type="submit" id="signin-submit" class="btn btn-primary">Sign in</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Update dialog -->
   <div id="update-overlay" class="modal-overlay hidden" role="dialog"
        aria-modal="true" aria-labelledby="update-dialog-title">
@@ -95,6 +123,15 @@
       </div>
     </div>
   </header>
+
+  <!-- Offline notice: shown when a signed-in Supabase call hits a connectivity
+       error and the app falls back to local fs (Phase 11.2). -->
+  <div id="offline-banner" class="hidden" role="status" aria-live="polite"
+       style="text-align:center;padding:0.4rem 1rem;font-size:0.8rem;
+              background:var(--danger-bg);color:var(--danger);
+              border-bottom:1px solid var(--border);">
+    Working offline — changes may not sync.
+  </div>
 
   <main class="main">
     <section id="dashboard" class="dashboard"></section>
@@ -248,6 +285,42 @@
       <div class="settings-header">
         <h2 id="settings-title">Settings</h2>
         <button id="settings-close" class="icon-btn" aria-label="Close settings"></button>
+      </div>
+
+      <!-- Account / Profile (Phase 11.4) — parity with the mobile Profile hub. -->
+      <div class="settings-row">
+        <span class="settings-label">Account</span>
+        <span class="settings-value" id="set-account-email">—</span>
+      </div>
+
+      <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:0.4rem;">
+        <span class="settings-label">Change email</span>
+        <input type="email" id="set-email-input" placeholder="New email" autocomplete="email"
+               style="width:100%;padding:0.45rem;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;color:var(--text);background:var(--surface);" />
+        <button type="button" id="set-email-save" class="btn btn-small" style="align-self:flex-end;">Save email</button>
+      </div>
+
+      <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:0.4rem;">
+        <span class="settings-label">Change password</span>
+        <input type="password" id="set-pass-new" placeholder="New password" autocomplete="new-password"
+               style="width:100%;padding:0.45rem;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;color:var(--text);background:var(--surface);" />
+        <input type="password" id="set-pass-confirm" placeholder="Confirm new password" autocomplete="new-password"
+               style="width:100%;padding:0.45rem;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;color:var(--text);background:var(--surface);" />
+        <button type="button" id="set-pass-save" class="btn btn-small" style="align-self:flex-end;">Save password</button>
+      </div>
+
+      <div class="settings-row" style="padding-top:0;">
+        <span id="set-account-status" class="hidden" style="font-size:0.8rem;color:var(--muted);"></span>
+      </div>
+
+      <div class="settings-row">
+        <span class="settings-label">Session</span>
+        <button type="button" id="set-signout" class="btn btn-small">Sign out</button>
+      </div>
+
+      <div class="settings-row">
+        <span class="settings-label">Delete account</span>
+        <button type="button" id="set-delete-account" class="btn btn-small btn-danger">Delete account</button>
       </div>
 
       <div class="settings-row">
@@ -410,10 +483,48 @@
     </div>
   </div>
 
+  <!-- One-time local→cloud upload offer (Phase 11.3). Shown on first sign-in when
+       there are local fs semesters not yet in the account. Idempotent + non-destructive:
+       existing cloud ids default to Skip and are never overwritten. -->
+  <div id="local-import-overlay" class="modal-overlay hidden" role="dialog"
+       aria-modal="true" aria-labelledby="local-import-title">
+    <div class="modal">
+      <h2 id="local-import-title">Upload local semesters to your account?</h2>
+      <p style="margin:-0.5rem 0 1rem;font-size:0.85rem;color:var(--muted);">
+        These semesters are stored on this computer. Upload copies to your account so they
+        sync to your other devices. Your local copies stay on disk.
+      </p>
+      <div id="local-import-list"></div>
+      <p id="local-import-result" class="hidden"
+         style="margin-top:0.75rem;font-size:0.85rem;color:var(--text);"></p>
+      <div class="modal-actions">
+        <button type="button" id="local-import-skip" class="btn">Not now</button>
+        <button type="button" id="local-import-upload" class="btn btn-primary">Upload</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supabase (renderer-side). supabase.js is the UMD bundle (window.supabase),
+       supabase-config.js carries the project URL + anon key — both vendored/generated
+       next to index.html by scripts/sync-supabase.js (git-ignored), like planner-core.
+       Order matters: bundle → config → client → auth, all before app.js. -->
+  <script src="supabase.js"></script>
+  <script src="supabase-config.js"></script>
+  <script src="supabase-client.js"></script>
+  <script src="auth.js"></script>
+
   <!-- Shared @lectio/core logic, vendored next to index.html by scripts/sync-core.js
        (and by electron-builder when packaged) so this relative path resolves both
-       under `npm start` and inside the flattened app bundle. -->
+       under `npm start` and inside the flattened app bundle. migrate.js must follow
+       planner-core.js (it reads window.PlannerCore); supabase-storage.js follows both
+       migrate.js and supabase-client.js (it reads window.PlannerMigrate and builds
+       window.lectioSupabaseStorage from window.lectioSupabase). -->
   <script src="planner-core.js"></script>
+  <script src="migrate.js"></script>
+  <script src="supabase-storage.js"></script>
+  <!-- One-time local→cloud upload helper (reads window.planner, uploads via the
+       cloud adapter); must load before app.js, which triggers it after sign-in. -->
+  <script src="local-import.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
