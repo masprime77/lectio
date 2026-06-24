@@ -2992,7 +2992,7 @@ function showSignIn() {
   document.getElementById('signin-overlay').classList.remove('hidden');
 }
 
-async function showApp() {
+async function showApp(session) {
   document.getElementById('signin-overlay').classList.add('hidden');
   if (!appStarted) {
     appStarted = true;
@@ -3000,6 +3000,8 @@ async function showApp() {
   } else {
     await loadInitialData(); // re-entry after a sign-out: just reload the data
   }
+  // One-time local→cloud upload offer for this account (Phase 11.3).
+  await maybeOfferLocalUpload(session);
 }
 
 // Single place that reacts to auth state, ignoring no-op repeats (onAuthChange
@@ -3009,7 +3011,7 @@ function handleSession(session) {
   if (nowSignedIn === signedIn) return;
   signedIn = nowSignedIn;
   if (nowSignedIn) {
-    showApp();
+    showApp(session);
   } else {
     showSignIn();
   }
@@ -3063,6 +3065,131 @@ function setupSignIn() {
     run(lectioAuth.signIn);
   });
   createBtn.addEventListener('click', () => run(lectioAuth.signUp));
+}
+
+// ---------------------------------------------------------------------------
+// One-time local→cloud upload (Phase 11.3). The first time an account signs in
+// with semesters in local fs-storage, offer to upload them to the cloud —
+// explicit, confirmed, idempotent, and non-destructive. The "handled" flag is
+// keyed BY USER in localStorage (`localUploadDone:<userId>`) so a different
+// account on the same machine still gets its own offer.
+// ---------------------------------------------------------------------------
+function isLocalUploadDone(userId) {
+  return readPref(`localUploadDone:${userId}`) === 'true';
+}
+function setLocalUploadDone(userId) {
+  writePref(`localUploadDone:${userId}`, 'true');
+}
+
+async function maybeOfferLocalUpload(session) {
+  const userId = session && session.user && session.user.id;
+  if (!userId) return;
+  const cloud = window.lectioSupabaseStorage;
+  if (!cloud || !window.LocalImport) return; // not signed into cloud storage
+  if (isLocalUploadDone(userId)) return;
+
+  let local;
+  try {
+    local = await window.LocalImport.getLocalSemesters();
+  } catch (e) {
+    return; // local fs unavailable — skip silently
+  }
+  if (!local.length) {
+    setLocalUploadDone(userId); // nothing to upload; don't offer again
+    return;
+  }
+  await openLocalImportModal(cloud, userId);
+}
+
+// Build one row of the upload list: name + New/Already-in-account badge, plus a
+// Skip / Upload-as-a-copy choice for ids that already exist in the cloud.
+function renderLocalImportRow(item) {
+  const exists = item.status === 'exists';
+  const el = document.createElement('div');
+  el.style.cssText =
+    'display:flex;align-items:center;justify-content:space-between;gap:0.75rem;' +
+    'padding:0.5rem 0;border-bottom:1px solid var(--border);';
+
+  const left = document.createElement('div');
+  const nameEl = document.createElement('div');
+  nameEl.textContent = item.semester.name || item.semester.id;
+  nameEl.style.cssText = 'font-size:0.9rem;color:var(--text);';
+  const badge = document.createElement('span');
+  badge.textContent = exists ? 'Already in your account' : 'New';
+  badge.style.cssText = `font-size:0.72rem;color:${exists ? 'var(--muted)' : 'var(--primary)'};`;
+  left.appendChild(nameEl);
+  left.appendChild(badge);
+  el.appendChild(left);
+
+  let getAction;
+  if (exists) {
+    const sel = document.createElement('select');
+    sel.style.cssText =
+      'padding:0.3rem 0.4rem;border:1px solid var(--border);border-radius:6px;' +
+      'font-size:0.8rem;color:var(--text);background:var(--surface);';
+    sel.innerHTML =
+      '<option value="skip">Skip</option>' +
+      '<option value="upload-as-new">Upload as a copy</option>';
+    el.appendChild(sel);
+    getAction = () => sel.value; // 'skip' | 'upload-as-new'
+  } else {
+    getAction = () => 'upload';
+  }
+  return { el, getAction };
+}
+
+async function openLocalImportModal(cloud, userId) {
+  const overlay = document.getElementById('local-import-overlay');
+  const listEl = document.getElementById('local-import-list');
+  const resultEl = document.getElementById('local-import-result');
+  const uploadBtn = document.getElementById('local-import-upload');
+  const skipBtn = document.getElementById('local-import-skip');
+
+  // Reset to the initial state (so a re-trigger looks fresh).
+  resultEl.classList.add('hidden');
+  resultEl.textContent = '';
+  uploadBtn.classList.remove('hidden');
+  uploadBtn.disabled = false;
+  uploadBtn.textContent = 'Upload';
+  skipBtn.textContent = 'Not now';
+  listEl.innerHTML = '';
+
+  const plan = await window.LocalImport.planUpload(cloud); // [{ semester, status }]
+  const rows = plan.map((item) => {
+    const row = renderLocalImportRow(item);
+    listEl.appendChild(row.el);
+    return { semester: item.semester, getAction: row.getAction };
+  });
+
+  // "Not now": close without setting the flag, so the offer can return later
+  // (and 11.4's Settings → Profile can re-open it).
+  skipBtn.onclick = () => overlay.classList.add('hidden');
+
+  uploadBtn.onclick = async () => {
+    const decisions = rows.map((r) => ({ semester: r.semester, action: r.getAction() }));
+    uploadBtn.disabled = true;
+    uploadBtn.textContent = 'Uploading…';
+    try {
+      const results = await window.LocalImport.runUpload(cloud, decisions);
+      const uploaded = results.filter((r) => r.uploaded).length;
+      const skipped = results.filter((r) => r.skipped).length;
+      resultEl.textContent = `Uploaded ${uploaded}, skipped ${skipped}.`;
+      resultEl.classList.remove('hidden');
+      setLocalUploadDone(userId); // a decision was made — don't offer again
+      uploadBtn.classList.add('hidden');
+      skipBtn.textContent = 'Done';
+      // Surface any newly-uploaded semesters in the selector.
+      await loadInitialData();
+    } catch (e) {
+      console.error('Local upload failed:', e);
+      resultEl.textContent = 'Upload failed. Please try again.';
+      resultEl.classList.remove('hidden');
+      uploadBtn.disabled = false;
+      uploadBtn.textContent = 'Upload';
+    }
+  };
+
+  overlay.classList.remove('hidden');
 }
 
 async function bootstrap() {

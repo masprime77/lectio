@@ -449,6 +449,27 @@
     </div>
   </div>
 
+  <!-- One-time local→cloud upload offer (Phase 11.3). Shown on first sign-in when
+       there are local fs semesters not yet in the account. Idempotent + non-destructive:
+       existing cloud ids default to Skip and are never overwritten. -->
+  <div id="local-import-overlay" class="modal-overlay hidden" role="dialog"
+       aria-modal="true" aria-labelledby="local-import-title">
+    <div class="modal">
+      <h2 id="local-import-title">Upload local semesters to your account?</h2>
+      <p style="margin:-0.5rem 0 1rem;font-size:0.85rem;color:var(--muted);">
+        These semesters are stored on this computer. Upload copies to your account so they
+        sync to your other devices. Your local copies stay on disk.
+      </p>
+      <div id="local-import-list"></div>
+      <p id="local-import-result" class="hidden"
+         style="margin-top:0.75rem;font-size:0.85rem;color:var(--text);"></p>
+      <div class="modal-actions">
+        <button type="button" id="local-import-skip" class="btn">Not now</button>
+        <button type="button" id="local-import-upload" class="btn btn-primary">Upload</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Supabase (renderer-side). supabase.js is the UMD bundle (window.supabase),
        supabase-config.js carries the project URL + anon key — both vendored/generated
        next to index.html by scripts/sync-supabase.js (git-ignored), like planner-core.
@@ -467,6 +488,9 @@
   <script src="planner-core.js"></script>
   <script src="migrate.js"></script>
   <script src="supabase-storage.js"></script>
+  <!-- One-time local→cloud upload helper (reads window.planner, uploads via the
+       cloud adapter); must load before app.js, which triggers it after sign-in. -->
+  <script src="local-import.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
