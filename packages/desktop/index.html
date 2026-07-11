@@ -507,6 +507,28 @@
     </div>
   </div>
 
+  <!-- Conflict resolution modal (Phase 12.3). Raised by openConflictModal() when
+       the cloud adapter rejects a save because the row changed on another device
+       since we opened it. Same three outcomes as mobile. -->
+  <div id="conflict-overlay" class="modal-overlay hidden" role="dialog"
+       aria-modal="true" aria-labelledby="conflict-title">
+    <div class="modal">
+      <h2 id="conflict-title">Changed on another device</h2>
+      <p style="margin:-0.5rem 0 1rem;font-size:0.85rem;color:var(--muted);">
+        This semester was updated somewhere else since you opened it. What would you
+        like to do?
+      </p>
+      <div class="modal-actions">
+        <button type="button" id="conflict-cancel" class="btn">Cancel</button>
+        <button type="button" id="conflict-discard" class="btn">Use the latest</button>
+        <button type="button" id="conflict-keep" class="btn btn-primary">Keep my changes</button>
+      </div>
+      <p style="margin:0.75rem 0 0;font-size:0.75rem;color:var(--muted);text-align:right;">
+        Keeping your changes saves a backup of the other version.
+      </p>
+    </div>
+  </div>
+
   <!-- One-time local→cloud upload offer (Phase 11.3). Shown on first sign-in when
        there are local fs semesters not yet in the account. Idempotent + non-destructive:
        existing cloud ids default to Skip and are never overwritten. -->
@@ -542,9 +564,12 @@
        under `npm start` and inside the flattened app bundle. migrate.js must follow
        planner-core.js (it reads window.PlannerCore); supabase-storage.js follows both
        migrate.js and supabase-client.js (it reads window.PlannerMigrate and builds
-       window.lectioSupabaseStorage from window.lectioSupabase). -->
+       window.lectioSupabaseStorage from window.lectioSupabase). conflict.js must
+       also precede supabase-storage.js, whose save() reads window.PlannerConflict
+       to detect cloud write conflicts. -->
   <script src="planner-core.js"></script>
   <script src="migrate.js"></script>
+  <script src="conflict.js"></script>
   <script src="supabase-storage.js"></script>
   <!-- One-time local→cloud upload helper (reads window.planner, uploads via the
        cloud adapter); must load before app.js, which triggers it after sign-in. -->

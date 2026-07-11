@@ -8,6 +8,8 @@ import { AuthProvider, useAuth } from '../src/auth/AuthProvider';
 import { StudyModeProvider } from '../src/study/StudyModeProvider';
 import { TutorialProvider, useTutorial } from '../src/tutorial/TutorialProvider';
 import { TutorialOverlay } from '../src/tutorial/TutorialOverlay';
+import { ConflictProvider } from '../src/sync/ConflictProvider';
+import { ConflictDialog } from '../src/sync/ConflictDialog';
 import { prefs } from '../src/lib/prefs';
 import { useTheme } from '../src/theme';
 
@@ -91,6 +93,7 @@ function AppShell() {
           <Stack.Screen name="semester/item-form" options={{ presentation: 'modal', title: 'Item', headerShown: false }} />
         </Stack>
         <TutorialOverlay />
+        <ConflictDialog />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
@@ -117,7 +120,9 @@ export default function RootLayout() {
     <AuthProvider>
       <StudyModeProvider>
         <TutorialProvider>
-          <AppShell />
+          <ConflictProvider>
+            <AppShell />
+          </ConflictProvider>
         </TutorialProvider>
       </StudyModeProvider>
     </AuthProvider>

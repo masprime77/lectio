@@ -2,9 +2,10 @@
 // A JS port of packages/mobile/test/mocks/supabase-client.ts, exposing only the
 // query surface the desktop adapter uses so it runs in Node without a real
 // project. The shapes mirror supabase-js exactly:
-//   list   → from('semesters').select('id, data')              (bare await → all rows)
-//   get    → from('semesters').select('data').eq('id', id).maybeSingle()
-//   save   → auth.getUser() then from('semesters').upsert({ id, user_id, data, updated_at })
+//   list   → from('semesters').select('id, data, updated_at')     (bare await → all rows)
+//   get    → from('semesters').select('data, updated_at').eq('id', id).maybeSingle()
+//   save   → auth.getUser(), a pre-upsert select('updated_at, data').eq(...).maybeSingle()
+//            conflict check, then from('semesters').upsert({ id, user_id, data, updated_at })
 //   delete → from('semesters').delete().eq('id', id)
 //
 // Each call to createFakeClient() yields a fresh, authenticated, empty store, so a
@@ -27,10 +28,19 @@ export function createFakeClient() {
           },
           async maybeSingle() {
             const r = api._id ? rows.get(api._id) : undefined;
-            return { data: r ? { data: r.data } : null, error: null };
+            // Return updated_at alongside data so the adapter can track/check it
+            // (which columns were selected doesn't matter for this in-memory fake).
+            return {
+              data: r ? { data: r.data, updated_at: r.updated_at } : null,
+              error: null,
+            };
           },
           then(resolve) {
-            const all = [...rows.values()].map((r) => ({ id: r.id, data: r.data }));
+            const all = [...rows.values()].map((r) => ({
+              id: r.id,
+              data: r.data,
+              updated_at: r.updated_at,
+            }));
             resolve({ data: all, error: null });
           },
         };
@@ -61,6 +71,12 @@ export function createFakeClient() {
     // Test-only hook: force the next getUser() to report no signed-in user.
     __setUnauthenticated() {
       authedUserId = null;
+    },
+    // Test-only hook: out-of-band mutate a row's updated_at, simulating another
+    // device writing between our get() and save() — lets a test force a conflict.
+    __setUpdatedAt(id, updated_at) {
+      const r = rows.get(id);
+      if (r) r.updated_at = updated_at;
     },
   };
   return client;

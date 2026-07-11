@@ -177,6 +177,31 @@ export const STORAGE_METHODS: string[];
 export function assertStorage<T>(impl: T): T;
 
 // ---------------------------------------------------------------------------
+// storage/conflict surface (cloud write-conflict detection)
+// ---------------------------------------------------------------------------
+
+/** Thrown by a cloud adapter's save() when the row changed on another device. */
+export class ConflictError extends Error {
+  code: 'CONFLICT';
+  semesterId: string;
+  expectedUpdatedAt: string | null;
+  actualUpdatedAt: string | null;
+  remote: Semester | null;
+  constructor(
+    id: string,
+    opts?: {
+      expectedUpdatedAt?: string | null;
+      actualUpdatedAt?: string | null;
+      remote?: Semester | null;
+    }
+  );
+}
+export function detectConflict(
+  expected: string | null,
+  actual: string | null
+): boolean;
+
+// ---------------------------------------------------------------------------
 // integrations/lectio-file surface (the `.lectio.json` interchange helpers)
 // ---------------------------------------------------------------------------
 
