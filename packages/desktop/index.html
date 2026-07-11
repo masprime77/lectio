@@ -542,9 +542,12 @@
        under `npm start` and inside the flattened app bundle. migrate.js must follow
        planner-core.js (it reads window.PlannerCore); supabase-storage.js follows both
        migrate.js and supabase-client.js (it reads window.PlannerMigrate and builds
-       window.lectioSupabaseStorage from window.lectioSupabase). -->
+       window.lectioSupabaseStorage from window.lectioSupabase). conflict.js must
+       also precede supabase-storage.js, whose save() reads window.PlannerConflict
+       to detect cloud write conflicts. -->
   <script src="planner-core.js"></script>
   <script src="migrate.js"></script>
+  <script src="conflict.js"></script>
   <script src="supabase-storage.js"></script>
   <!-- One-time local→cloud upload helper (reads window.planner, uploads via the
        cloud adapter); must load before app.js, which triggers it after sign-in. -->

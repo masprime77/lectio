@@ -16,32 +16,57 @@
 (function (global, factory) {
   let migrate;
   let assertStorage;
+  let detectConflict;
+  let ConflictError;
   if (typeof module !== 'undefined' && module.exports) {
     migrate = require('@lectio/core/storage/migrate').migrateStatusToTagId;
     assertStorage = require('@lectio/core/storage/contract').assertStorage;
-    module.exports = factory(migrate, assertStorage);
+    const conflict = require('@lectio/core/storage/conflict');
+    detectConflict = conflict.detectConflict;
+    ConflictError = conflict.ConflictError;
+    module.exports = factory(migrate, assertStorage, detectConflict, ConflictError);
     return;
   }
   if (global) {
     migrate = global.PlannerMigrate && global.PlannerMigrate.migrateStatusToTagId;
+    // conflict.js is vendored + loaded before this file (see index.html), exposing
+    // window.PlannerConflict — the same pattern as migrate → window.PlannerMigrate.
+    const conflict = global.PlannerConflict || {};
+    detectConflict = conflict.detectConflict;
+    ConflictError = conflict.ConflictError;
     // assertStorage isn't exposed to the renderer; the adapter shape is verified
     // by the contract test in Node, so skip it here.
-    const createSupabaseStorage = factory(migrate, null);
+    const createSupabaseStorage = factory(migrate, null, detectConflict, ConflictError);
     global.createSupabaseStorage = createSupabaseStorage;
     // Construct the live adapter once the renderer client is up (11.1).
     if (global.lectioSupabase) {
       global.lectioSupabaseStorage = createSupabaseStorage(global.lectioSupabase);
     }
   }
-})(typeof window !== 'undefined' ? window : null, function (migrateStatusToTagId, assertStorage) {
+})(typeof window !== 'undefined' ? window : null, function (
+  migrateStatusToTagId,
+  assertStorage,
+  detectConflict,
+  ConflictError
+) {
   const safeId = (id) => /^[a-zA-Z0-9_-]+$/.test(id);
 
   return function createSupabaseStorage(client) {
+    // Last observed `updated_at` per id, filled on list/get and checked on save —
+    // see the mobile supabase-storage.ts for the rationale (kept byte-symmetric).
+    const seen = new Map();
+
     const adapter = {
       async list() {
-        const { data, error } = await client.from('semesters').select('id, data');
+        const { data, error } = await client
+          .from('semesters')
+          .select('id, data, updated_at');
         if (error) throw error;
-        return (data || []).map((r) => ({
+        const rows = data || [];
+        for (const r of rows) {
+          if (r.updated_at != null) seen.set(r.id, r.updated_at);
+        }
+        return rows.map((r) => ({
           id: r.id,
           // Mirror mobile's `r.data?.name ?? r.id` (keeps an empty-string name).
           name: r.data && r.data.name != null ? r.data.name : r.id,
@@ -52,11 +77,12 @@
         if (!safeId(id)) throw new Error(`Invalid semester id: ${id}`);
         const { data, error } = await client
           .from('semesters')
-          .select('data')
+          .select('data, updated_at')
           .eq('id', id)
           .maybeSingle();
         if (error) throw error;
         if (!data) throw new Error(`Semester not found: ${id}`);
+        if (data.updated_at != null) seen.set(id, data.updated_at);
         return migrateStatusToTagId(data.data);
       },
 
@@ -65,13 +91,31 @@
         const { data: u } = await client.auth.getUser();
         const user_id = u && u.user && u.user.id;
         if (!user_id) throw new Error('Not authenticated');
+        // Read the current cloud row and reject if it moved since we last saw it
+        // (one extra read per save — acceptable for correctness).
+        const { data: cur } = await client
+          .from('semesters')
+          .select('updated_at, data')
+          .eq('id', id)
+          .maybeSingle();
+        const expected = seen.has(id) ? seen.get(id) : null;
+        const actual = cur && cur.updated_at != null ? cur.updated_at : null;
+        if (detectConflict(expected, actual)) {
+          throw new ConflictError(id, {
+            expectedUpdatedAt: expected,
+            actualUpdatedAt: actual,
+            remote: cur ? migrateStatusToTagId(cur.data) : null,
+          });
+        }
+        const newTs = new Date().toISOString();
         const { error } = await client.from('semesters').upsert({
           id,
           user_id,
           data: value,
-          updated_at: new Date().toISOString(),
+          updated_at: newTs,
         });
         if (error) throw error;
+        seen.set(id, newTs);
         return { ok: true, id };
       },
 
