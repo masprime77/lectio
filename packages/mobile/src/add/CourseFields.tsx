@@ -13,6 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { addCourse, editCourseColor, editCourseName } from '@lectio/core/planner-core';
 import { storage } from '../storage';
+import { saveWithConflict } from '../sync/saveWithConflict';
 import { useTheme } from '../theme';
 
 const COURSE_COLORS = ['#4a90d9', '#22c55e', '#ef4444', '#f97316',
@@ -89,7 +90,12 @@ export function CourseFields({
       } else {
         addCourse(sem, { name: trimmedName, color });
       }
-      await storage.save(id, sem);
+      // Conflict-aware: "Cancel" stays on the form so edits aren't lost.
+      const outcome = await saveWithConflict(id, sem);
+      if (outcome === 'cancelled') {
+        setBusy(false);
+        return;
+      }
       router.back();
     } catch (e: any) {
       setError(e?.message ?? 'Something went wrong.');

@@ -24,6 +24,7 @@ import {
   reorderTags,
 } from '@lectio/core/planner-core';
 import { storage } from '../storage';
+import { saveWithConflict } from '../sync/saveWithConflict';
 import { useTheme } from '../theme';
 import { FormTabs } from '../components/FormTabs';
 import type { Semester, Tag, TagSection } from '../../types/lectio-core';
@@ -141,7 +142,11 @@ export function TagsFields({ semesterId }: { semesterId: string }) {
   const persist = useCallback(
     (next: Semester) => {
       setSemester(next);
-      storage.save(semesterId, next).catch((err) => console.warn('save failed', err));
+      // Conflict-aware: onApplied swaps the editor to the cloud version on "Use
+      // the latest"; "Cancel" keeps `next` on screen unsaved.
+      saveWithConflict(semesterId, next, setSemester).catch((err) =>
+        console.warn('save failed', err)
+      );
     },
     [semesterId]
   );
