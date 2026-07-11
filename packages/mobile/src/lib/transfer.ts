@@ -22,6 +22,7 @@ import {
 import { uid } from '@lectio/core/planner-core';
 import type { Course, Semester } from '../../types/lectio-core';
 import { storage } from '../storage';
+import { saveWithConflict } from '../sync/saveWithConflict';
 
 // A safe filename stem, mirroring the desktop's export naming.
 function fileStem(name: string): string {
@@ -113,7 +114,10 @@ export async function saveImportedSemester(
   if (ids.has(toSave.id)) {
     toSave = { ...toSave, id: uniqueSemesterId(toSave.name, ids) };
   }
-  await storage.save(toSave.id, toSave);
+  // Imports always land on a free id, so a conflict is not expected; route
+  // through the helper anyway so a stray ConflictError surfaces the dialog
+  // rather than crashing the import.
+  await saveWithConflict(toSave.id, toSave);
   return { id: toSave.id, name: toSave.name };
 }
 
@@ -133,6 +137,8 @@ export async function saveImportedCourse(
     ...semester,
     courses: [...(semester.courses ?? []), fresh],
   };
-  await storage.save(semesterId, next);
+  // Fresh `get` above refreshed the adapter baseline, so this rarely conflicts;
+  // route through the helper so any conflict surfaces the dialog, not a crash.
+  await saveWithConflict(semesterId, next);
   return { name: fresh.name };
 }
