@@ -9,6 +9,7 @@ import {
   sortedCourses,
 } from '@lectio/core/planner-core';
 import { storage } from '../../src/storage';
+import { saveWithConflict } from '../../src/sync/saveWithConflict';
 import { prefs } from '../../src/lib/prefs';
 import { useSortOrder } from '../../src/lib/use-sort-order';
 import { useStudyMode } from '../../src/study/StudyModeProvider';
@@ -74,7 +75,9 @@ export default function CoursesScreen() {
   const persist = useCallback(
     (next: Semester) => {
       setSemester(next);
-      storage.save(id, next).catch((err) => console.warn('save failed', err));
+      // Conflict-aware: onApplied swaps the screen to the cloud version when the
+      // user chooses "Use the latest"; "Cancel" leaves `next` on screen unsaved.
+      saveWithConflict(id, next, setSemester).catch((err) => console.warn('save failed', err));
     },
     [id]
   );

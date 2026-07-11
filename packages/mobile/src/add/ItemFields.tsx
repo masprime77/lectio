@@ -13,6 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { addItem, editItem, getCourses } from '@lectio/core/planner-core';
 import { storage } from '../storage';
+import { saveWithConflict } from '../sync/saveWithConflict';
 import { useTheme } from '../theme';
 import { DateField } from '../components/DateField';
 
@@ -117,7 +118,12 @@ export function ItemFields({
           ...(kind === 'task' ? { dueDate: trimmedDue } : {}),
         });
       }
-      await storage.save(id, sem);
+      // Conflict-aware: "Cancel" stays on the form so edits aren't lost.
+      const outcome = await saveWithConflict(id, sem);
+      if (outcome === 'cancelled') {
+        setBusy(false);
+        return;
+      }
       router.back();
     } catch (e: any) {
       setError(e?.message ?? 'Something went wrong.');
