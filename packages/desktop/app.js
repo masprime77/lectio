@@ -144,6 +144,51 @@ const api = {
 };
 
 // ---------------------------------------------------------------------------
+// Conflict-aware save (Phase 12.3). The cloud (Supabase) adapter throws a
+// ConflictError (code 'CONFLICT') from save() when the row changed on another
+// device since we last observed it. saveWithConflict() is the single path all
+// desktop saves go through: on a conflict it opens the resolution modal and
+// applies the user's choice.
+//   - 'cancel'  → return { cancelled: true }; the caller keeps its unsaved edit.
+//   - 'discard' → return { applied: remote, reloaded: true }; the caller reloads
+//                 the cloud version into state / the view.
+//   - 'keep'    → back up the remote copy (recoverable, non-destructive), refresh
+//                 the adapter's `seen` baseline via a load, then force the write.
+// The fs fallback path can't conflict (no baseline compare), so ConflictError
+// only arises when online — offline saves never reach the modal.
+async function saveWithConflict(id, value) {
+  try {
+    await api.save(id, value);
+    return { applied: value };
+  } catch (err) {
+    if (err && err.code === 'CONFLICT') {
+      const choice = await openConflictModal();
+      if (choice === 'cancel') return { cancelled: true };
+      if (choice === 'discard') return { applied: err.remote, reloaded: true };
+      // keep: stash the remote version, refresh baseline, then force the write.
+      await backupRemote(id, err.remote);
+      await api.load(id).catch(() => {}); // refreshes the adapter's `seen` baseline
+      await api.save(id, value);
+      return { applied: value };
+    }
+    throw err;
+  }
+}
+
+// Save the remote (losing) version under a fresh, non-colliding id so the user
+// can recover it from the semester list. Non-destructive; skipped if there's no
+// remote blob to preserve.
+async function backupRemote(id, remote) {
+  if (!remote) return;
+  const ids = new Set((await api.list()).map((s) => s.id));
+  let backupId = `${id}-conflict-backup`;
+  let n = 2;
+  while (ids.has(backupId)) backupId = `${id}-conflict-backup-${n++}`;
+  const name = (remote.name || id) + ' (conflict backup)';
+  await api.save(backupId, { ...remote, id: backupId, name });
+}
+
+// ---------------------------------------------------------------------------
 // Save system: debounced autosave with a header "Saving…/Saved" indicator.
 // ---------------------------------------------------------------------------
 const SAVE_DEBOUNCE_MS = 500;
