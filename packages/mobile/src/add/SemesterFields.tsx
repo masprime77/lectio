@@ -13,6 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { DEFAULT_READING_TAGS, DEFAULT_TASK_TAGS } from '@lectio/core/planner-core';
 import { storage } from '../storage';
+import { saveWithConflict } from '../sync/saveWithConflict';
 import { uniqueSemesterId } from '../lib/semester-id';
 import { useTheme } from '../theme';
 import { DateField } from '../components/DateField';
@@ -91,7 +92,14 @@ export function SemesterFields({
           startDate: date,
           weeks: parsedWeeks,
         };
-        await storage.save(id, updated);
+        // Conflict-aware: "Cancel" stays on the form so the input isn't lost;
+        // "Keep"/"Use the latest" both leave and the list reload reflects the
+        // resolved state.
+        const outcome = await saveWithConflict(id, updated);
+        if (outcome === 'cancelled') {
+          setBusy(false);
+          return;
+        }
       } else {
         const existing = await storage.list();
         const newId = uniqueSemesterId(trimmedName, new Set(existing.map((s) => s.id)));
@@ -104,7 +112,8 @@ export function SemesterFields({
           readingTags: DEFAULT_READING_TAGS.map((t) => ({ ...t })),
           taskTags: DEFAULT_TASK_TAGS.map((t) => ({ ...t })),
         };
-        await storage.save(newId, semester);
+        // A fresh id can't conflict, but route through the helper for uniformity.
+        await saveWithConflict(newId, semester);
       }
       router.back();
     } catch (e: any) {

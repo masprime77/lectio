@@ -34,3 +34,38 @@ describe('desktop-supabase-storage: auth guard', () => {
     ).rejects.toThrow(/not authenticated/i);
   });
 });
+
+// Beyond the contract: cloud write-conflict detection (Phase 12.1).
+describe('desktop-supabase-storage: conflict detection', () => {
+  const v1 = { id: 'c', name: 'C', courses: [] };
+  const v2 = { id: 'c', name: 'C edited here', courses: [] };
+
+  it('save() rejects with ConflictError when the row changed on another device', async () => {
+    const client = createFakeClient();
+    const s = createSupabaseStorage(client);
+    await s.save('c', v1); // baseline written
+    await s.get('c'); // observe current updated_at
+    // Another device writes: bump the row's updated_at out-of-band.
+    client.__setUpdatedAt('c', '2999-01-01T00:00:00.000Z');
+
+    const err = await s.save('c', v2).catch((e) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err.name).toBe('ConflictError');
+    expect(err.code).toBe('CONFLICT');
+    expect(err.semesterId).toBe('c');
+    expect(err.actualUpdatedAt).toBe('2999-01-01T00:00:00.000Z');
+    // .remote is the bumped remote blob (migrated), for the "load latest" path.
+    expect(err.remote.name).toBe('C');
+    expect(Array.isArray(err.remote.readingTags)).toBe(true);
+  });
+
+  it('save() succeeds and advances the baseline when there is no external change', async () => {
+    const client = createFakeClient();
+    const s = createSupabaseStorage(client);
+    await s.save('c', v1);
+    await s.get('c');
+    await expect(s.save('c', v2)).resolves.toEqual({ ok: true, id: 'c' });
+    // Baseline advanced, so an immediate second save also succeeds.
+    await expect(s.save('c', v1)).resolves.toEqual({ ok: true, id: 'c' });
+  });
+});

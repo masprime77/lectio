@@ -12,6 +12,7 @@
     "./integrations/lectio-file": "./src/integrations/lectio-file.js",
     "./storage/migrate": "./src/storage/migrate.js",
     "./storage/contract": "./src/storage/contract.js",
+    "./storage/conflict": "./src/storage/conflict.js",
     "./storage/fs": "./src/storage/fs-storage.js"
   },
   "scripts": {
