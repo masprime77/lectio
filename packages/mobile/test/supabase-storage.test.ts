@@ -7,7 +7,11 @@ import { describe, it, expect, vi } from 'vitest';
 // absolute path can't intercept a relative specifier, hence vi.mock here.
 vi.mock('../src/supabase/client', () => import('./mocks/supabase-client'));
 
-import { __reset, __setUnauthenticated } from './mocks/supabase-client';
+import {
+  __reset,
+  __setUnauthenticated,
+  __setUpdatedAt,
+} from './mocks/supabase-client';
 import { createSupabaseStorage } from '../src/storage/supabase-storage';
 import { assertStorage } from '@lectio/core/storage/contract';
 import { runStorageContract } from '../../core/tests/contract/storage-contract.js';
@@ -33,5 +37,40 @@ describe('supabase-storage: auth guard', () => {
     await expect(
       s.save('x', { id: 'x', name: 'X', courses: [] })
     ).rejects.toThrow(/not authenticated/i);
+  });
+});
+
+// Beyond the contract: cloud write-conflict detection (Phase 12.1).
+describe('supabase-storage: conflict detection', () => {
+  const v1 = { id: 'c', name: 'C', courses: [] };
+  const v2 = { id: 'c', name: 'C edited here', courses: [] };
+
+  it('save() rejects with ConflictError when the row changed on another device', async () => {
+    __reset();
+    const s = createSupabaseStorage();
+    await s.save('c', v1); // baseline written
+    await s.get('c'); // observe current updated_at
+    // Another device writes: bump the row's updated_at out-of-band.
+    __setUpdatedAt('c', '2999-01-01T00:00:00.000Z');
+
+    const err = await s.save('c', v2).catch((e) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err.name).toBe('ConflictError');
+    expect(err.code).toBe('CONFLICT');
+    expect(err.semesterId).toBe('c');
+    expect(err.actualUpdatedAt).toBe('2999-01-01T00:00:00.000Z');
+    // .remote is the bumped remote blob (migrated), for the "load latest" path.
+    expect(err.remote?.name).toBe('C');
+    expect(Array.isArray(err.remote?.readingTags)).toBe(true);
+  });
+
+  it('save() succeeds and advances the baseline when there is no external change', async () => {
+    __reset();
+    const s = createSupabaseStorage();
+    await s.save('c', v1);
+    await s.get('c');
+    await expect(s.save('c', v2)).resolves.toEqual({ ok: true, id: 'c' });
+    // Baseline advanced, so an immediate second save also succeeds.
+    await expect(s.save('c', v1)).resolves.toEqual({ ok: true, id: 'c' });
   });
 });
