@@ -144,6 +144,74 @@ const api = {
 };
 
 // ---------------------------------------------------------------------------
+// Conflict-aware save (Phase 12.3). The cloud (Supabase) adapter throws a
+// ConflictError (code 'CONFLICT') from save() when the row changed on another
+// device since we last observed it. saveWithConflict() is the single path all
+// desktop saves go through: on a conflict it opens the resolution modal and
+// applies the user's choice.
+//   - 'cancel'  → return { cancelled: true }; the caller keeps its unsaved edit.
+//   - 'discard' → return { applied: remote, reloaded: true }; the caller reloads
+//                 the cloud version into state / the view.
+//   - 'keep'    → back up the remote copy (recoverable, non-destructive), refresh
+//                 the adapter's `seen` baseline via a load, then force the write.
+// The fs fallback path can't conflict (no baseline compare), so ConflictError
+// only arises when online — offline saves never reach the modal.
+async function saveWithConflict(id, value) {
+  try {
+    await api.save(id, value);
+    return { applied: value };
+  } catch (err) {
+    if (err && err.code === 'CONFLICT') {
+      const choice = await openConflictModal();
+      if (choice === 'cancel') return { cancelled: true };
+      if (choice === 'discard') return { applied: err.remote, reloaded: true };
+      // keep: stash the remote version, refresh baseline, then force the write.
+      await backupRemote(id, err.remote);
+      await api.load(id).catch(() => {}); // refreshes the adapter's `seen` baseline
+      await api.save(id, value);
+      return { applied: value };
+    }
+    throw err;
+  }
+}
+
+// Save the remote (losing) version under a fresh, non-colliding id so the user
+// can recover it from the semester list. Non-destructive; skipped if there's no
+// remote blob to preserve.
+async function backupRemote(id, remote) {
+  if (!remote) return;
+  const ids = new Set((await api.list()).map((s) => s.id));
+  let backupId = `${id}-conflict-backup`;
+  let n = 2;
+  while (ids.has(backupId)) backupId = `${id}-conflict-backup-${n++}`;
+  const name = (remote.name || id) + ' (conflict backup)';
+  await api.save(backupId, { ...remote, id: backupId, name });
+}
+
+// Show the conflict resolution modal and resolve to the clicked choice
+// ('keep' | 'discard' | 'cancel'). Buttons are re-cloned before wiring so
+// listeners never accumulate across opens (same pattern the settings tabs use).
+function openConflictModal() {
+  const overlay = document.getElementById('conflict-overlay');
+  return new Promise((resolve) => {
+    const finish = (choice) => {
+      overlay.classList.add('hidden');
+      resolve(choice);
+    };
+    const wire = (btnId, choice) => {
+      const btn = document.getElementById(btnId);
+      const fresh = btn.cloneNode(true);
+      btn.replaceWith(fresh);
+      fresh.addEventListener('click', () => finish(choice));
+    };
+    wire('conflict-keep', 'keep');
+    wire('conflict-discard', 'discard');
+    wire('conflict-cancel', 'cancel');
+    overlay.classList.remove('hidden');
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Save system: debounced autosave with a header "Saving…/Saved" indicator.
 // ---------------------------------------------------------------------------
 const SAVE_DEBOUNCE_MS = 500;
@@ -246,8 +314,18 @@ async function flushSave() {
   }
   save.saving = true;
   saveIndicator('saving');
+  let cancelled = false;
   try {
-    await api.save(state.semesterId, state.semester);
+    const r = await saveWithConflict(state.semesterId, state.semester);
+    if (r.reloaded) {
+      // "Use the latest": adopt the cloud version and re-render, dropping the
+      // in-memory edit that lost the conflict.
+      state.semester = r.applied;
+      render();
+    } else if (r.cancelled) {
+      // The edit stays on screen and unsaved; keep the dirty state below.
+      cancelled = true;
+    }
   } catch (err) {
     console.error('Save failed:', err);
   } finally {
@@ -256,8 +334,13 @@ async function flushSave() {
       save.queued = false;
       return flushSave();
     }
-    markDirty(false);
-    saveIndicator('saved');
+    if (cancelled) {
+      markDirty(true);
+      saveIndicator('unsaved');
+    } else {
+      markDirty(false);
+      saveIndicator('saved');
+    }
   }
 }
 
@@ -1953,10 +2036,17 @@ async function importSemester(parsedPayload) {
       }
 
       try {
-        await api.save(targetId, toSave);
-        await populateSelector();
-        await loadSemester(targetId);
-        showSaveStatus('Semester imported', 2000);
+        const r = await saveWithConflict(targetId, toSave);
+        if (r.cancelled) {
+          // User chose Cancel in the conflict modal: nothing written, don't switch.
+          showSaveStatus('Import cancelled', 2000);
+        } else {
+          // Whether we wrote our copy or reloaded the cloud version, land on the
+          // resulting semester (loadSemester re-reads from storage).
+          await populateSelector();
+          await loadSemester(targetId);
+          showSaveStatus(r.reloaded ? 'Loaded latest version' : 'Semester imported', 2000);
+        }
       } catch (err) {
         alert('Import failed: ' + (err.message || err));
       }
@@ -2442,7 +2532,11 @@ async function submitModal() {
       readingTags: getReadingTags(base),
       taskTags: getTaskTags(base),
     };
-    await api.save(state.editingId, semester);
+    const r = await saveWithConflict(state.editingId, semester);
+    // Cancel: keep the editor open so the user's in-progress edits aren't lost.
+    if (r.cancelled) return;
+    // Applied or reloaded: loadSemester re-reads storage (our copy, or the cloud
+    // version we discarded to), so the view lands on the resolved semester.
     closeModal();
     await populateSelector();
     await loadSemester(state.editingId);
@@ -2485,7 +2579,10 @@ async function submitModal() {
     readingTags: getReadingTags(draft),
     taskTags: getTaskTags(draft),
   };
-  await api.save(id, semester);
+  // A freshly-minted id has no cloud baseline, so this can't actually conflict;
+  // routed through the same wrapper for uniformity (cancel would keep the modal).
+  const r = await saveWithConflict(id, semester);
+  if (r.cancelled) return;
   closeModal();
   await populateSelector();
   await loadSemester(id);
