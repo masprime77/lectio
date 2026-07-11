@@ -128,8 +128,13 @@ The gaps are all about the new cross-device direction:
       in-memory AsyncStorage / Supabase-client fakes under Vitest).
 - [ ] **Realtime live-sync** — the Supabase adapter does plain reads/writes; no
       `realtime` subscriptions, so other devices update only on refocus/reload.
-- [ ] **Offline mode / conflict resolution** — `device-storage` exists as the
-      intended offline fallback but is not wired up; there's no merge strategy.
+- [ ] **Offline mode** — `device-storage` exists as the intended offline
+      fallback but is not wired up; there's no offline↔cloud merge strategy.
+- [x] **Conflict resolution (mobile)** — the Supabase adapter detects cloud
+      write conflicts (12.1) and the mobile app now surfaces a resolution dialog
+      (Keep my changes / Use the latest / Cancel) routed through one
+      conflict-aware save helper, backing up the overwritten remote version on
+      "keep" (12.2). The desktop equivalent (12.3) is still pending.
 - [ ] **Desktop → Supabase wiring** — the planned 4th use of the storage
       adapter, to bring desktop into the same sync model as mobile.
 
