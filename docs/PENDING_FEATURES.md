@@ -138,6 +138,25 @@ The gaps are all about the new cross-device direction:
 - [ ] **Desktop → Supabase wiring** — the planned 4th use of the storage
       adapter, to bring desktop into the same sync model as mobile.
 
+## Moodle integration (Track C)
+
+Auto-populate a semester from a student's real Moodle courses instead of
+typing everything by hand. See `docs/MOODLE_INTEGRATION_SPIKE.md` for the
+design decision.
+
+- [ ] **Phase 13 — design spike** — decision doc
+      (`docs/MOODLE_INTEGRATION_SPIKE.md`) and a throwaway PoC
+      (`spikes/moodle-poc/`) exist; still needs a live run against a real
+      Moodle instance to confirm the approach before Phase 14 starts.
+- [ ] **Phase 14 — core mapper** — pure `@lectio/core/integrations/moodle`
+      module (`mapMoodleCoursesToCourses`, `mapMoodleContentToWeeks`,
+      `mergeMoodleIntoSemester`) with a Vitest fixture suite.
+- [ ] **Phase 15 — fetch + auth (platform layers)** — network client +
+      secure token storage (Expo SecureStore on mobile, OS keychain on
+      desktop).
+- [ ] **Phase 16 — sync UX** — "Import from Moodle" preview/confirm flow,
+      re-sync, per-course opt-in.
+
 ## Notes
 
 - This is a living checklist — fold any future "pending/roadmap" notes in here
