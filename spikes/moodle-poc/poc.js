@@ -7,7 +7,12 @@
 // no tests, no package.json, run directly with Node's built-in fetch.
 //
 // Usage:
-//   node --env-file=.env spikes/moodle-poc/poc.js
+//   node --env-file=.env spikes/moodle-poc/poc.js [courseId]
+//
+// With no courseId, targets the first course returned by
+// core_enrol_get_users_courses. Pass a courseId (e.g. 1998) to target a
+// specific course instead — useful for re-running against a course that
+// actually has active assignments.
 //
 // Required env vars (see .env.example):
 //   MOODLE_BASE_URL  e.g. https://moodle.tu-darmstadt.de
@@ -18,6 +23,12 @@ const path = require('path');
 
 const BASE_URL = process.env.MOODLE_BASE_URL;
 const TOKEN = process.env.MOODLE_TOKEN;
+
+const REQUESTED_COURSE_ID = process.argv[2] ? Number(process.argv[2]) : null;
+if (process.argv[2] && Number.isNaN(REQUESTED_COURSE_ID)) {
+  console.error(`Invalid course id argument: "${process.argv[2]}" is not a number.`);
+  process.exit(1);
+}
 
 if (!BASE_URL || !TOKEN) {
   console.error(
@@ -68,7 +79,19 @@ async function main() {
     return;
   }
 
-  const target = courses[0];
+  let target;
+  if (REQUESTED_COURSE_ID !== null) {
+    target = courses.find((c) => c.id === REQUESTED_COURSE_ID);
+    if (!target) {
+      console.error(
+        `Course id ${REQUESTED_COURSE_ID} was not found among your ${courses.length} enrolled course(s).\n` +
+          'Enrolled course ids: ' + courses.map((c) => c.id).join(', ')
+      );
+      process.exit(1);
+    }
+  } else {
+    target = courses[0];
+  }
   console.log(`3/3 — core_course_get_contents for "${target.fullname}" (id ${target.id})`);
   const contents = await callMoodle('core_course_get_contents', { courseid: target.id });
   saveOutput(`course-${target.id}-contents`, contents);

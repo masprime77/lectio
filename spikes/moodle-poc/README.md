@@ -26,6 +26,9 @@ token, get your user id), `core_enrol_get_users_courses` (list your courses),
 optional `mod_assign_get_assignments`, and writes each raw response into
 `output/` for inspection.
 
+Pass a course id as an argument to target a specific course instead of the
+first one returned, e.g. `node --env-file=.env poc.js 1998`.
+
 ## Getting a token
 
 Moodle's "Mobile app" web service can issue a token via `login/token.php`. From
