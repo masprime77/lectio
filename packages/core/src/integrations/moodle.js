@@ -58,10 +58,99 @@
     };
   }
 
+  // German month names as they appear in Moodle section names, lower-cased.
+  // No abbreviations seen in the wild across the two validated courses, so
+  // only full names are matched.
+  const GERMAN_MONTHS = {
+    januar: 1,
+    februar: 2,
+    märz: 3,
+    april: 4,
+    mai: 5,
+    juni: 6,
+    juli: 7,
+    august: 8,
+    september: 9,
+    oktober: 10,
+    november: 11,
+    dezember: 12,
+  };
+
+  // Parses a section name of the shape "13. April - 19. April" (day, month,
+  // day, month — no year; Moodle never includes one in these section names).
+  // Accepts a plain hyphen or an en dash between the two dates, and tolerates
+  // surrounding/inner whitespace. Returns null for anything that doesn't match
+  // — topic-named sections ("Thema 00 - Einleitung", "Allgemeines") are
+  // expected to return null; this is the normal, common case for some courses,
+  // not an error.
+  const DATE_RANGE_RE =
+    /^\s*(\d{1,2})\.\s*([A-Za-zÀ-ÖØ-öø-ÿ]+)\s*[-–]\s*(\d{1,2})\.\s*([A-Za-zÀ-ÖØ-öø-ÿ]+)\s*$/;
+
+  function parseGermanDateRangeSectionName(name) {
+    if (typeof name !== 'string') return null;
+    const match = DATE_RANGE_RE.exec(name);
+    if (!match) return null;
+    const [, startDay, startMonthName, endDay, endMonthName] = match;
+    const startMonth = GERMAN_MONTHS[startMonthName.toLowerCase()];
+    const endMonth = GERMAN_MONTHS[endMonthName.toLowerCase()];
+    if (!startMonth || !endMonth) return null;
+    return {
+      startDay: Number(startDay),
+      startMonth,
+      endDay: Number(endDay),
+      endMonth,
+    };
+  }
+
+  // The Phase 14 orchestrator. Takes the raw `sections` array as returned by
+  // Moodle's core_course_get_contents (each with `visible`, `uservisible`,
+  // `name`, `section` (Moodle's own raw section number), and `modules`), and
+  // returns `{ weeks: [...] }`.
+  //
+  // Each week is `{ moodleSection, sectionName, dateRange, items }`:
+  //   - moodleSection: the section's own raw Moodle section number (Moodle's
+  //     sequential order, gaps allowed once hidden sections are dropped — this
+  //     IS "raw section order", not a re-index) — used as the grouping/fallback
+  //     ordering when the name doesn't parse as a date range.
+  //   - sectionName: the section's name, verbatim.
+  //   - dateRange: parseGermanDateRangeSectionName(sectionName)'s result, or
+  //     null when the name isn't a parseable date range.
+  //   - items: mapModuleToItem() output for every importable module in the
+  //     section, in Moodle's original order.
+  //
+  // Items never carry a week/type field themselves — grouping lives at the
+  // week level only; readings-vs-tasks classification is the user's job in the
+  // Phase 16 import UI, not this mapper's.
+  //
+  // By default, sections whose surviving `items` end up empty (e.g. a section
+  // made only of label/forum/choice modules, like course 1998's "Allgemeines")
+  // are dropped entirely — they'd just be noise in the Phase 16 triage screen.
+  // Pass `{ includeEmptyWeeks: true }` to keep them (e.g. for debugging).
+  function mapCourseContents(sections, options) {
+    const includeEmptyWeeks = !!(options && options.includeEmptyWeeks);
+    const weeks = (sections || [])
+      .filter(isSectionVisible)
+      .map((section) => {
+        const items = (section.modules || [])
+          .filter(isModuleImportable)
+          .map(mapModuleToItem);
+        return {
+          moodleSection: section.section,
+          sectionName: section.name,
+          dateRange: parseGermanDateRangeSectionName(section.name),
+          items,
+        };
+      })
+      .filter((week) => includeEmptyWeeks || week.items.length > 0);
+    return { weeks };
+  }
+
   return {
     IMPORTABLE_MODNAMES,
     isModuleImportable,
     isSectionVisible,
     mapModuleToItem,
+    parseGermanDateRangeSectionName,
+    mapCourseContents,
   };
 });
