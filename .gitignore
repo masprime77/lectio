@@ -40,3 +40,5 @@ credentials.*
 config/secrets.*
 # Output of scripts/gen-macos-signing-cert.sh (self-signed cert material)
 macos-signing/
+# Raw Moodle API responses from local Phase-13 PoC runs (spikes/moodle-poc)
+spikes/moodle-poc/output/

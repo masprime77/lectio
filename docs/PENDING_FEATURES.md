@@ -138,6 +138,39 @@ The gaps are all about the new cross-device direction:
 - [ ] **Desktop → Supabase wiring** — the planned 4th use of the storage
       adapter, to bring desktop into the same sync model as mobile.
 
+## Moodle integration (Track C)
+
+Auto-populate a semester from a student's real Moodle courses instead of
+typing everything by hand. See `docs/MOODLE_INTEGRATION_SPIKE.md` for the
+design decision.
+
+- [x] **Phase 13 — design spike** — decision doc
+      (`docs/MOODLE_INTEGRATION_SPIKE.md`) and a throwaway PoC
+      (`spikes/moodle-poc/`), **validated live** against
+      `moodle.informatik.tu-darmstadt.de` on two contrasting real courses
+      (id 10, topic-structured; id 1998, date-range-structured). All Web
+      Services calls work; the findings reshaped the Phase 14/16 scope below.
+- [ ] **Phase 14 — core mapper** — pure `@lectio/core/integrations/moodle`
+      module that is **type-agnostic**: it does *not* classify items as
+      readings vs. tasks (that's the user's choice in Phase 16). Its job is
+      to keep only `modname` in `resource`/`url`/`folder`, drop anything with
+      `visible: 0` or `uservisible: false`, group surviving modules into
+      weeks by parsing the section's German date-range name with a fallback
+      to raw section order when it doesn't parse, and emit
+      `{ name, url, moodleModuleId }` per item (always `module.url`, never
+      `contents[].fileurl`, so no token is ever stored in a link). Needs a
+      Vitest fixture suite covering both real course shapes.
+- [ ] **Phase 15 — fetch + auth (platform layers)** — network client +
+      secure token storage (Expo SecureStore on mobile, OS keychain on
+      desktop). For TU Darmstadt specifically the token must come from the
+      SSO-derived WebView flow (`admin/tool/mobile/launch.php` +
+      `moodlemobile://token=` redirect capture) — native `login/token.php`
+      does not work against this SSO-backed instance.
+- [ ] **Phase 16 — sync UX** — a **per-week triage/import screen**, not a flat
+      preview/confirm list: the user reviews the imported items grouped by
+      week, picks reading-mode or task-mode, and confirms items per week into
+      that type. Plus re-sync and per-course opt-in.
+
 ## Notes
 
 - This is a living checklist — fold any future "pending/roadmap" notes in here
