@@ -10,6 +10,7 @@
     "./semester-store": "./src/semester-store.js",
     "./ipc-handlers": "./src/ipc-handlers.js",
     "./integrations/lectio-file": "./src/integrations/lectio-file.js",
+    "./integrations/moodle": "./src/integrations/moodle.js",
     "./storage/migrate": "./src/storage/migrate.js",
     "./storage/contract": "./src/storage/contract.js",
     "./storage/conflict": "./src/storage/conflict.js",
