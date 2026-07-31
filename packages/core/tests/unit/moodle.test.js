@@ -218,7 +218,10 @@ describe('parseGermanDateRangeSectionName', () => {
 
 // Trimmed, anonymized fixture based on spikes/moodle-poc/output/course-10-contents.json
 // (an old, cross-semester, topic-structured course — no section names parse as
-// date ranges anywhere in the real response).
+// date ranges anywhere in the real response: 0 of its 15 non-empty sections).
+// The section names/numbers and module mixes are real; the folder in
+// "Allgemeines" is added (the real section 0 holds only label/forum, so it is
+// dropped as item-less in practice) to exercise a surviving item there.
 const topicStructuredCourseSections = () => [
   {
     id: 1001,
@@ -350,6 +353,9 @@ const dateRangeStructuredCourseSections = () => [
     ],
   },
   // Real shape: hidden trailing sections that must never surface as content.
+  // The section itself is real (visible:0/uservisible:false at section 14); the
+  // resource inside is synthetic — the real one is empty, so only planting an
+  // importable module here actually proves nothing leaks out of it.
   {
     id: 2004,
     name: 'DMML Klausur',
