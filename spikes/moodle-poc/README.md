@@ -29,6 +29,24 @@ optional `mod_assign_get_assignments`, and writes each raw response into
 Pass a course id as an argument to target a specific course instead of the
 first one returned, e.g. `node --env-file=.env poc.js 1998`.
 
+## Testing more than one Moodle account
+
+Module ids are only unique *within* one Moodle instance, so it's worth running
+against a second account. One `.env` can hold several named accounts instead of
+needing a file each — set `MOODLE_ACCOUNTS` plus a
+`MOODLE_<ID>_BASE_URL`/`MOODLE_<ID>_TOKEN` pair per account (see
+[`.env.example`](.env.example) for the exact shape), then pick one per run:
+
+```bash
+node --env-file=.env poc.js --account=tu_main 43541
+```
+
+Output filenames gain the account id in this mode
+(`course-<accountId>-<id>-contents.json`), so two accounts' dumps sit side by
+side. Leaving `MOODLE_ACCOUNTS` unset keeps the original single-account
+behaviour and the original filenames exactly as they were.
+
+
 ## Getting a token
 
 Moodle's "Mobile app" web service can issue a token via `login/token.php`. From
