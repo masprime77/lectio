@@ -76,29 +76,44 @@
     dezember: 12,
   };
 
-  // Parses a section name of the shape "13. April - 19. April" (day, month,
-  // day, month — no year; Moodle never includes one in these section names).
+  // Finds a date range of the shape "13. April - 19. April" (day, month, day,
+  // month — no year; Moodle never includes one in these section names).
   // Accepts a plain hyphen or an en dash between the two dates, and tolerates
-  // surrounding/inner whitespace. Returns null for anything that doesn't match
-  // — topic-named sections ("Thema 00 - Einleitung", "Allgemeines") are
-  // expected to return null; this is the normal, common case for some courses,
-  // not an error.
-  const DATE_RANGE_RE =
-    /^\s*(\d{1,2})\.\s*([A-Za-zÀ-ÖØ-öø-ÿ]+)\s*[-–]\s*(\d{1,2})\.\s*([A-Za-zÀ-ÖØ-öø-ÿ]+)\s*$/;
+  // whitespace and any casing of the month name.
+  //
+  // The range is searched for ANYWHERE in the name rather than having to be the
+  // whole name: a third real course (43541) names all 14 of its weeks
+  // "Woche 1: 22. April – 25. April" — a perfectly good range behind a
+  // "Woche N: " prefix — and an anchored pattern silently dropped the date on
+  // every one of them. The trade-off is that a name merely *containing* a range
+  // now parses; that's the right way to be wrong, since a missed range only
+  // costs us the optimization (we fall back to raw section order) while a
+  // spurious one is corrected by the user in the Phase 16 triage screen.
+  //
+  // The month names are part of the pattern, not validated after the fact, so
+  // a structurally similar phrase ("1. Woche - 2. Woche") can't match and
+  // shadow a real range later in the same name — the engine keeps searching.
+  // That also makes the captured month lookups below total: they cannot miss.
+  //
+  // Returns null for anything without a range — topic-named sections ("Thema 00
+  // - Einleitung", "Allgemeines") are expected to return null; this is the
+  // normal, common case for some courses, not an error.
+  const MONTH_PATTERN = Object.keys(GERMAN_MONTHS).join('|');
+  const DATE_RANGE_RE = new RegExp(
+    `(\\d{1,2})\\.\\s*(${MONTH_PATTERN})\\b\\s*[-–]\\s*(\\d{1,2})\\.\\s*(${MONTH_PATTERN})\\b`,
+    'i'
+  );
 
   function parseGermanDateRangeSectionName(name) {
     if (typeof name !== 'string') return null;
     const match = DATE_RANGE_RE.exec(name);
     if (!match) return null;
     const [, startDay, startMonthName, endDay, endMonthName] = match;
-    const startMonth = GERMAN_MONTHS[startMonthName.toLowerCase()];
-    const endMonth = GERMAN_MONTHS[endMonthName.toLowerCase()];
-    if (!startMonth || !endMonth) return null;
     return {
       startDay: Number(startDay),
-      startMonth,
+      startMonth: GERMAN_MONTHS[startMonthName.toLowerCase()],
       endDay: Number(endDay),
-      endMonth,
+      endMonth: GERMAN_MONTHS[endMonthName.toLowerCase()],
     };
   }
 
