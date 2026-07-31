@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import moodleSso from '../../src/integrations/moodle-sso.js';
 
 const { buildLaunchUrl, parseMoodleMobileRedirect } = moodleSso;
@@ -84,5 +84,23 @@ describe('parseMoodleMobileRedirect', () => {
   it('returns null for non-string input', () => {
     expect(parseMoodleMobileRedirect(null)).toBeNull();
     expect(parseMoodleMobileRedirect(undefined)).toBeNull();
+  });
+});
+
+describe('parseMoodleMobileRedirect — manual base64 fallback', () => {
+  it('still decodes correctly when neither Buffer nor atob are available', () => {
+    const encoded = encode('manualtoken0aaaa:::manualprivate0bbbb');
+
+    vi.stubGlobal('Buffer', undefined);
+    vi.stubGlobal('atob', undefined);
+    try {
+      const result = parseMoodleMobileRedirect(`moodlemobile://token=${encoded}`);
+      expect(result).toEqual({
+        wstoken: 'manualtoken0aaaa',
+        privatetoken: 'manualprivate0bbbb',
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

@@ -15,6 +15,7 @@ export default defineConfig({
         './test/mocks/async-storage.ts',
         import.meta.url
       ).pathname,
+      'expo-secure-store': new URL('./test/mocks/expo-secure-store.ts', import.meta.url).pathname,
     },
   },
 });

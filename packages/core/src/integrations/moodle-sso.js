@@ -47,9 +47,35 @@
     return url.toString();
   }
 
+  // Manual, dependency-free base64 decoder — the last-resort fallback when
+  // neither Buffer (Node) nor atob (browser) exist, which React Native's
+  // Hermes engine doesn't reliably guarantee. Sufficient for this module's
+  // actual payload shape (ASCII hex tokens joined by ":::") — not a
+  // general-purpose base64-to-UTF8 decoder for arbitrary binary/unicode data.
+  const BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+  function manualBase64Decode(value) {
+    const clean = value.replace(/=+$/, '');
+    let output = '';
+    let buffer = 0;
+    let bits = 0;
+    for (let i = 0; i < clean.length; i++) {
+      const idx = BASE64_CHARS.indexOf(clean[i]);
+      if (idx === -1) throw new Error('Invalid base64 character.');
+      buffer = (buffer << 6) | idx;
+      bits += 6;
+      if (bits >= 8) {
+        bits -= 8;
+        output += String.fromCharCode((buffer >> bits) & 0xff);
+      }
+    }
+    return output;
+  }
+
   // Portable base64 -> utf8 decode: Buffer in Node (Electron's main
-  // process), atob in browsers/React Native. Mirrors the fetch-detection
-  // portability approach already used in moodle-client.js.
+  // process), atob in browsers, manualBase64Decode as a last resort for
+  // environments with neither (e.g. React Native/Hermes, where atob's
+  // availability isn't guaranteed across versions).
   function base64Decode(value) {
     if (typeof Buffer !== 'undefined') {
       return Buffer.from(value, 'base64').toString('utf8');
@@ -57,7 +83,7 @@
     if (typeof atob !== 'undefined') {
       return atob(value);
     }
-    throw new Error('No base64 decoder available in this environment.');
+    return manualBase64Decode(value);
   }
 
   // Parses a captured `<scheme>://token=<base64>` redirect URL (the
