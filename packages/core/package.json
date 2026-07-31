@@ -12,6 +12,7 @@
     "./integrations/lectio-file": "./src/integrations/lectio-file.js",
     "./integrations/moodle": "./src/integrations/moodle.js",
     "./integrations/moodle-client": "./src/integrations/moodle-client.js",
+    "./integrations/moodle-sso": "./src/integrations/moodle-sso.js",
     "./storage/migrate": "./src/storage/migrate.js",
     "./storage/contract": "./src/storage/contract.js",
     "./storage/conflict": "./src/storage/conflict.js",
