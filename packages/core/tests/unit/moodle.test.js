@@ -598,3 +598,91 @@ describe('mapCourseContents — edge cases', () => {
     );
   });
 });
+
+describe('mapModuleToItem — optional source tagging', () => {
+  it('omits moodleSource entirely when no source is passed (unchanged shape)', () => {
+    const item = mapModuleToItem({
+      id: 87317,
+      name: '1. Vorlesung: Einführung',
+      url: 'https://moodle.example/mod/resource/view.php?id=87317',
+    });
+    expect(Object.keys(item).sort()).toEqual(['moodleModuleId', 'name', 'url']);
+  });
+
+  it('attaches moodleSource when a source is passed', () => {
+    const item = mapModuleToItem(
+      {
+        id: 87317,
+        name: '1. Vorlesung: Einführung',
+        url: 'https://moodle.example/mod/resource/view.php?id=87317',
+      },
+      'https://moodle.tu-darmstadt.de'
+    );
+    expect(item).toEqual({
+      name: '1. Vorlesung: Einführung',
+      url: 'https://moodle.example/mod/resource/view.php?id=87317',
+      moodleModuleId: 87317,
+      moodleSource: 'https://moodle.tu-darmstadt.de',
+    });
+  });
+
+  it('treats an empty-string source as a real value, not "no source"', () => {
+    const item = mapModuleToItem({ id: 1, name: 'x', url: 'https://moodle.example/x' }, '');
+    expect(item.moodleSource).toBe('');
+  });
+});
+
+describe('mapCourseContents — optional source tagging', () => {
+  it('does not add moodleSource to any item when options.source is omitted', () => {
+    const { weeks } = mapCourseContents(dateRangeStructuredCourseSections());
+    weeks.forEach((w) => w.items.forEach((item) => expect(item).not.toHaveProperty('moodleSource')));
+  });
+
+  it('tags every item with the same source across all weeks when provided', () => {
+    const { weeks } = mapCourseContents(dateRangeStructuredCourseSections(), {
+      source: 'https://moodle.tu-darmstadt.de',
+    });
+    weeks.forEach((w) =>
+      w.items.forEach((item) => expect(item.moodleSource).toBe('https://moodle.tu-darmstadt.de'))
+    );
+  });
+
+  it('lets two different accounts share the same moodleModuleId without colliding, once tagged', () => {
+    const accountA = mapCourseContents(topicStructuredCourseSections(), { source: 'account-a' });
+    const accountB = mapCourseContents(topicStructuredCourseSections(), { source: 'account-b' });
+    const itemA = accountA.weeks[0].items[0];
+    const itemB = accountB.weeks[0].items[0];
+    expect(itemA.moodleModuleId).toBe(itemB.moodleModuleId);
+    expect(itemA.moodleSource).not.toBe(itemB.moodleSource);
+  });
+
+  it('combines includeEmptyWeeks and source together without interfering', () => {
+    const { weeks } = mapCourseContents(dateRangeStructuredCourseSections(), {
+      includeEmptyWeeks: true,
+      source: 'account-a',
+    });
+    const allgemeines = weeks.find((w) => w.moodleSection === 0);
+    expect(allgemeines.items).toEqual([]);
+  });
+
+  // The bare `.map(mapModuleToItem)` this used to be would hand Array#map's
+  // index in as `source`, tagging items moodleSource: 0, 1, 2…
+  it('does not leak the array index in as a source', () => {
+    const { weeks } = mapCourseContents(dateRangeStructuredCourseSections());
+    const multiItemWeek = weeks.find((w) => w.items.length > 1);
+    expect(multiItemWeek).toBeDefined();
+    multiItemWeek.items.forEach((item) => expect(item).not.toHaveProperty('moodleSource'));
+  });
+
+  // `options && options.source` would resolve to null here and tag everything.
+  it('treats a null options argument as "no options", not a null source', () => {
+    const { weeks } = mapCourseContents(dateRangeStructuredCourseSections(), null);
+    weeks.forEach((w) => w.items.forEach((item) => expect(item).not.toHaveProperty('moodleSource')));
+  });
+
+  // An explicit null source is still a caller-chosen value, and does tag.
+  it('treats an explicit { source: null } as a real value', () => {
+    const { weeks } = mapCourseContents(dateRangeStructuredCourseSections(), { source: null });
+    expect(weeks[0].items[0].moodleSource).toBeNull();
+  });
+});
