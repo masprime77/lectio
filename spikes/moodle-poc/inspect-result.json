@@ -1,0 +1,594 @@
+{
+  "weeks": [
+    {
+      "moodleSection": 0,
+      "sectionName": "General",
+      "dateRange": null,
+      "items": [
+        {
+          "name": "Vorlesungsfolien",
+          "url": "https://moodle.tu-darmstadt.de/mod/folder/view.php?id=1594007",
+          "moodleModuleId": 1594007,
+          "moodleSource": "tu_main"
+        }
+      ]
+    },
+    {
+      "moodleSection": 1,
+      "sectionName": "Übungen",
+      "dateRange": null,
+      "items": [
+        {
+          "name": "Wiki für praktische Hausübungen",
+          "url": "https://moodle.tu-darmstadt.de/mod/url/view.php?id=1571530",
+          "moodleModuleId": 1571530,
+          "moodleSource": "tu_main"
+        }
+      ]
+    },
+    {
+      "moodleSection": 4,
+      "sectionName": "Woche 1: 22. April – 25. April",
+      "dateRange": {
+        "startDay": 22,
+        "startMonth": 4,
+        "endDay": 25,
+        "endMonth": 4
+      },
+      "items": [
+        {
+          "name": "Folien 00 Administratives",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1571756",
+          "moodleModuleId": 1571756,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Folien 01 Einleitung",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1571757",
+          "moodleModuleId": 1571757,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Folien 02a – Sortieren: Insertion Sort",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1575952",
+          "moodleModuleId": 1575952,
+          "moodleSource": "tu_main"
+        }
+      ]
+    },
+    {
+      "moodleSection": 5,
+      "sectionName": "Woche 2: 28. April – 2. Mai",
+      "dateRange": {
+        "startDay": 28,
+        "startMonth": 4,
+        "endDay": 2,
+        "endMonth": 5
+      },
+      "items": [
+        {
+          "name": "Folien 02a-b – Sortieren: Insertion Sort, Laufzeitanalyse",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1581022",
+          "moodleModuleId": 1581022,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Ergänzende Notizen Vorlesung 3",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1587287",
+          "moodleModuleId": 1587287,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 1 mit theoretischer Hausübung 1",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1579870",
+          "moodleModuleId": 1579870,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 1 - Lösungen Gruppenübung",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1587176",
+          "moodleModuleId": 1587176,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 1 - Lösungen Hausübungen",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1592072",
+          "moodleModuleId": 1592072,
+          "moodleSource": "tu_main"
+        }
+      ]
+    },
+    {
+      "moodleSection": 6,
+      "sectionName": "Woche 3: 5. Mai - 9. Mai",
+      "dateRange": {
+        "startDay": 5,
+        "startMonth": 5,
+        "endDay": 9,
+        "endMonth": 5
+      },
+      "items": [
+        {
+          "name": "Folien 02b-c – Sortieren: Laufzeitanalyse, Merge Sort",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1587922",
+          "moodleModuleId": 1587922,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Ergänzende Notizen Vorlesung 4",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1589831",
+          "moodleModuleId": 1589831,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Ergänzende Folien: Alternativer Induktionsschritt für Merge Sort",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1591560",
+          "moodleModuleId": 1591560,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Ergänzende Notizen Vorlesung 5",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1590820",
+          "moodleModuleId": 1590820,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 2",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1587166",
+          "moodleModuleId": 1587166,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 2 - Lösungen Gruppenübung",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1592081",
+          "moodleModuleId": 1592081,
+          "moodleSource": "tu_main"
+        }
+      ]
+    },
+    {
+      "moodleSection": 7,
+      "sectionName": "Woche 4: 12. Mai - 16. Mai",
+      "dateRange": {
+        "startDay": 12,
+        "startMonth": 5,
+        "endDay": 16,
+        "endMonth": 5
+      },
+      "items": [
+        {
+          "name": "Folien Vorlesung 6 – Sortieren: Mastertheorem, Quicksort",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1591998",
+          "moodleModuleId": 1591998,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Ergänzende Notizen Vorlesung 6",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1592786",
+          "moodleModuleId": 1592786,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Folien Vorlesung 7 – Sortieren: untere Schranke für Sortieren, RadixSort",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1593348",
+          "moodleModuleId": 1593348,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt zur Test-Programmierübung",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1591477",
+          "moodleModuleId": 1591477,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Vorlage zur Test-Programmierübung (GitLab)",
+          "url": "https://moodle.tu-darmstadt.de/mod/url/view.php?id=1591464",
+          "moodleModuleId": 1591464,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 03",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1591557",
+          "moodleModuleId": 1591557,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 3 - Lösungen Gruppenübung",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1594005",
+          "moodleModuleId": 1594005,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Vorlage zu Programmierübung 1 (GitLab)",
+          "url": "https://moodle.tu-darmstadt.de/mod/url/view.php?id=1591458",
+          "moodleModuleId": 1591458,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Musterlösung zu Programmierübung 01",
+          "url": "https://moodle.tu-darmstadt.de/mod/url/view.php?id=1610794",
+          "moodleModuleId": 1610794,
+          "moodleSource": "tu_main"
+        }
+      ]
+    },
+    {
+      "moodleSection": 8,
+      "sectionName": "Woche 5: 19. Mai - 23. Mai",
+      "dateRange": {
+        "startDay": 19,
+        "startMonth": 5,
+        "endDay": 23,
+        "endMonth": 5
+      },
+      "items": [
+        {
+          "name": "Folien Vorlesung 8 und 9 – Grundlegende Datenstrukturen",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1594684",
+          "moodleModuleId": 1594684,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Ergänzende Notizen Vorlesung 8",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1598705",
+          "moodleModuleId": 1598705,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 4",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1594006",
+          "moodleModuleId": 1594006,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 4 - Lösungen Gruppenübung",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1596122",
+          "moodleModuleId": 1596122,
+          "moodleSource": "tu_main"
+        }
+      ]
+    },
+    {
+      "moodleSection": 9,
+      "sectionName": "Woche 6: 26. Mai - 30. Mai",
+      "dateRange": {
+        "startDay": 26,
+        "startMonth": 5,
+        "endDay": 30,
+        "endMonth": 5
+      },
+      "items": [
+        {
+          "name": "Folien Vorlesung 10 – Fortgeschrittene Datenstrukturen -- bis Folie 51",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1595438",
+          "moodleModuleId": 1595438,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Zeichnungen von Beispielen für Rot-Schwarz-Bäume (zu Folie 9)",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1597886",
+          "moodleModuleId": 1597886,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 5",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1596436",
+          "moodleModuleId": 1596436,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 5 - Lösungen Gruppenübung",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1598308",
+          "moodleModuleId": 1598308,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 5 - Lösungen Hausübungen 2",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1608216",
+          "moodleModuleId": 1608216,
+          "moodleSource": "tu_main"
+        }
+      ]
+    },
+    {
+      "moodleSection": 10,
+      "sectionName": "Woche 7: 2. Juni - 6. Juni",
+      "dateRange": {
+        "startDay": 2,
+        "startMonth": 6,
+        "endDay": 6,
+        "endMonth": 6
+      },
+      "items": [
+        {
+          "name": "Folien Vorlesung 11 und 12 -- Fortgeschrittene Datenstrukturen",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1600750",
+          "moodleModuleId": 1600750,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 6",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1598323",
+          "moodleModuleId": 1598323,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 6 - Lösungen Gruppenübung",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1600478",
+          "moodleModuleId": 1600478,
+          "moodleSource": "tu_main"
+        }
+      ]
+    },
+    {
+      "moodleSection": 11,
+      "sectionName": "Woche 8: 9. Juni - 13. Juni",
+      "dateRange": {
+        "startDay": 9,
+        "startMonth": 6,
+        "endDay": 13,
+        "endMonth": 6
+      },
+      "items": [
+        {
+          "name": "Folien Vorlesung 13 -- Probabilistische Datenstrukturen",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1598850",
+          "moodleModuleId": 1598850,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Folien Vorlesung 14 -- Graphen",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1601296",
+          "moodleModuleId": 1601296,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 7",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1600534",
+          "moodleModuleId": 1600534,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Vorlage zu Programmierübung 2 (GitLab)",
+          "url": "https://moodle.tu-darmstadt.de/mod/url/view.php?id=1600535",
+          "moodleModuleId": 1600535,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 7 - Lösungen Gruppenübung",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1602209",
+          "moodleModuleId": 1602209,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Musterlösung zu Programmierübung 02",
+          "url": "https://moodle.tu-darmstadt.de/mod/url/view.php?id=1611142",
+          "moodleModuleId": 1611142,
+          "moodleSource": "tu_main"
+        }
+      ]
+    },
+    {
+      "moodleSection": 12,
+      "sectionName": "Woche 9: 16. Juni - 20. Juni",
+      "dateRange": {
+        "startDay": 16,
+        "startMonth": 6,
+        "endDay": 20,
+        "endMonth": 6
+      },
+      "items": [
+        {
+          "name": "Folien Vorlesung 15 -- Graphen",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1606291",
+          "moodleModuleId": 1606291,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 8",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1602218",
+          "moodleModuleId": 1602218,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 8 - Lösungen Gruppenübung",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1603426",
+          "moodleModuleId": 1603426,
+          "moodleSource": "tu_main"
+        }
+      ]
+    },
+    {
+      "moodleSection": 13,
+      "sectionName": "Woche 10: 23. Juni - 27. Juni",
+      "dateRange": {
+        "startDay": 23,
+        "startMonth": 6,
+        "endDay": 27,
+        "endMonth": 6
+      },
+      "items": [
+        {
+          "name": "Folien Vorlesung 16 und 17 -- Graphen",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1606292",
+          "moodleModuleId": 1606292,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 9",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1603708",
+          "moodleModuleId": 1603708,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 9 - Lösungen Gruppenübung",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1604294",
+          "moodleModuleId": 1604294,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 9 - Lösungen Hausübungen 3",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1608249",
+          "moodleModuleId": 1608249,
+          "moodleSource": "tu_main"
+        }
+      ]
+    },
+    {
+      "moodleSection": 14,
+      "sectionName": "Woche 11: 30. Juni - 4. Juli",
+      "dateRange": {
+        "startDay": 30,
+        "startMonth": 6,
+        "endDay": 4,
+        "endMonth": 7
+      },
+      "items": [
+        {
+          "name": "Folien Vorlesung 18 -- Graphen",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1607646",
+          "moodleModuleId": 1607646,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Exkurs: endliche Automaten",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1607647",
+          "moodleModuleId": 1607647,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 10",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1604288",
+          "moodleModuleId": 1604288,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 10 - Lösungen Gruppenübung",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1604290",
+          "moodleModuleId": 1604290,
+          "moodleSource": "tu_main"
+        }
+      ]
+    },
+    {
+      "moodleSection": 15,
+      "sectionName": "Woche 12: 7. Juli - 11. Juli",
+      "dateRange": {
+        "startDay": 7,
+        "startMonth": 7,
+        "endDay": 11,
+        "endMonth": 7
+      },
+      "items": [
+        {
+          "name": "Folien Vorlesung 19",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1610046",
+          "moodleModuleId": 1610046,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Ergänzende Notizen Vorlesung 19",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1610921",
+          "moodleModuleId": 1610921,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Folien Vorlesung 20",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1610923",
+          "moodleModuleId": 1610923,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Regular Expressions 101",
+          "url": "https://moodle.tu-darmstadt.de/mod/url/view.php?id=1611482",
+          "moodleModuleId": 1611482,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 11 / Version 17.07.25",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1613482",
+          "moodleModuleId": 1613482,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Vorlage zu Programmierübung 3 (GitLab)",
+          "url": "https://moodle.tu-darmstadt.de/mod/url/view.php?id=1604320",
+          "moodleModuleId": 1604320,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 11 - Lösungen Gruppenübung",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1604315",
+          "moodleModuleId": 1604315,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Musterlösung zu Programmierübung 3",
+          "url": "https://moodle.tu-darmstadt.de/mod/url/view.php?id=1620717",
+          "moodleModuleId": 1620717,
+          "moodleSource": "tu_main"
+        }
+      ]
+    },
+    {
+      "moodleSection": 16,
+      "sectionName": "Woche 13: 14. Juli - 18. Juli",
+      "dateRange": {
+        "startDay": 14,
+        "startMonth": 7,
+        "endDay": 18,
+        "endMonth": 7
+      },
+      "items": [
+        {
+          "name": "Folien Vorlesung 21",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1612010",
+          "moodleModuleId": 1612010,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 12",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1611902",
+          "moodleModuleId": 1611902,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 12 - Lösungen Gruppenübung",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1611903",
+          "moodleModuleId": 1611903,
+          "moodleSource": "tu_main"
+        }
+      ]
+    },
+    {
+      "moodleSection": 17,
+      "sectionName": "Woche 14: 21. Juli - 25. Juli",
+      "dateRange": {
+        "startDay": 21,
+        "startMonth": 7,
+        "endDay": 25,
+        "endMonth": 7
+      },
+      "items": [
+        {
+          "name": "Folien Vorlesung 22 und 23",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1613945",
+          "moodleModuleId": 1613945,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 13",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1613665",
+          "moodleModuleId": 1613665,
+          "moodleSource": "tu_main"
+        },
+        {
+          "name": "Übungsblatt 13 - Lösungen Gruppenübung",
+          "url": "https://moodle.tu-darmstadt.de/mod/resource/view.php?id=1613666",
+          "moodleModuleId": 1613666,
+          "moodleSource": "tu_main"
+        }
+      ]
+    }
+  ]
+}
