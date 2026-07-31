@@ -1,9 +1,10 @@
-const { app, BrowserWindow, ipcMain, Menu, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, dialog, shell, safeStorage } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log/main');
 const fs = require('fs');
 const path = require('path');
 const { registerIpcHandlers } = require('@lectio/core/ipc-handlers');
+const { buildLaunchUrl, parseMoodleMobileRedirect } = require('@lectio/core/integrations/moodle-sso');
 
 let mainWindow = null;
 
@@ -270,6 +271,98 @@ ipcMain.handle('open-external', (event, url) => {
   }
   return Promise.resolve();
 });
+
+// ---------------------------------------------------------------------------
+// Moodle: secure token storage + SSO capture window
+//
+// Exactly one Moodle connection at a time for now (no multi-account storage
+// yet — matches Phase 15 Part A's single-account createMoodleClient scope).
+// Token refresh/expiry/revocation isn't designed yet; this only covers the
+// initial SSO-driven capture and secure-at-rest storage of the result.
+// ---------------------------------------------------------------------------
+const MOODLE_TOKEN_FILE = path.join(app.getPath('userData'), 'moodle-token.enc');
+
+function isMoodleEncryptionAvailable() {
+  return safeStorage.isEncryptionAvailable();
+}
+
+// Persists { baseUrl, wstoken } encrypted at rest via the OS keychain
+// (Keychain on macOS, DPAPI on Windows) through Electron's safeStorage.
+// safeStorage is main-process-only, which is why this whole module lives
+// here rather than being callable directly from the renderer.
+function setMoodleToken({ baseUrl, wstoken }) {
+  if (!isMoodleEncryptionAvailable()) {
+    throw new Error('OS-backed encryption is not available on this machine.');
+  }
+  const payload = JSON.stringify({ baseUrl, wstoken });
+  const encrypted = safeStorage.encryptString(payload);
+  fs.mkdirSync(path.dirname(MOODLE_TOKEN_FILE), { recursive: true });
+  fs.writeFileSync(MOODLE_TOKEN_FILE, encrypted);
+  return { ok: true };
+}
+
+function getMoodleToken() {
+  if (!fs.existsSync(MOODLE_TOKEN_FILE)) return null;
+  if (!isMoodleEncryptionAvailable()) {
+    throw new Error('OS-backed encryption is not available on this machine.');
+  }
+  const encrypted = fs.readFileSync(MOODLE_TOKEN_FILE);
+  return JSON.parse(safeStorage.decryptString(encrypted));
+}
+
+function clearMoodleToken() {
+  if (fs.existsSync(MOODLE_TOKEN_FILE)) fs.unlinkSync(MOODLE_TOKEN_FILE);
+  return { ok: true };
+}
+
+// Drives the SSO login in its own window and intercepts the
+// moodlemobile://token=... redirect before Electron tries (and fails) to
+// actually navigate to it. Resolves with the parsed
+// { wstoken, privatetoken, passport? }, or rejects if the user closes the
+// window before completing login, or if the redirect couldn't be parsed.
+function captureMoodleToken(baseUrl) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const launchUrl = buildLaunchUrl(baseUrl);
+
+    const authWindow = new BrowserWindow({
+      width: 480,
+      height: 720,
+      title: 'Connect Moodle',
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
+    });
+
+    function handleRedirect(event, url) {
+      if (settled || !/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/token=/.test(url)) return;
+      event.preventDefault();
+      settled = true;
+      const parsed = parseMoodleMobileRedirect(url);
+      authWindow.destroy();
+      if (!parsed) {
+        reject(new Error('Could not parse the Moodle SSO redirect.'));
+        return;
+      }
+      resolve(parsed);
+    }
+
+    authWindow.webContents.on('will-redirect', handleRedirect);
+    authWindow.webContents.on('will-navigate', handleRedirect);
+
+    authWindow.on('closed', () => {
+      if (!settled) reject(new Error('Moodle sign-in was cancelled.'));
+    });
+
+    authWindow.loadURL(launchUrl);
+  });
+}
+
+ipcMain.handle('moodle-get-token', () => getMoodleToken());
+ipcMain.handle('moodle-set-token', (event, { baseUrl, wstoken }) => setMoodleToken({ baseUrl, wstoken }));
+ipcMain.handle('moodle-clear-token', () => clearMoodleToken());
+ipcMain.handle('moodle-capture-token', (event, baseUrl) => captureMoodleToken(baseUrl));
 
 // ---------------------------------------------------------------------------
 // App lifecycle
