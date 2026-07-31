@@ -20,7 +20,8 @@
       "@react-native-community/datetimepicker",
       "expo-sharing",
       "expo-web-browser",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": false
