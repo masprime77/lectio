@@ -160,10 +160,53 @@ describe('parseGermanDateRangeSectionName', () => {
     });
   });
 
+  // Real shape from course 43541, whose 14 weeks all carry a "Woche N: " prefix
+  // in front of an otherwise ordinary range.
+  it('finds a range behind a "Woche N: " prefix', () => {
+    expect(parseGermanDateRangeSectionName('Woche 1: 22. April – 25. April')).toEqual({
+      startDay: 22,
+      startMonth: 4,
+      endDay: 25,
+      endMonth: 4,
+    });
+    expect(parseGermanDateRangeSectionName('Woche 11: 30. Juni - 4. Juli')).toEqual({
+      startDay: 30,
+      startMonth: 6,
+      endDay: 4,
+      endMonth: 7,
+    });
+    // The two-digit week number must not be mistaken for a day: "10" is not
+    // followed by a period, so the scan moves past it to the real range.
+    expect(parseGermanDateRangeSectionName('Woche 10: 23. Juni - 27. Juni')).toEqual({
+      startDay: 23,
+      startMonth: 6,
+      endDay: 27,
+      endMonth: 6,
+    });
+  });
+
+  it('does not let a structurally similar phrase shadow a real range later in the name', () => {
+    // "1. Woche - 2. Woche" has the right shape but no month names, so the
+    // scan keeps going and finds the actual range.
+    expect(parseGermanDateRangeSectionName('1. Woche - 2. Woche: 5. Mai - 9. Mai')).toEqual({
+      startDay: 5,
+      startMonth: 5,
+      endDay: 9,
+      endMonth: 5,
+    });
+    // …and on its own it is not a date range at all.
+    expect(parseGermanDateRangeSectionName('1. Woche - 2. Woche')).toBeNull();
+  });
+
   it('returns null for topic-named sections (the common case on some courses)', () => {
     expect(parseGermanDateRangeSectionName('Allgemeines')).toBeNull();
     expect(parseGermanDateRangeSectionName('Thema 00 - Einleitung')).toBeNull();
     expect(parseGermanDateRangeSectionName('DMML Klausur')).toBeNull();
+    expect(parseGermanDateRangeSectionName('Sprechstunden zur Prüfung')).toBeNull();
+  });
+
+  it('requires a whole month word, not a prefix of one', () => {
+    expect(parseGermanDateRangeSectionName('13. Aprilx - 19. April')).toBeNull();
   });
 
   it('returns null for non-string or empty input', () => {
@@ -333,6 +376,139 @@ const dateRangeStructuredCourseSections = () => [
     modules: [],
   },
 ];
+
+// Trimmed fixture based on spikes/moodle-poc/output/course-43541-contents.json
+// — a third real shape the spike doc didn't capture: every week carries a
+// parseable German date range, but behind a "Woche N: " prefix. Also the only
+// real dump with `scheduler`/`lti`/`choicegroup` modules, and with a *visible*
+// section whose modules are all non-importable forums.
+const weekPrefixedCourseSections = () => [
+  {
+    id: 537527,
+    name: 'General',
+    section: 0,
+    visible: 1,
+    uservisible: true,
+    modules: [
+      { id: 1575955, modname: 'label', name: 'Allgemeine Foren', visible: 1, uservisible: true },
+      { id: 1519677, modname: 'forum', name: 'Ankündigungen', url: 'https://moodle.example/mod/forum/view.php?id=1519677', visible: 1, uservisible: true },
+      {
+        id: 1594007,
+        modname: 'folder',
+        name: 'Vorlesungsfolien',
+        url: 'https://moodle.example/mod/folder/view.php?id=1594007',
+        visible: 1,
+        uservisible: true,
+      },
+      { id: 1800036, modname: 'scheduler', name: 'Klausureinsicht WiSe 2025/26', url: 'https://moodle.example/mod/scheduler/view.php?id=1800036', visible: 1, uservisible: true },
+    ],
+  },
+  // Hidden section — must never surface.
+  {
+    id: 559999,
+    name: 'Sprechstunden und Übungsforen',
+    section: 2,
+    visible: 0,
+    uservisible: false,
+    modules: [],
+  },
+  // Visible, but every module is a forum → no importable items.
+  {
+    id: 566612,
+    name: 'Sprechstunden zur Prüfung',
+    section: 3,
+    visible: 1,
+    uservisible: true,
+    modules: [
+      { id: 1608432, modname: 'forum', name: '01, Mo, 8:00-9:40, S202/C110', url: 'https://moodle.example/mod/forum/view.php?id=1608432', visible: 1, uservisible: false },
+      { id: 1608449, modname: 'forum', name: '18, Do, 13:30-15:10, S103/223 (englisch)', url: 'https://moodle.example/mod/forum/view.php?id=1608449', visible: 1, uservisible: true },
+    ],
+  },
+  {
+    id: 537528,
+    name: 'Woche 1: 22. April – 25. April',
+    section: 4,
+    visible: 1,
+    uservisible: true,
+    modules: [
+      { id: 1575953, modname: 'label', name: 'Vorlesung 1', visible: 1, uservisible: true },
+      {
+        id: 1571756,
+        modname: 'resource',
+        name: 'Folien 00 Administratives',
+        url: 'https://moodle.example/mod/resource/view.php?id=1571756',
+        visible: 1,
+        uservisible: true,
+      },
+      // `lti` (an external-tool lecture recording) is not in the allowlist.
+      { id: 1572980, modname: 'lti', name: 'Vorlesung 01 – Administratives', url: 'https://moodle.example/mod/lti/view.php?id=1572980', visible: 1, uservisible: true },
+      {
+        id: 1575952,
+        modname: 'resource',
+        name: 'Folien 02a – Sortieren: Insertion Sort',
+        url: 'https://moodle.example/mod/resource/view.php?id=1575952',
+        visible: 1,
+        uservisible: true,
+      },
+      { id: 1550175, modname: 'choicegroup', name: 'Übungsgruppen-Wahl', url: 'https://moodle.example/mod/choicegroup/view.php?id=1550175', visible: 1, uservisible: true },
+    ],
+  },
+  {
+    id: 537538,
+    name: 'Woche 11: 30. Juni - 4. Juli',
+    section: 14,
+    visible: 1,
+    uservisible: true,
+    modules: [
+      {
+        id: 1606291,
+        modname: 'resource',
+        name: 'Folien Vorlesung 15 -- Graphen',
+        url: 'https://moodle.example/mod/resource/view.php?id=1606291',
+        visible: 1,
+        uservisible: true,
+      },
+    ],
+  },
+];
+
+describe('mapCourseContents — week-prefixed course (range behind "Woche N: ")', () => {
+  it('parses the date range on every prefixed week', () => {
+    const { weeks } = mapCourseContents(weekPrefixedCourseSections());
+    const w1 = weeks.find((w) => w.moodleSection === 4);
+    expect(w1.dateRange).toEqual({ startDay: 22, startMonth: 4, endDay: 25, endMonth: 4 });
+    const w11 = weeks.find((w) => w.moodleSection === 14);
+    expect(w11.dateRange).toEqual({ startDay: 30, startMonth: 6, endDay: 4, endMonth: 7 });
+  });
+
+  it('keeps the section name verbatim, prefix included', () => {
+    const { weeks } = mapCourseContents(weekPrefixedCourseSections());
+    expect(weeks.find((w) => w.moodleSection === 4).sectionName).toBe('Woche 1: 22. April – 25. April');
+  });
+
+  it('drops the hidden section and the forum-only section, keeping three weeks', () => {
+    const { weeks } = mapCourseContents(weekPrefixedCourseSections());
+    expect(weeks.map((w) => w.moodleSection)).toEqual([0, 4, 14]);
+    expect(weeks.some((w) => w.sectionName === 'Sprechstunden und Übungsforen')).toBe(false);
+    expect(weeks.some((w) => w.sectionName === 'Sprechstunden zur Prüfung')).toBe(false);
+  });
+
+  it('drops scheduler/lti/choicegroup modules alongside label and forum', () => {
+    const { weeks } = mapCourseContents(weekPrefixedCourseSections());
+    expect(weeks.find((w) => w.moodleSection === 0).items).toEqual([
+      { name: 'Vorlesungsfolien', url: 'https://moodle.example/mod/folder/view.php?id=1594007', moodleModuleId: 1594007 },
+    ]);
+    expect(weeks.find((w) => w.moodleSection === 4).items).toEqual([
+      { name: 'Folien 00 Administratives', url: 'https://moodle.example/mod/resource/view.php?id=1571756', moodleModuleId: 1571756 },
+      { name: 'Folien 02a – Sortieren: Insertion Sort', url: 'https://moodle.example/mod/resource/view.php?id=1575952', moodleModuleId: 1575952 },
+    ]);
+  });
+
+  it('still reports dateRange: null for the un-prefixed General section', () => {
+    const { weeks } = mapCourseContents(weekPrefixedCourseSections());
+    expect(weeks.find((w) => w.moodleSection === 0).dateRange).toBeNull();
+  });
+});
 
 describe('mapCourseContents — topic-structured course (no parseable dates)', () => {
   it('drops the empty Allgemeines-style section by default and keeps only real weeks', () => {
