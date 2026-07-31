@@ -47,6 +47,25 @@ side. Leaving `MOODLE_ACCOUNTS` unset keeps the original single-account
 behaviour and the original filenames exactly as they were.
 
 
+## Inspecting what the mapper makes of a course
+
+`inspect-course.js` runs an already-downloaded course through the real
+`@lectio/core` mapper and prints a per-section report — every section's name,
+whether it's hidden, how many of its modules are importable, and what the
+German date-range parser made of the name. It never touches the network; it
+only reads what `poc.js` already saved, so you can iterate on the mapper
+without re-fetching:
+
+```bash
+node inspect-course.js 1998
+node inspect-course.js 43541 --account=tu_main
+```
+
+Pass `--account=<id>` to read an account-scoped file; the account id is also
+used as the mapper's `source`, so the items come back tagged with
+`moodleSource`. Override that with `--source=<value>`. The full mapped result
+is written to a git-ignored `inspect-result.json` for deeper inspection.
+
 ## Getting a token
 
 Moodle's "Mobile app" web service can issue a token via `login/token.php`. From
