@@ -42,3 +42,5 @@ config/secrets.*
 macos-signing/
 # Raw Moodle API responses from local Phase-13 PoC runs (spikes/moodle-poc)
 spikes/moodle-poc/output/
+# Mapper output from inspect-course.js — also real course data
+spikes/moodle-poc/inspect-result.json
