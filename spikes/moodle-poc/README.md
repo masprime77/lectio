@@ -29,6 +29,43 @@ optional `mod_assign_get_assignments`, and writes each raw response into
 Pass a course id as an argument to target a specific course instead of the
 first one returned, e.g. `node --env-file=.env poc.js 1998`.
 
+## Testing more than one Moodle account
+
+Module ids are only unique *within* one Moodle instance, so it's worth running
+against a second account. One `.env` can hold several named accounts instead of
+needing a file each — set `MOODLE_ACCOUNTS` plus a
+`MOODLE_<ID>_BASE_URL`/`MOODLE_<ID>_TOKEN` pair per account (see
+[`.env.example`](.env.example) for the exact shape), then pick one per run:
+
+```bash
+node --env-file=.env poc.js --account=tu_main 43541
+```
+
+Output filenames gain the account id in this mode
+(`course-<accountId>-<id>-contents.json`), so two accounts' dumps sit side by
+side. Leaving `MOODLE_ACCOUNTS` unset keeps the original single-account
+behaviour and the original filenames exactly as they were.
+
+
+## Inspecting what the mapper makes of a course
+
+`inspect-course.js` runs an already-downloaded course through the real
+`@lectio/core` mapper and prints a per-section report — every section's name,
+whether it's hidden, how many of its modules are importable, and what the
+German date-range parser made of the name. It never touches the network; it
+only reads what `poc.js` already saved, so you can iterate on the mapper
+without re-fetching:
+
+```bash
+node inspect-course.js 1998
+node inspect-course.js 43541 --account=tu_main
+```
+
+Pass `--account=<id>` to read an account-scoped file; the account id is also
+used as the mapper's `source`, so the items come back tagged with
+`moodleSource`. Override that with `--source=<value>`. The full mapped result
+is written to a git-ignored `inspect-result.json` for deeper inspection.
+
 ## Getting a token
 
 Moodle's "Mobile app" web service can issue a token via `login/token.php`. From

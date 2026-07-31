@@ -50,12 +50,30 @@
   // `contents[].fileurl` (requires the wstoken as a query param). `module.name`
   // is used verbatim, no parsing. `moodleModuleId` is the stable id a later
   // re-sync (Phase 16+) can match against.
-  function mapModuleToItem(mod) {
-    return {
+  //
+  // `moodleModuleId` is only unique WITHIN one Moodle instance/account —
+  // confirmed by testing against two separate real TU Darmstadt instances
+  // that both happily assign overlapping module ids. If a caller may ever
+  // combine items from more than one Moodle account, pass `source` (any
+  // stable identifier for that account/instance — e.g. its base URL or
+  // account id) and it gets attached as `moodleSource`, so
+  // `(moodleSource, moodleModuleId)` together are collision-free. Omit
+  // `source` entirely for the single-account case; the item then has exactly
+  // the same three keys as before (`name`, `url`, `moodleModuleId`) — no
+  // behavior change for existing callers. NOTE: this only tags items so a
+  // future merge/re-sync CAN disambiguate — it does not itself implement any
+  // merge or conflict-resolution logic; that's a separate, not-yet-designed
+  // Phase 16+ concern.
+  function mapModuleToItem(mod, source) {
+    const item = {
       name: mod.name,
       url: mod.url,
       moodleModuleId: mod.id,
     };
+    if (source !== undefined) {
+      item.moodleSource = source;
+    }
+    return item;
   }
 
   // German month names as they appear in Moodle section names, lower-cased.
@@ -141,14 +159,24 @@
   // made only of label/forum/choice modules, like course 1998's "Allgemeines")
   // are dropped entirely — they'd just be noise in the Phase 16 triage screen.
   // Pass `{ includeEmptyWeeks: true }` to keep them (e.g. for debugging).
+  //
+  // `options.source` is passed straight through to mapModuleToItem, tagging
+  // every item with `moodleSource` so items from two different Moodle
+  // accounts can't collide on `moodleModuleId` alone (see that function's
+  // comment). Omit it and items keep their original three-key shape.
   function mapCourseContents(sections, options) {
     const includeEmptyWeeks = !!(options && options.includeEmptyWeeks);
+    // Ternary, not `options && options.source`: the latter yields `null` for a
+    // null `options` argument, which would tag every item `moodleSource: null`.
+    // An explicit `{ source: null }` still tags — only a missing options object
+    // or a missing key means "no source".
+    const source = options ? options.source : undefined;
     const weeks = (sections || [])
       .filter(isSectionVisible)
       .map((section) => {
         const items = (section.modules || [])
           .filter(isModuleImportable)
-          .map(mapModuleToItem);
+          .map((mod) => mapModuleToItem(mod, source));
         return {
           moodleSection: section.section,
           sectionName: section.name,
