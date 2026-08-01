@@ -326,6 +326,28 @@
         </label>
       </div>
 
+      <div class="settings-row" id="set-moodle-row" style="flex-direction:column;align-items:stretch;gap:0.4rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span class="settings-label">Moodle accounts</span>
+          <button type="button" id="set-moodle-add" class="btn btn-small">+ Add account</button>
+        </div>
+        <!-- Inline in place of a prompt(): Electron never implemented
+             window.prompt() (alert/confirm are supported, prompt always
+             throws "prompt() is not supported."), so base-URL entry needs a
+             real input. Hidden until "+ Add account" is clicked. -->
+        <div id="set-moodle-add-form" class="hidden" style="display:flex;gap:0.4rem;">
+          <input type="text" id="set-moodle-add-url" placeholder="https://moodle.example.edu"
+                 style="flex:1;min-width:0;padding:0.3rem 0.4rem;border:1px solid var(--border);border-radius:6px;font-size:0.8rem;color:var(--text);background:var(--surface);" />
+          <button type="button" id="set-moodle-add-confirm" class="btn btn-small">Connect</button>
+          <button type="button" id="set-moodle-add-cancel" class="btn btn-small">Cancel</button>
+        </div>
+        <div id="set-moodle-accounts-list" style="display:flex;flex-direction:column;gap:0.4rem;"></div>
+        <div style="display:flex;justify-content:flex-end;">
+          <button type="button" id="set-moodle-import" class="btn btn-small hidden">Import courses…</button>
+        </div>
+        <span id="set-moodle-status-line" class="hidden" style="font-size:0.8rem;"></span>
+      </div>
+
       <div class="settings-row">
         <span class="settings-label">Tutorial</span>
         <button type="button" id="set-tutorial-btn" class="btn btn-small">Start tour</button>
@@ -568,6 +590,8 @@
        also precede supabase-storage.js, whose save() reads window.PlannerConflict
        to detect cloud write conflicts. -->
   <script src="planner-core.js"></script>
+  <script src="moodle.js"></script>
+  <script src="moodle-client.js"></script>
   <script src="migrate.js"></script>
   <script src="conflict.js"></script>
   <script src="supabase-storage.js"></script>

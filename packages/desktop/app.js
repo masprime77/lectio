@@ -1677,6 +1677,7 @@ async function init() {
   setupUpdater();
   setupSave();
   setupSettings();
+  setupMoodleSettings();
   setupFeedback();
   setupAddItem();
   setupTutorial();
@@ -2896,6 +2897,172 @@ async function withBusy(btn, busyLabel, fn) {
     btn.disabled = false;
     btn.textContent = original;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Settings modal: Moodle accounts (Phase 16 Part A, multi-account). Vendored
+// via sync-core.js: window.LectioMoodleClient (integrations/moodle-client)
+// and window.moodleAuth (preload bridge to main's safeStorage-backed,
+// multi-account store + SSO capture, Phase 16 Part 0). Any number of accounts
+// can be connected at once, one per Moodle base URL.
+// ---------------------------------------------------------------------------
+function setMoodleStatusLine(msg, isError) {
+  const el = document.getElementById('set-moodle-status-line');
+  if (!el) return;
+  if (!msg) {
+    el.classList.add('hidden');
+    el.textContent = '';
+    return;
+  }
+  el.textContent = msg;
+  el.style.color = isError ? 'var(--danger)' : 'var(--muted)';
+  el.classList.remove('hidden');
+}
+
+// One row per connected account: label/baseUrl + its own Disconnect button.
+// Built fresh on every refreshMoodleAccounts() call, so no stale-listener risk
+// (mirrors renderLocalImportRow's pattern — a new element per render, not a
+// reused one needing rewireButton).
+function renderMoodleAccountRow(account) {
+  const el = document.createElement('div');
+  el.style.cssText =
+    'display:flex;align-items:center;justify-content:space-between;gap:0.5rem;' +
+    'padding:0.3rem 0;border-bottom:1px solid var(--border);';
+
+  const label = document.createElement('span');
+  label.textContent = account.label ? `${account.label} — ${account.baseUrl}` : account.baseUrl;
+  label.style.cssText =
+    'font-size:0.85rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+
+  const disconnectBtn = document.createElement('button');
+  disconnectBtn.type = 'button';
+  disconnectBtn.className = 'btn btn-small btn-danger';
+  disconnectBtn.textContent = 'Disconnect';
+  disconnectBtn.addEventListener('click', () => {
+    withBusy(disconnectBtn, 'Disconnecting…', async () => {
+      try {
+        await window.moodleAuth.removeAccount(account.baseUrl);
+        setMoodleStatusLine(`Disconnected ${account.baseUrl}.`, false);
+      } catch (e) {
+        setMoodleStatusLine(e.message || 'Could not disconnect.', true);
+      }
+      await refreshMoodleAccounts();
+    });
+  });
+
+  el.appendChild(label);
+  el.appendChild(disconnectBtn);
+  return el;
+}
+
+// Re-reads the account list from storage and re-renders it, showing/hiding
+// the "Import courses…" button depending on whether any account exists.
+async function refreshMoodleAccounts() {
+  const listEl = document.getElementById('set-moodle-accounts-list');
+  const importBtn = document.getElementById('set-moodle-import');
+  if (!window.moodleAuth) {
+    listEl.textContent = 'Unavailable';
+    return [];
+  }
+
+  let accounts = [];
+  try {
+    accounts = await window.moodleAuth.listAccounts();
+  } catch (e) {
+    setMoodleStatusLine(e.message || 'Could not read stored accounts.', true);
+  }
+
+  listEl.innerHTML = '';
+  if (accounts.length === 0) {
+    const empty = document.createElement('span');
+    empty.textContent = 'No accounts connected.';
+    empty.style.cssText = 'font-size:0.85rem;color:var(--muted);';
+    listEl.appendChild(empty);
+  } else {
+    accounts.forEach((a) => listEl.appendChild(renderMoodleAccountRow(a)));
+  }
+  if (importBtn) importBtn.classList.toggle('hidden', accounts.length === 0);
+  return accounts;
+}
+
+function setupMoodleSettings() {
+  refreshMoodleAccounts();
+
+  const form = document.getElementById('set-moodle-add-form');
+  const urlInput = document.getElementById('set-moodle-add-url');
+
+  const openAddForm = () => {
+    setMoodleStatusLine('');
+    form.classList.remove('hidden');
+    urlInput.value = '';
+    urlInput.focus();
+  };
+  const closeAddForm = () => {
+    form.classList.add('hidden');
+    urlInput.value = '';
+  };
+
+  rewireButton('set-moodle-add', openAddForm);
+  rewireButton('set-moodle-add-cancel', closeAddForm);
+
+  rewireButton('set-moodle-add-confirm', async (btn) => {
+    setMoodleStatusLine('');
+    const baseUrl = urlInput.value;
+    if (!baseUrl || !baseUrl.trim()) return;
+    const cleanUrl = baseUrl.trim().replace(/\/+$/, '');
+    if (!/^https?:\/\//i.test(cleanUrl)) {
+      setMoodleStatusLine('Enter a full URL, starting with https://', true);
+      return;
+    }
+
+    await withBusy(btn, 'Connecting…', async () => {
+      let captured;
+      try {
+        captured = await window.moodleAuth.captureToken(cleanUrl);
+      } catch (e) {
+        setMoodleStatusLine(e.message || 'Moodle sign-in was cancelled.', true);
+        return;
+      }
+
+      // Verify the token works AND get a display label before storing
+      // anything — an unverified token is not stored at all.
+      let label;
+      try {
+        const client = window.LectioMoodleClient.createMoodleClient({
+          baseUrl: cleanUrl,
+          token: captured.wstoken,
+        });
+        const info = await client.getSiteInfo();
+        label = info.fullname || info.username || undefined;
+      } catch (e) {
+        setMoodleStatusLine(`Could not verify the connection: ${e.message || 'unknown error'}`, true);
+        return;
+      }
+
+      try {
+        await window.moodleAuth.addAccount(cleanUrl, captured.wstoken, label);
+        setMoodleStatusLine(label ? `Connected as ${label}.` : 'Connected.', false);
+      } catch (e) {
+        setMoodleStatusLine(e.message || 'Could not store the Moodle token.', true);
+        return;
+      }
+
+      closeAddForm();
+      await refreshMoodleAccounts();
+    });
+  });
+
+  // Enter submits, Escape cancels — the input is the whole point of this
+  // form, so both should work without reaching for the mouse.
+  urlInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('set-moodle-add-confirm').click();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeAddForm();
+    }
+  });
 }
 
 // Hide both account windows (used by sign-out / delete, where the sign-in

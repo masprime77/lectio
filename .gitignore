@@ -19,6 +19,8 @@ supabase/.env
 packages/desktop/planner-core.js
 packages/desktop/migrate.js
 packages/desktop/conflict.js
+packages/desktop/moodle.js
+packages/desktop/moodle-client.js
 
 # Vendored supabase-js UMD bundle + generated renderer config (see scripts/sync-supabase.js).
 # The config holds the publishable anon key, kept out of git like the mobile .env.
