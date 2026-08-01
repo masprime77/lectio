@@ -37,5 +37,8 @@
     "react-native-gesture-handler": "2.31.2",
     "react-native-reanimated": "4.3.1",
     "react-native-worklets": "0.8.3"
+  },
+  "allowScripts": {
+    "electron@43.2.0": true
   }
 }
