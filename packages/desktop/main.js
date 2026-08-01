@@ -275,10 +275,11 @@ ipcMain.handle('open-external', (event, url) => {
 // ---------------------------------------------------------------------------
 // Moodle: secure token storage + SSO capture window
 //
-// Exactly one Moodle connection at a time for now (no multi-account storage
-// yet — matches Phase 15 Part A's single-account createMoodleClient scope).
-// Token refresh/expiry/revocation isn't designed yet; this only covers the
-// initial SSO-driven capture and secure-at-rest storage of the result.
+// One encrypted file holding several accounts, keyed by baseUrl — a Moodle
+// instance is the natural unique key here (this is one person's own accounts
+// on several instances, not a multi-user handoff). Token
+// refresh/expiry/revocation isn't designed yet; this only covers the initial
+// SSO-driven capture and secure-at-rest storage of the result.
 // ---------------------------------------------------------------------------
 const MOODLE_TOKEN_FILE = path.join(app.getPath('userData'), 'moodle-token.enc');
 
@@ -286,32 +287,70 @@ function isMoodleEncryptionAvailable() {
   return safeStorage.isEncryptionAvailable();
 }
 
-// Persists { baseUrl, wstoken } encrypted at rest via the OS keychain
-// (Keychain on macOS, DPAPI on Windows) through Electron's safeStorage.
-// safeStorage is main-process-only, which is why this whole module lives
-// here rather than being callable directly from the renderer.
-function setMoodleToken({ baseUrl, wstoken }) {
-  if (!isMoodleEncryptionAvailable()) {
-    throw new Error('OS-backed encryption is not available on this machine.');
-  }
-  const payload = JSON.stringify({ baseUrl, wstoken });
-  const encrypted = safeStorage.encryptString(payload);
-  fs.mkdirSync(path.dirname(MOODLE_TOKEN_FILE), { recursive: true });
-  fs.writeFileSync(MOODLE_TOKEN_FILE, encrypted);
-  return { ok: true };
-}
-
-function getMoodleToken() {
-  if (!fs.existsSync(MOODLE_TOKEN_FILE)) return null;
+// The accounts file is encrypted at rest via the OS keychain (Keychain on
+// macOS, DPAPI on Windows) through Electron's safeStorage. safeStorage is
+// main-process-only, which is why this whole module lives here rather than
+// being callable directly from the renderer.
+//
+// Reads the raw accounts file, transparently migrating Phase 15's old
+// single-account shape ({ baseUrl, wstoken }) to the new
+// { accounts: [{ baseUrl, wstoken, label }] } shape in memory. The migrated
+// shape is NOT written back until the next mutation (addMoodleAccount /
+// removeMoodleAccount) — a read-only call never rewrites the file.
+function readMoodleAccountsFile() {
+  if (!fs.existsSync(MOODLE_TOKEN_FILE)) return { accounts: [] };
   if (!isMoodleEncryptionAvailable()) {
     throw new Error('OS-backed encryption is not available on this machine.');
   }
   const encrypted = fs.readFileSync(MOODLE_TOKEN_FILE);
-  return JSON.parse(safeStorage.decryptString(encrypted));
+  const data = JSON.parse(safeStorage.decryptString(encrypted));
+  if (Array.isArray(data.accounts)) return data;
+  // Old Phase 15 single-account shape.
+  if (data.baseUrl && data.wstoken) {
+    return { accounts: [{ baseUrl: data.baseUrl, wstoken: data.wstoken, label: undefined }] };
+  }
+  return { accounts: [] };
 }
 
-function clearMoodleToken() {
-  if (fs.existsSync(MOODLE_TOKEN_FILE)) fs.unlinkSync(MOODLE_TOKEN_FILE);
+function writeMoodleAccountsFile(data) {
+  if (!isMoodleEncryptionAvailable()) {
+    throw new Error('OS-backed encryption is not available on this machine.');
+  }
+  const encrypted = safeStorage.encryptString(JSON.stringify(data));
+  fs.mkdirSync(path.dirname(MOODLE_TOKEN_FILE), { recursive: true });
+  fs.writeFileSync(MOODLE_TOKEN_FILE, encrypted);
+}
+
+// Accounts WITHOUT their wstoken — safe to hand to the renderer for display
+// (Settings list, course-picker account selector) without re-exposing every
+// token on every listing call.
+function listMoodleAccounts() {
+  return readMoodleAccountsFile().accounts.map(({ baseUrl, label }) => ({ baseUrl, label }));
+}
+
+// One account's full record (including wstoken), by baseUrl. The renderer
+// still builds createMoodleClient() itself (same boundary Phase 15 already
+// crossed for the single-account case), so it needs the token on demand.
+function getMoodleAccountToken(baseUrl) {
+  return readMoodleAccountsFile().accounts.find((a) => a.baseUrl === baseUrl) || null;
+}
+
+// Adds a new account, or replaces an existing one with the same baseUrl (a
+// reconnect after an expired/invalid token) — exactly one entry per baseUrl.
+function addMoodleAccount({ baseUrl, wstoken, label }) {
+  const data = readMoodleAccountsFile();
+  const idx = data.accounts.findIndex((a) => a.baseUrl === baseUrl);
+  const entry = { baseUrl, wstoken, label };
+  if (idx === -1) data.accounts.push(entry);
+  else data.accounts[idx] = entry;
+  writeMoodleAccountsFile(data);
+  return { ok: true };
+}
+
+function removeMoodleAccount(baseUrl) {
+  const data = readMoodleAccountsFile();
+  data.accounts = data.accounts.filter((a) => a.baseUrl !== baseUrl);
+  writeMoodleAccountsFile(data);
   return { ok: true };
 }
 
@@ -359,9 +398,10 @@ function captureMoodleToken(baseUrl) {
   });
 }
 
-ipcMain.handle('moodle-get-token', () => getMoodleToken());
-ipcMain.handle('moodle-set-token', (event, { baseUrl, wstoken }) => setMoodleToken({ baseUrl, wstoken }));
-ipcMain.handle('moodle-clear-token', () => clearMoodleToken());
+ipcMain.handle('moodle-list-accounts', () => listMoodleAccounts());
+ipcMain.handle('moodle-get-account-token', (event, baseUrl) => getMoodleAccountToken(baseUrl));
+ipcMain.handle('moodle-add-account', (event, { baseUrl, wstoken, label }) => addMoodleAccount({ baseUrl, wstoken, label }));
+ipcMain.handle('moodle-remove-account', (event, baseUrl) => removeMoodleAccount(baseUrl));
 ipcMain.handle('moodle-capture-token', (event, baseUrl) => captureMoodleToken(baseUrl));
 
 // ---------------------------------------------------------------------------
