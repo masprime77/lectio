@@ -28,7 +28,7 @@
   },
   "devDependencies": {
     "@supabase/supabase-js": "^2.108.1",
-    "electron": "31.7.7",
+    "electron": "43.2.0",
     "electron-builder": "^24.13.3",
     "png-to-ico": "^3.0.1"
   },
