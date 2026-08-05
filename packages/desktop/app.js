@@ -348,7 +348,7 @@ async function flushSave() {
 const {
   getReadingTags, getTaskTags,
   isProtectedTag, addTag, deleteTag, editTag, reorderTags,
-  courseProgress, uid, deleteCourse, addItem,
+  courseProgress, uid, addCourse, deleteCourse, addItem,
 } = window.PlannerCore;
 
 // ---------------------------------------------------------------------------
@@ -1678,6 +1678,7 @@ async function init() {
   setupSave();
   setupSettings();
   setupMoodleSettings();
+  setupMoodleImport();
   setupFeedback();
   setupAddItem();
   setupTutorial();
@@ -3062,6 +3063,252 @@ function setupMoodleSettings() {
       e.preventDefault();
       closeAddForm();
     }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Moodle import: pick an account + Moodle course + target Lectio course, then
+// fetch that course's contents and run them through the pure core mapper
+// (Phase 16 Part B). Stops once the mapped weeks are in memory — Part C owns
+// the per-week triage/confirm UI that turns them into readings and tasks.
+// ---------------------------------------------------------------------------
+
+// Transient Moodle import session data — never persisted, reset each time
+// the import modal is (re)opened. `mapped` is set once the course-content
+// fetch completes; Part C's triage modal reads it. `accountBaseUrl` is the
+// source tag passed to mapCourseContents so items from different accounts
+// never collide on moodleModuleId.
+const moodleImport = {
+  accountBaseUrl: null,
+  client: null,
+  courses: [],
+  selectedCourseId: null,
+  mapped: null,
+};
+
+// Fetches + populates the Moodle-course dropdown for one connected account.
+// Called once when the modal opens (with the first/only account) and again
+// whenever the account dropdown changes.
+async function loadMoodleCoursesForAccount(baseUrl) {
+  const errorEl = document.getElementById('moodle-course-error');
+  const loadingEl = document.getElementById('moodle-course-loading');
+  const selectRow = document.getElementById('moodle-course-select-row');
+  const nextBtn = document.getElementById('moodle-course-next');
+
+  errorEl.classList.add('hidden');
+  loadingEl.textContent = 'Loading your courses…';
+  loadingEl.classList.remove('hidden');
+  selectRow.classList.add('hidden');
+  nextBtn.disabled = true;
+  moodleImport.client = null;
+  moodleImport.courses = [];
+
+  let stored;
+  try {
+    stored = await window.moodleAuth.getAccountToken(baseUrl);
+  } catch (e) {
+    stored = null;
+  }
+  if (!stored) {
+    loadingEl.classList.add('hidden');
+    errorEl.textContent = "Could not read that account's token. Reconnect it in Settings.";
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  try {
+    const client = window.LectioMoodleClient.createMoodleClient({
+      baseUrl: stored.baseUrl,
+      token: stored.wstoken,
+    });
+    const info = await client.getSiteInfo();
+    const courses = await client.getEnrolledCourses(info.userid);
+    moodleImport.accountBaseUrl = baseUrl;
+    moodleImport.client = client;
+    moodleImport.courses = courses;
+
+    const select = document.getElementById('moodle-course-select');
+    select.innerHTML = courses
+      .map((c) => `<option value="${c.id}">${escapeHtml(c.fullname || c.shortname || ('Course ' + c.id))}</option>`)
+      .join('');
+
+    loadingEl.classList.add('hidden');
+    selectRow.classList.remove('hidden');
+    nextBtn.disabled = courses.length === 0;
+    if (courses.length === 0) {
+      errorEl.textContent = 'No enrolled courses were returned by Moodle for that account.';
+      errorEl.classList.remove('hidden');
+    }
+  } catch (e) {
+    loadingEl.classList.add('hidden');
+    errorEl.textContent = e.message || 'Could not reach Moodle.';
+    errorEl.classList.remove('hidden');
+  }
+}
+
+function closeMoodleCourseModal() {
+  document.getElementById('moodle-course-overlay').classList.add('hidden');
+}
+
+async function openMoodleCourseModal() {
+  const overlay = document.getElementById('moodle-course-overlay');
+  const errorEl = document.getElementById('moodle-course-error');
+  const loadingEl = document.getElementById('moodle-course-loading');
+  const accountRow = document.getElementById('moodle-course-account-row');
+  const selectRow = document.getElementById('moodle-course-select-row');
+  const targetRow = document.getElementById('moodle-course-target-row');
+  const newNameRow = document.getElementById('moodle-course-newname-row');
+  const nextBtn = document.getElementById('moodle-course-next');
+
+  errorEl.classList.add('hidden');
+  accountRow.classList.add('hidden');
+  selectRow.classList.add('hidden');
+  targetRow.classList.add('hidden');
+  newNameRow.classList.add('hidden');
+  nextBtn.disabled = true;
+  moodleImport.accountBaseUrl = null;
+  moodleImport.client = null;
+  moodleImport.courses = [];
+  moodleImport.mapped = null;
+
+  overlay.classList.remove('hidden');
+  loadingEl.textContent = 'Loading your Moodle accounts…';
+  loadingEl.classList.remove('hidden');
+
+  // Everything downstream writes into a loaded semester (a new target course
+  // is pushed onto state.semester.courses), so without one there is nothing
+  // to import into — bail before spending a Moodle round trip.
+  if (!state.semester) {
+    loadingEl.classList.add('hidden');
+    errorEl.textContent = 'Open or create a semester first, then import into it.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  let accounts = [];
+  try {
+    accounts = await window.moodleAuth.listAccounts();
+  } catch (e) {
+    accounts = [];
+  }
+  if (accounts.length === 0) {
+    loadingEl.classList.add('hidden');
+    errorEl.textContent = 'Connect a Moodle account in Settings first.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  const accountSelect = document.getElementById('moodle-course-account');
+  accountSelect.innerHTML = accounts
+    .map((a) => `<option value="${escapeHtml(a.baseUrl)}">${escapeHtml(a.label ? `${a.label} — ${a.baseUrl}` : a.baseUrl)}</option>`)
+    .join('');
+  // Only worth asking when there's an actual choice — one account is the
+  // common case and shouldn't force an extra click.
+  accountRow.classList.toggle('hidden', accounts.length <= 1);
+
+  targetRow.classList.remove('hidden');
+  populateMoodleTargetSelect();
+  newNameRow.classList.remove('hidden'); // shown by default since "+ New course" is the default target
+
+  await loadMoodleCoursesForAccount(accountSelect.value);
+}
+
+// Existing Lectio courses in the current semester, plus the fixed "+ New course" option.
+function populateMoodleTargetSelect() {
+  const select = document.getElementById('moodle-course-target');
+  const sem = state.semester;
+  const existing = sem ? sem.courses : [];
+  select.innerHTML =
+    '<option value="__new__">+ New course</option>' +
+    existing.map((c) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('');
+}
+
+function setupMoodleImport() {
+  const importBtn = document.getElementById('set-moodle-import');
+  if (importBtn) {
+    importBtn.addEventListener('click', () => {
+      closeSettingsModal();
+      openMoodleCourseModal();
+    });
+  }
+
+  document.getElementById('moodle-course-cancel').addEventListener('click', closeMoodleCourseModal);
+  document.getElementById('moodle-course-overlay').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('moodle-course-overlay')) closeMoodleCourseModal();
+  });
+
+  // Switching accounts re-fetches that account's course list.
+  document.getElementById('moodle-course-account').addEventListener('change', (e) => {
+    loadMoodleCoursesForAccount(e.target.value);
+  });
+
+  // New-course name field only matters (and is only shown) when "+ New course" is picked.
+  document.getElementById('moodle-course-target').addEventListener('change', (e) => {
+    document.getElementById('moodle-course-newname-row').classList.toggle('hidden', e.target.value !== '__new__');
+  });
+
+  document.getElementById('moodle-course-next').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const errorEl = document.getElementById('moodle-course-error');
+    errorEl.classList.add('hidden');
+
+    const moodleCourseId = parseInt(document.getElementById('moodle-course-select').value, 10);
+    const targetValue = document.getElementById('moodle-course-target').value;
+    const newName = document.getElementById('moodle-course-newname').value.trim();
+
+    if (targetValue === '__new__' && !newName) {
+      errorEl.textContent = 'Enter a name for the new course.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    await withBusy(btn, 'Fetching…', async () => {
+      try {
+        const contents = await moodleImport.client.getCourseContents(moodleCourseId);
+        // Tag every item with the source account's baseUrl so two accounts'
+        // items never collide on moodleModuleId.
+        moodleImport.mapped = window.LectioMoodle.mapCourseContents(contents, {
+          source: moodleImport.accountBaseUrl,
+        });
+        moodleImport.selectedCourseId = moodleCourseId;
+      } catch (err) {
+        errorEl.textContent = err.message || 'Could not fetch course content.';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      // Resolve (or create) the target Lectio course now, before handing off
+      // to Part C's triage modal — a fresh course must exist so the triage
+      // UI always has a real course id to attach items to. New courses follow
+      // the same palette-by-position rule as the semester editor's rows.
+      let targetCourse;
+      if (targetValue === '__new__') {
+        const idx = state.semester.courses.length;
+        targetCourse = addCourse(state.semester, {
+          name: newName,
+          color: DEFAULT_COLORS[idx % DEFAULT_COLORS.length],
+        });
+        persist();
+        renderDashboard();
+        renderPlanner();
+      } else {
+        targetCourse = state.semester.courses.find((c) => c.id === targetValue);
+      }
+
+      if (!targetCourse || !moodleImport.mapped) {
+        errorEl.textContent = 'Something went wrong preparing the import.';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      closeMoodleCourseModal();
+      // Part C implements openMoodleTriageModal(targetCourse, mapped, accountBaseUrl).
+      if (typeof openMoodleTriageModal === 'function') {
+        openMoodleTriageModal(targetCourse, moodleImport.mapped, moodleImport.accountBaseUrl);
+      } else {
+        alert('Fetched ' + moodleImport.mapped.weeks.length + ' week(s). Triage UI not installed yet.');
+      }
+    });
   });
 }
 
