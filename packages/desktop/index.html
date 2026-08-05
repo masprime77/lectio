@@ -487,6 +487,20 @@
     </div>
   </div>
 
+  <!-- Moodle: per-week triage/import (Phase 16 Part C) -->
+  <div id="moodle-triage-overlay" class="modal-overlay hidden">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="moodle-triage-title" style="max-width:640px;">
+      <h2 id="moodle-triage-title">Import weeks</h2>
+      <p id="moodle-triage-source" style="font-size:0.8rem;color:var(--muted);margin:-0.5rem 0 0.75rem;"></p>
+      <p id="moodle-triage-error" class="hidden" style="font-size:0.85rem;color:var(--danger);margin:-0.5rem 0 0.75rem;"></p>
+      <div id="moodle-triage-list"></div>
+      <div class="modal-actions">
+        <button type="button" id="moodle-triage-cancel" class="btn">Cancel</button>
+        <button type="button" id="moodle-triage-confirm" class="btn btn-primary">Import selected</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Add reading / task modal -->
   <div id="add-item-overlay" class="modal-overlay hidden">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="add-item-title">

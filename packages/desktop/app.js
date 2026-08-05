@@ -3433,14 +3433,187 @@ function setupMoodleImport() {
       }
 
       closeMoodleCourseModal();
-      // Part C implements openMoodleTriageModal(targetCourse, mapped, accountBaseUrl).
-      if (typeof openMoodleTriageModal === 'function') {
-        openMoodleTriageModal(targetCourse, moodleImport.mapped, moodleImport.accountBaseUrl);
-      } else {
-        alert('Fetched ' + moodleImport.mapped.weeks.length + ' week(s). Triage UI not installed yet.');
-      }
+      // Hand the mapped weeks to the triage screen, which owns turning them
+      // into readings/tasks. closeMoodleCourseModal() runs first so a
+      // create-mode import's New Semester modal is already restored behind it.
+      openMoodleTriageModal(targetCourse, moodleImport.mapped, moodleImport.accountBaseUrl);
     });
   });
+}
+
+// ---------------------------------------------------------------------------
+// Moodle import, per-week triage (Phase 16 Part C). One decision per week —
+// Skip / Reading / Task — applied to every item that week contains, created
+// through PlannerCore.addItem so Moodle-sourced items go through the same
+// core logic (and default statuses) as hand-added ones.
+//
+// Deliberate non-goal: addItem has no field for moodleModuleId/moodleSource,
+// so those stay on the in-memory mapped items for this session's
+// disambiguation only and are NOT persisted onto the created reading/task.
+// Storing them for a future re-sync would change core's stored shape, and
+// merge/dedup between accounts is still an open product decision.
+// ---------------------------------------------------------------------------
+
+// The semester whose start date and length the week suggestions are measured
+// against. A create-mode import has no saved semester yet — its start date and
+// length are still unsaved values in the New Semester form — so read them from
+// there rather than from state.semester, which at that moment is whatever
+// semester happens to be open behind the modal (or nothing at all).
+function moodleTriageSemesterContext() {
+  if (!moodleImport.draft) return state.semester;
+  return {
+    startDate: document.getElementById('ns-start').value,
+    weeks: parseInt(document.getElementById('ns-weeks').value, 10) || 15,
+  };
+}
+
+// Given a semester's startDate (YYYY-MM-DD) and a Moodle dateRange
+// { startDay, startMonth, ... } (no year), guess which Lectio week (1-based)
+// the section falls in. Moodle's semester runs across a single calendar-year
+// boundary at most, so: try the semester start's year first; if that lands the
+// section date before the semester start, try start year + 1 instead (a winter
+// semester starting in October, with a "13. Januar" section, is next calendar
+// year). Returns a 1-based week clamped to [1, semester.weeks], or null when
+// there's no dateRange — or no usable start date — to work from at all.
+function suggestWeekFromDateRange(semester, dateRange) {
+  if (!dateRange || !semester || !semester.startDate) return null;
+  const start = new Date(semester.startDate + 'T00:00:00');
+  if (Number.isNaN(start.getTime())) return null;
+  const startYear = start.getFullYear();
+  const candidates = [startYear, startYear + 1].map(
+    (year) => new Date(year, dateRange.startMonth - 1, dateRange.startDay)
+  );
+  // Prefer the earliest candidate that is on/after the semester start.
+  let sectionDate = candidates.find((d) => d >= start);
+  if (!sectionDate) sectionDate = candidates[0]; // both before start — best effort
+  const diffDays = Math.floor((sectionDate - start) / (1000 * 60 * 60 * 24));
+  const week = Math.floor(diffDays / 7) + 1;
+  return Math.max(1, Math.min(semester.weeks, week));
+}
+
+// One row per mapped Moodle week: section name, item count, a mode select
+// (Skip / Reading / Task), and a week-number input pre-filled from
+// suggestWeekFromDateRange (editable — the user has the final say, especially
+// when dateRange was null or the guess landed outside the semester).
+function renderMoodleTriageRow(week, semester) {
+  const el = document.createElement('div');
+  el.style.cssText =
+    'display:flex;align-items:center;gap:0.75rem;padding:0.6rem 0;border-bottom:1px solid var(--border);';
+
+  const info = document.createElement('div');
+  info.style.cssText = 'flex:1;min-width:0;';
+  const title = document.createElement('div');
+  title.textContent = week.sectionName || ('Section ' + week.moodleSection);
+  title.style.cssText = 'font-size:0.9rem;color:var(--text);';
+  const sub = document.createElement('div');
+  sub.textContent = week.items.length + (week.items.length === 1 ? ' item' : ' items');
+  sub.style.cssText = 'font-size:0.75rem;color:var(--muted);';
+  info.appendChild(title);
+  info.appendChild(sub);
+
+  const weekInput = document.createElement('input');
+  weekInput.type = 'number';
+  weekInput.min = '1';
+  weekInput.max = String(semester.weeks);
+  weekInput.style.cssText =
+    'width:4.5rem;padding:0.3rem;border:1px solid var(--border);border-radius:6px;' +
+    'font-size:0.85rem;color:var(--text);background:var(--surface);';
+  const suggested = suggestWeekFromDateRange(semester, week.dateRange);
+  weekInput.value = suggested || '';
+  weekInput.placeholder = 'Wk';
+
+  const modeSelect = document.createElement('select');
+  modeSelect.style.cssText =
+    'padding:0.3rem 0.4rem;border:1px solid var(--border);border-radius:6px;' +
+    'font-size:0.85rem;color:var(--text);background:var(--surface);';
+  modeSelect.innerHTML =
+    '<option value="skip">Skip</option>' +
+    '<option value="reading">Reading</option>' +
+    '<option value="task">Task</option>';
+
+  el.appendChild(info);
+  el.appendChild(weekInput);
+  el.appendChild(modeSelect);
+
+  return {
+    el,
+    getDecision: () => ({
+      week,
+      mode: modeSelect.value,
+      targetWeek: parseInt(weekInput.value, 10),
+    }),
+  };
+}
+
+function closeMoodleTriageModal() {
+  document.getElementById('moodle-triage-overlay').classList.add('hidden');
+}
+
+function openMoodleTriageModal(targetCourse, mapped, accountBaseUrl) {
+  const overlay = document.getElementById('moodle-triage-overlay');
+  const listEl = document.getElementById('moodle-triage-list');
+  const errorEl = document.getElementById('moodle-triage-error');
+  const sourceEl = document.getElementById('moodle-triage-source');
+  const confirmBtn = document.getElementById('moodle-triage-confirm');
+
+  errorEl.classList.add('hidden');
+  sourceEl.textContent = accountBaseUrl ? `From ${accountBaseUrl}` : '';
+  listEl.innerHTML = '';
+  confirmBtn.disabled = false;
+  confirmBtn.textContent = 'Import selected';
+
+  const sem = moodleTriageSemesterContext();
+  const isDraft = moodleImport.draft;
+  const rows = mapped.weeks.map((week) => {
+    const row = renderMoodleTriageRow(week, sem);
+    listEl.appendChild(row.el);
+    return row;
+  });
+
+  // Assigned (not addEventListener) so re-running the import replaces these
+  // handlers instead of stacking them, mirroring openLocalImportModal.
+  document.getElementById('moodle-triage-cancel').onclick = () => closeMoodleTriageModal();
+  overlay.onclick = (e) => {
+    if (e.target === overlay) closeMoodleTriageModal();
+  };
+
+  confirmBtn.onclick = async () => {
+    errorEl.classList.add('hidden');
+    const decisions = rows.map((r) => r.getDecision()).filter((d) => d.mode !== 'skip');
+
+    // Validate every non-skipped row up front so a bad week number can never
+    // leave a half-finished import behind.
+    const invalid = decisions.find(
+      (d) => !Number.isInteger(d.targetWeek) || d.targetWeek < 1 || d.targetWeek > sem.weeks
+    );
+    if (invalid) {
+      errorEl.textContent = `Enter a valid week (1–${sem.weeks}) for "${invalid.week.sectionName || 'that section'}".`;
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    await withBusy(confirmBtn, 'Importing…', async () => {
+      let created = 0;
+      decisions.forEach((d) => {
+        d.week.items.forEach((item) => {
+          addItem(targetCourse, d.mode, { title: item.name, week: d.targetWeek });
+          created += 1;
+        });
+      });
+      // A create-mode import writes into the unsaved draft course, which the
+      // New Semester modal still owns — saving and re-rendering there would
+      // persist whichever semester happens to be loaded behind it. Create does
+      // that work when the user submits the form.
+      if (!isDraft) {
+        persist();
+        render();
+      }
+      closeMoodleTriageModal();
+      alert(`Imported ${created} item(s) into "${targetCourse.name}".`);
+    });
+  };
+
+  overlay.classList.remove('hidden');
 }
 
 // Hide both account windows (used by sign-out / delete, where the sign-in
