@@ -2253,8 +2253,12 @@ function setupModal() {
 
   document.getElementById('modal-moodle-import-btn').addEventListener('click', async () => {
     if (!(await ensureMoodleAccountOrPrompt())) return;
+    // Create mode imports into the modal's unsaved draft; closeModal() only
+    // hides the overlay, so the draft survives and closeMoodleCourseModal()
+    // brings it back when the picker is done.
+    const draftMode = !state.editingId;
     closeModal();
-    openMoodleCourseModal();
+    openMoodleCourseModal({ draftMode });
   });
 
   overlay.addEventListener('click', (e) => {
@@ -2349,7 +2353,7 @@ function updateModalFooter() {
     .classList.toggle('hidden', !(tab === 'semester' && isEdit));
   document
     .getElementById('modal-moodle-import-btn')
-    .classList.toggle('hidden', !(tab === 'courses' && isEdit));
+    .classList.toggle('hidden', tab !== 'courses');
   const submit = document.getElementById('modal-submit');
   if (tab === 'items') {
     submit.textContent = 'Add';
@@ -3101,12 +3105,18 @@ function setupMoodleSettings() {
 // fetch completes; Part C's triage modal reads it. `accountBaseUrl` is the
 // source tag passed to mapCourseContents so items from different accounts
 // never collide on moodleModuleId.
+// `draft` marks an import into the New Semester modal's unsaved draft rather
+// than a live semester: the target course lives in state.editingSemester.courses
+// keyed to a course row, and nothing is persisted until Create is clicked.
+// The triage step must read it before writing items anywhere.
 const moodleImport = {
   accountBaseUrl: null,
   client: null,
   courses: [],
   selectedCourseId: null,
   mapped: null,
+  draft: false,
+  returnToSemesterModal: false,
 };
 
 // Shared guard for every "Import from Moodle" entry point (Settings, the
@@ -3190,9 +3200,18 @@ async function loadMoodleCoursesForAccount(baseUrl) {
 
 function closeMoodleCourseModal() {
   document.getElementById('moodle-course-overlay').classList.add('hidden');
+  // A create-mode import is launched from the still-unsaved New Semester
+  // modal, whose draft (form values + course rows) lives only in that modal's
+  // DOM — closeModal() merely hides it, so bringing it back here, on every
+  // close path (Cancel, backdrop, completed fetch), is what stops an
+  // in-progress semester from being stranded behind the picker.
+  if (moodleImport.returnToSemesterModal) {
+    moodleImport.returnToSemesterModal = false;
+    document.getElementById('modal-overlay').classList.remove('hidden');
+  }
 }
 
-async function openMoodleCourseModal({ presetCourseId } = {}) {
+async function openMoodleCourseModal({ presetCourseId, draftMode = false } = {}) {
   const overlay = document.getElementById('moodle-course-overlay');
   const errorEl = document.getElementById('moodle-course-error');
   const loadingEl = document.getElementById('moodle-course-loading');
@@ -3212,6 +3231,8 @@ async function openMoodleCourseModal({ presetCourseId } = {}) {
   moodleImport.client = null;
   moodleImport.courses = [];
   moodleImport.mapped = null;
+  moodleImport.draft = draftMode;
+  moodleImport.returnToSemesterModal = draftMode;
 
   overlay.classList.remove('hidden');
   loadingEl.textContent = 'Loading your Moodle accounts…';
@@ -3219,8 +3240,10 @@ async function openMoodleCourseModal({ presetCourseId } = {}) {
 
   // Everything downstream writes into a loaded semester (a new target course
   // is pushed onto state.semester.courses), so without one there is nothing
-  // to import into — bail before spending a Moodle round trip.
-  if (!state.semester) {
+  // to import into — bail before spending a Moodle round trip. Draft mode is
+  // exempt: it writes into the New Semester modal's draft, which is the case
+  // where there deliberately isn't a loaded semester yet.
+  if (!draftMode && !state.semester) {
     loadingEl.classList.add('hidden');
     errorEl.textContent = 'Open or create a semester first, then import into it.';
     errorEl.classList.remove('hidden');
@@ -3249,7 +3272,7 @@ async function openMoodleCourseModal({ presetCourseId } = {}) {
   accountRow.classList.toggle('hidden', accounts.length <= 1);
 
   targetRow.classList.remove('hidden');
-  populateMoodleTargetSelect();
+  populateMoodleTargetSelect(draftMode);
   const targetSelect = document.getElementById('moodle-course-target');
   if (presetCourseId) {
     // Called from a specific course's own import action — skip the picker,
@@ -3266,13 +3289,31 @@ async function openMoodleCourseModal({ presetCourseId } = {}) {
 }
 
 // Existing Lectio courses in the current semester, plus the fixed "+ New course" option.
-function populateMoodleTargetSelect() {
+function populateMoodleTargetSelect(draftMode) {
   const select = document.getElementById('moodle-course-target');
-  const sem = state.semester;
-  const existing = sem ? sem.courses : [];
+  const existing = draftMode
+    ? draftCourseRows()
+    : (state.semester ? state.semester.courses : []);
   select.innerHTML =
     '<option value="__new__">+ New course</option>' +
     existing.map((c) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('');
+}
+
+// The courses on offer while creating a semester are the modal's own rows —
+// they don't exist as course objects until Create is clicked, so state.semester
+// can't be consulted. Blank rows are skipped (submitModal drops them too), and
+// a row that has never been imported into gets an id minted here so a draft
+// course can be keyed to it; an id that ends up unused is simply ignored by
+// submitModal, which mints a fresh one for any row it can't match.
+function draftCourseRows() {
+  return [...document.querySelectorAll('#ns-courses .ns-course-row')]
+    .map((row) => {
+      const name = row.querySelector('.ns-course-name').value.trim();
+      if (!name) return null;
+      if (!row.dataset.courseId) row.dataset.courseId = uid('course');
+      return { id: row.dataset.courseId, name };
+    })
+    .filter(Boolean);
 }
 
 function setupMoodleImport() {
@@ -3334,7 +3375,45 @@ function setupMoodleImport() {
       // UI always has a real course id to attach items to. New courses follow
       // the same palette-by-position rule as the semester editor's rows.
       let targetCourse;
-      if (targetValue === '__new__') {
+      if (moodleImport.draft) {
+        // Create mode: mirror importCourseFromModal's draft handling — the
+        // course object goes in state.editingSemester.courses (so submitModal
+        // keeps whatever the triage step attaches) with a matching row in the
+        // modal. Nothing is persisted or rendered; Create does that.
+        if (!state.editingSemester.courses) state.editingSemester.courses = [];
+        if (targetValue === '__new__') {
+          const idx = document.querySelectorAll('#ns-courses .ns-course-row').length;
+          targetCourse = {
+            id: uid('course'),
+            name: newName,
+            color: DEFAULT_COLORS[idx % DEFAULT_COLORS.length],
+            readings: [],
+            tasks: [],
+          };
+          state.editingSemester.courses.push(targetCourse);
+          addCourseField(targetCourse);
+        } else {
+          targetCourse = state.editingSemester.courses.find((c) => c.id === targetValue);
+          if (!targetCourse) {
+            // A row the user typed but never imported into has no draft entry
+            // yet — promote it to one, keyed to the row, so the triage step
+            // has a real course object to attach items to.
+            const row = [...document.querySelectorAll('#ns-courses .ns-course-row')].find(
+              (r) => r.dataset.courseId === targetValue
+            );
+            if (row) {
+              targetCourse = {
+                id: targetValue,
+                name: row.querySelector('.ns-course-name').value.trim(),
+                color: row.querySelector('.ns-course-color').value,
+                readings: [],
+                tasks: [],
+              };
+              state.editingSemester.courses.push(targetCourse);
+            }
+          }
+        }
+      } else if (targetValue === '__new__') {
         const idx = state.semester.courses.length;
         targetCourse = addCourse(state.semester, {
           name: newName,
