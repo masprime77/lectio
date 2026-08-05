@@ -3591,15 +3591,25 @@ function renderMoodleTriageRow(week, semester) {
   }
   updateSub();
 
-  toggle.addEventListener('click', () => {
-    const open = itemsEl.classList.toggle('hidden') === false;
+  function setExpanded(open) {
+    itemsEl.classList.toggle('hidden', !open);
     toggle.style.transform = open ? 'rotate(90deg)' : '';
     toggle.title = open ? 'Hide items' : 'Show items';
+  }
+
+  toggle.addEventListener('click', () => {
+    setExpanded(itemsEl.classList.contains('hidden'));
+    // Let the modal re-label its expand/collapse-all button, so toggling the
+    // last collapsed row by hand doesn't leave it offering "Expand all".
+    if (api.onToggle) api.onToggle();
   });
 
   const api = {
     el,
     onWeekInput: null,
+    onToggle: null,
+    isExpanded: () => !itemsEl.classList.contains('hidden'),
+    setExpanded,
     getDecision: () => ({
       week,
       mode: modeSelect.value,
@@ -3665,17 +3675,34 @@ function openMoodleTriageModal(targetCourse, mapped, accountBaseUrl) {
     listEl.appendChild(row.el);
     return row;
   });
+  // One button covers both directions: it reads the rows' current state, so it
+  // offers "Collapse all" only once everything really is open — including when
+  // the last row was opened by its own chevron rather than by this button.
+  const expandBtn = document.getElementById('moodle-triage-expand-all');
+  const syncExpandLabel = () => {
+    const allOpen = rows.length > 0 && rows.every((r) => r.isExpanded());
+    expandBtn.textContent = allOpen ? 'Collapse all' : 'Expand all';
+  };
+
   // A row can't know its own index until the whole list exists, so the cascade
   // hook is attached here rather than inside the row factory.
   rows.forEach((row, i) => {
     row.onWeekInput = () => cascadeMoodleTriageWeeks(rows, i, sem.weeks);
+    row.onToggle = syncExpandLabel;
   });
+  syncExpandLabel();
 
   // Assigned (not addEventListener) so re-running the import replaces these
   // handlers instead of stacking them, mirroring openLocalImportModal.
   document.getElementById('moodle-triage-cancel').onclick = () => closeMoodleTriageModal();
   overlay.onclick = (e) => {
     if (e.target === overlay) closeMoodleTriageModal();
+  };
+
+  expandBtn.onclick = () => {
+    const allOpen = rows.length > 0 && rows.every((r) => r.isExpanded());
+    rows.forEach((r) => r.setExpanded(!allOpen));
+    syncExpandLabel();
   };
 
   const setAllModes = (mode) => rows.forEach((r) => r.setMode(mode));
