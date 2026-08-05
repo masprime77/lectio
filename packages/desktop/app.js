@@ -891,6 +891,18 @@ function renderCourseView() {
     });
     header.appendChild(importCourseBtn);
 
+    // Import from Moodle (skips the target-course picker — this course is
+    // already the target).
+    const moodleImportBtn = document.createElement('button');
+    moodleImportBtn.className = 'icon-btn';
+    moodleImportBtn.innerHTML = icon('school');
+    moodleImportBtn.title = 'Import from Moodle';
+    moodleImportBtn.addEventListener('click', async () => {
+      if (!(await ensureMoodleAccountOrPrompt())) return;
+      openMoodleCourseModal({ presetCourseId: course.id });
+    });
+    header.appendChild(moodleImportBtn);
+
     // Delete
     const delBtn = document.createElement('button');
     delBtn.className = 'icon-btn btn-danger';
@@ -1639,6 +1651,8 @@ async function init() {
     icon('file-import') + '<span>Import</span>';
   document.getElementById('modal-export-btn').innerHTML =
     icon('file-export') + '<span>Export</span>';
+  document.getElementById('modal-moodle-import-btn').innerHTML =
+    icon('school') + '<span>Moodle</span>';
 
   // Bulk expand/collapse controls (apply to whichever view is active)
   const expandAllBtn = document.getElementById('expand-all-btn');
@@ -2237,6 +2251,12 @@ function setupModal() {
     exportSemester();
   });
 
+  document.getElementById('modal-moodle-import-btn').addEventListener('click', async () => {
+    if (!(await ensureMoodleAccountOrPrompt())) return;
+    closeModal();
+    openMoodleCourseModal();
+  });
+
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) closeModal();
   });
@@ -2327,6 +2347,9 @@ function updateModalFooter() {
   document
     .getElementById('modal-export-btn')
     .classList.toggle('hidden', !(tab === 'semester' && isEdit));
+  document
+    .getElementById('modal-moodle-import-btn')
+    .classList.toggle('hidden', !(tab === 'courses' && isEdit));
   const submit = document.getElementById('modal-submit');
   if (tab === 'items') {
     submit.textContent = 'Add';
@@ -3086,6 +3109,25 @@ const moodleImport = {
   mapped: null,
 };
 
+// Shared guard for every "Import from Moodle" entry point (Settings, the
+// dashboard per-course icon, the Courses tab footer). If no account is
+// connected, offers to open Settings — where Part A's "Moodle accounts"
+// section already lives — instead of silently opening an empty picker.
+// Returns true when it's safe to proceed.
+async function ensureMoodleAccountOrPrompt() {
+  let accounts = [];
+  try {
+    accounts = await window.moodleAuth.listAccounts();
+  } catch (e) {
+    accounts = [];
+  }
+  if (accounts.length > 0) return true;
+  if (confirm('No Moodle account is connected yet. Connect one in Settings now?')) {
+    openSettingsModal();
+  }
+  return false;
+}
+
 // Fetches + populates the Moodle-course dropdown for one connected account.
 // Called once when the modal opens (with the first/only account) and again
 // whenever the account dropdown changes.
@@ -3150,7 +3192,7 @@ function closeMoodleCourseModal() {
   document.getElementById('moodle-course-overlay').classList.add('hidden');
 }
 
-async function openMoodleCourseModal() {
+async function openMoodleCourseModal({ presetCourseId } = {}) {
   const overlay = document.getElementById('moodle-course-overlay');
   const errorEl = document.getElementById('moodle-course-error');
   const loadingEl = document.getElementById('moodle-course-loading');
@@ -3208,7 +3250,17 @@ async function openMoodleCourseModal() {
 
   targetRow.classList.remove('hidden');
   populateMoodleTargetSelect();
-  newNameRow.classList.remove('hidden'); // shown by default since "+ New course" is the default target
+  const targetSelect = document.getElementById('moodle-course-target');
+  if (presetCourseId) {
+    // Called from a specific course's own import action — skip the picker,
+    // the target is already known.
+    targetSelect.value = presetCourseId;
+    targetSelect.disabled = true;
+    newNameRow.classList.add('hidden');
+  } else {
+    targetSelect.disabled = false;
+    newNameRow.classList.remove('hidden'); // shown by default since "+ New course" is the default target
+  }
 
   await loadMoodleCoursesForAccount(accountSelect.value);
 }
