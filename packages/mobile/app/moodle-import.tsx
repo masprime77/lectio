@@ -16,7 +16,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getCourses, addCourse } from '@lectio/core/planner-core';
 import { createMoodleClient } from '@lectio/core/integrations/moodle-client';
 import { mapCourseContents } from '@lectio/core/integrations/moodle';
@@ -37,20 +37,23 @@ function Picker({
   selectedKey,
   onSelect,
   theme,
+  disabled,
 }: {
   items: { key: string; label: string }[];
   selectedKey?: string;
   onSelect: (key: string) => void;
   theme: ReturnType<typeof useTheme>;
+  disabled?: boolean;
 }) {
   return (
-    <View style={styles.pillRow}>
+    <View style={[styles.pillRow, disabled && { opacity: 0.5 }]}>
       {items.map((it) => {
         const isActive = it.key === selectedKey;
         return (
           <Pressable
             key={it.key}
-            onPress={() => onSelect(it.key)}
+            onPress={disabled ? undefined : () => onSelect(it.key)}
+            disabled={disabled}
             style={[
               styles.pill,
               { backgroundColor: theme.surface, borderColor: theme.border },
@@ -68,9 +71,11 @@ function Picker({
 export default function MoodleImportScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const { semesterId: presetSemesterId, courseId: presetCourseId } =
+    useLocalSearchParams<{ semesterId?: string; courseId?: string }>();
 
   const [semesters, setSemesters] = useState<SemesterSummary[] | null>(null);
-  const [semesterId, setSemesterId] = useState<string | undefined>();
+  const [semesterId, setSemesterId] = useState<string | undefined>(presetSemesterId);
   const [semesterCourses, setSemesterCourses] = useState<Course[]>([]);
 
   const [accounts, setAccounts] = useState<MoodleAccountSummary[] | null>(null);
@@ -79,7 +84,7 @@ export default function MoodleImportScreen() {
   const [moodleCourses, setMoodleCourses] = useState<MoodleCourse[] | null>(null);
   const [moodleCourseId, setMoodleCourseId] = useState<number | undefined>();
 
-  const [targetCourseId, setTargetCourseId] = useState<string>('__new__');
+  const [targetCourseId, setTargetCourseId] = useState<string>(presetCourseId ?? '__new__');
   const [newCourseName, setNewCourseName] = useState('');
 
   const [busy, setBusy] = useState(false);
@@ -91,7 +96,7 @@ export default function MoodleImportScreen() {
       .list()
       .then((list) => {
         setSemesters(list);
-        setSemesterId((cur) => cur ?? list[0]?.id);
+        setSemesterId((cur) => cur ?? presetSemesterId ?? list[0]?.id);
       })
       .catch((e) => setError(e?.message ?? 'Could not load semesters.'));
     listMoodleAccounts()
@@ -190,6 +195,7 @@ export default function MoodleImportScreen() {
             items={semesters.map((s) => ({ key: s.id, label: s.name }))}
             selectedKey={semesterId}
             onSelect={setSemesterId}
+            disabled={!!presetCourseId}
           />
         )}
 
@@ -233,6 +239,7 @@ export default function MoodleImportScreen() {
           ]}
           selectedKey={targetCourseId}
           onSelect={setTargetCourseId}
+          disabled={!!presetCourseId}
         />
         {targetCourseId === '__new__' ? (
           <TextInput
