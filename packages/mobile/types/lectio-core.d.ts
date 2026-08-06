@@ -263,8 +263,65 @@ export function createMoodleClient(config: {
 }): {
   getSiteInfo(): Promise<MoodleSiteInfo>;
   getEnrolledCourses(userId: number): Promise<MoodleCourse[]>;
-  getCourseContents(courseId: number): Promise<unknown[]>;
+  getCourseContents(courseId: number): Promise<MoodleSection[]>;
 };
+
+// ---------------------------------------------------------------------------
+// integrations/moodle surface (the pure Moodle content mapper)
+// ---------------------------------------------------------------------------
+
+export interface MoodleModule {
+  id: number;
+  name: string;
+  modname: string;
+  url?: string;
+  visible?: number;
+  uservisible?: boolean;
+  [k: string]: unknown;
+}
+
+export interface MoodleSection {
+  section: number;
+  name: string;
+  visible?: number;
+  uservisible?: boolean;
+  modules: MoodleModule[];
+  [k: string]: unknown;
+}
+
+export interface MoodleMappedItem {
+  name: string;
+  url?: string;
+  moodleModuleId: number;
+  moodleSource?: string;
+}
+
+export interface MoodleDateRange {
+  startDay: number;
+  startMonth: number;
+  endDay: number;
+  endMonth: number;
+}
+
+export interface MoodleWeek {
+  moodleSection: number;
+  sectionName: string;
+  dateRange: MoodleDateRange | null;
+  items: MoodleMappedItem[];
+}
+
+export interface MoodleMappedContent {
+  weeks: MoodleWeek[];
+}
+
+export function isModuleImportable(mod: MoodleModule): boolean;
+export function isSectionVisible(section: MoodleSection): boolean;
+export function mapModuleToItem(mod: MoodleModule, source?: string): MoodleMappedItem;
+export function parseGermanDateRangeSectionName(name: string): MoodleDateRange | null;
+export function mapCourseContents(
+  sections: MoodleSection[],
+  options?: { includeEmptyWeeks?: boolean; source?: string }
+): MoodleMappedContent;
 
 // planner-core's "." export is a CommonJS object; expose it as a default too.
 declare const core: {
