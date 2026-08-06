@@ -233,6 +233,39 @@ export function prepareImportedCourse(
   makeId?: (prefix: string) => string
 ): Course;
 
+// ---------------------------------------------------------------------------
+// integrations/moodle-client surface (the Moodle Web Services REST client)
+// ---------------------------------------------------------------------------
+
+export interface MoodleSiteInfo {
+  userid: number;
+  fullname?: string;
+  username?: string;
+  [k: string]: unknown;
+}
+
+export interface MoodleCourse {
+  id: number;
+  fullname?: string;
+  shortname?: string;
+  [k: string]: unknown;
+}
+
+export class MoodleApiError extends Error {
+  errorcode?: string;
+  wsfunction?: string;
+}
+
+export function createMoodleClient(config: {
+  baseUrl: string;
+  token: string;
+  fetchImpl?: typeof fetch;
+}): {
+  getSiteInfo(): Promise<MoodleSiteInfo>;
+  getEnrolledCourses(userId: number): Promise<MoodleCourse[]>;
+  getCourseContents(courseId: number): Promise<unknown[]>;
+};
+
 // planner-core's "." export is a CommonJS object; expose it as a default too.
 declare const core: {
   DEFAULT_READING_TAGS: Tag[];
