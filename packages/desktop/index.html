@@ -269,6 +269,10 @@
                     title="Export this semester to a .lectio.json file">
               <!-- icon injected by app.js -->
             </button>
+            <button type="button" id="modal-moodle-import-btn" class="btn btn-small btn-icon-text hidden"
+                    title="Import from Moodle">
+              <!-- icon injected by app.js -->
+            </button>
           </div>
           <div class="modal-actions-right">
             <button type="button" id="modal-cancel" class="btn">Cancel</button>
@@ -324,6 +328,28 @@
           <input type="checkbox" id="set-autoupdate" />
           <span class="slider"></span>
         </label>
+      </div>
+
+      <div class="settings-row" id="set-moodle-row" style="flex-direction:column;align-items:stretch;gap:0.4rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span class="settings-label">Moodle accounts</span>
+          <button type="button" id="set-moodle-add" class="btn btn-small">+ Add account</button>
+        </div>
+        <!-- Inline in place of a prompt(): Electron never implemented
+             window.prompt() (alert/confirm are supported, prompt always
+             throws "prompt() is not supported."), so base-URL entry needs a
+             real input. Hidden until "+ Add account" is clicked. -->
+        <div id="set-moodle-add-form" class="hidden" style="display:flex;gap:0.4rem;">
+          <input type="text" id="set-moodle-add-url" placeholder="https://moodle.example.edu"
+                 style="flex:1;min-width:0;padding:0.3rem 0.4rem;border:1px solid var(--border);border-radius:6px;font-size:0.8rem;color:var(--text);background:var(--surface);" />
+          <button type="button" id="set-moodle-add-confirm" class="btn btn-small">Connect</button>
+          <button type="button" id="set-moodle-add-cancel" class="btn btn-small">Cancel</button>
+        </div>
+        <div id="set-moodle-accounts-list" style="display:flex;flex-direction:column;gap:0.4rem;"></div>
+        <div style="display:flex;justify-content:flex-end;">
+          <button type="button" id="set-moodle-import" class="btn btn-small hidden">Import courses…</button>
+        </div>
+        <span id="set-moodle-status-line" class="hidden" style="font-size:0.8rem;"></span>
       </div>
 
       <div class="settings-row">
@@ -419,6 +445,59 @@
       </div>
 
       <p class="feedback-footer">Lectio <span id="feedback-version">—</span></p>
+    </div>
+  </div>
+
+  <!-- Moodle: pick an account + course to import (Phase 16 Part B) -->
+  <div id="moodle-course-overlay" class="modal-overlay hidden">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="moodle-course-title">
+      <h2 id="moodle-course-title">Import from Moodle</h2>
+      <p id="moodle-course-error" class="hidden" style="font-size:0.85rem;color:var(--danger);margin:-0.5rem 0 0.75rem;"></p>
+      <p id="moodle-course-loading" style="font-size:0.85rem;color:var(--muted);">Loading your Moodle accounts…</p>
+
+      <!-- Only shown when more than one account is connected — with exactly
+           one, there is nothing to choose and this row stays hidden. -->
+      <label id="moodle-course-account-row" class="hidden">
+        Moodle account
+        <select id="moodle-course-account" style="display:block;width:100%;margin-top:0.25rem;padding:0.5rem;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;color:var(--text);background:var(--surface);"></select>
+      </label>
+
+      <label id="moodle-course-select-row" class="hidden" style="margin-top:0.75rem;">
+        Moodle course
+        <select id="moodle-course-select" style="display:block;width:100%;margin-top:0.25rem;padding:0.5rem;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;color:var(--text);background:var(--surface);"></select>
+      </label>
+
+      <label id="moodle-course-target-row" class="hidden" style="margin-top:0.75rem;">
+        Import into
+        <select id="moodle-course-target" style="display:block;width:100%;margin-top:0.25rem;padding:0.5rem;border:1px solid var(--border);border-radius:6px;font-size:0.9rem;color:var(--text);background:var(--surface);">
+          <option value="__new__">+ New course</option>
+        </select>
+      </label>
+
+      <label id="moodle-course-newname-row" style="margin-top:0.75rem;">
+        New course name
+        <input type="text" id="moodle-course-newname" placeholder="Course name…"
+          style="display:block;width:100%;margin-top:0.25rem;" />
+      </label>
+
+      <div class="modal-actions">
+        <button type="button" id="moodle-course-cancel" class="btn">Cancel</button>
+        <button type="button" id="moodle-course-next" class="btn btn-primary" disabled>Fetch content</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Moodle: per-week triage/import (Phase 16 Part C) -->
+  <div id="moodle-triage-overlay" class="modal-overlay hidden">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="moodle-triage-title" style="max-width:640px;">
+      <h2 id="moodle-triage-title">Import weeks</h2>
+      <p id="moodle-triage-source" style="font-size:0.8rem;color:var(--muted);margin:-0.5rem 0 0.75rem;"></p>
+      <p id="moodle-triage-error" class="hidden" style="font-size:0.85rem;color:var(--danger);margin:-0.5rem 0 0.75rem;"></p>
+      <div id="moodle-triage-list"></div>
+      <div class="modal-actions">
+        <button type="button" id="moodle-triage-cancel" class="btn">Cancel</button>
+        <button type="button" id="moodle-triage-confirm" class="btn btn-primary">Import selected</button>
+      </div>
     </div>
   </div>
 
@@ -568,6 +647,8 @@
        also precede supabase-storage.js, whose save() reads window.PlannerConflict
        to detect cloud write conflicts. -->
   <script src="planner-core.js"></script>
+  <script src="moodle.js"></script>
+  <script src="moodle-client.js"></script>
   <script src="migrate.js"></script>
   <script src="conflict.js"></script>
   <script src="supabase-storage.js"></script>

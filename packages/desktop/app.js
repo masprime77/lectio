@@ -348,7 +348,7 @@ async function flushSave() {
 const {
   getReadingTags, getTaskTags,
   isProtectedTag, addTag, deleteTag, editTag, reorderTags,
-  courseProgress, uid, deleteCourse, addItem,
+  courseProgress, uid, addCourse, deleteCourse, addItem,
 } = window.PlannerCore;
 
 // ---------------------------------------------------------------------------
@@ -890,6 +890,18 @@ function renderCourseView() {
       }
     });
     header.appendChild(importCourseBtn);
+
+    // Import from Moodle (skips the target-course picker — this course is
+    // already the target).
+    const moodleImportBtn = document.createElement('button');
+    moodleImportBtn.className = 'icon-btn';
+    moodleImportBtn.innerHTML = icon('school');
+    moodleImportBtn.title = 'Import from Moodle';
+    moodleImportBtn.addEventListener('click', async () => {
+      if (!(await ensureMoodleAccountOrPrompt())) return;
+      openMoodleCourseModal({ presetCourseId: course.id });
+    });
+    header.appendChild(moodleImportBtn);
 
     // Delete
     const delBtn = document.createElement('button');
@@ -1639,6 +1651,8 @@ async function init() {
     icon('file-import') + '<span>Import</span>';
   document.getElementById('modal-export-btn').innerHTML =
     icon('file-export') + '<span>Export</span>';
+  document.getElementById('modal-moodle-import-btn').innerHTML =
+    icon('school') + '<span>Moodle</span>';
 
   // Bulk expand/collapse controls (apply to whichever view is active)
   const expandAllBtn = document.getElementById('expand-all-btn');
@@ -1677,6 +1691,8 @@ async function init() {
   setupUpdater();
   setupSave();
   setupSettings();
+  setupMoodleSettings();
+  setupMoodleImport();
   setupFeedback();
   setupAddItem();
   setupTutorial();
@@ -2235,6 +2251,16 @@ function setupModal() {
     exportSemester();
   });
 
+  document.getElementById('modal-moodle-import-btn').addEventListener('click', async () => {
+    if (!(await ensureMoodleAccountOrPrompt())) return;
+    // Create mode imports into the modal's unsaved draft; closeModal() only
+    // hides the overlay, so the draft survives and closeMoodleCourseModal()
+    // brings it back when the picker is done.
+    const draftMode = !state.editingId;
+    closeModal();
+    openMoodleCourseModal({ draftMode });
+  });
+
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) closeModal();
   });
@@ -2325,6 +2351,9 @@ function updateModalFooter() {
   document
     .getElementById('modal-export-btn')
     .classList.toggle('hidden', !(tab === 'semester' && isEdit));
+  document
+    .getElementById('modal-moodle-import-btn')
+    .classList.toggle('hidden', tab !== 'courses');
   const submit = document.getElementById('modal-submit');
   if (tab === 'items') {
     submit.textContent = 'Add';
@@ -2896,6 +2925,695 @@ async function withBusy(btn, busyLabel, fn) {
     btn.disabled = false;
     btn.textContent = original;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Settings modal: Moodle accounts (Phase 16 Part A, multi-account). Vendored
+// via sync-core.js: window.LectioMoodleClient (integrations/moodle-client)
+// and window.moodleAuth (preload bridge to main's safeStorage-backed,
+// multi-account store + SSO capture, Phase 16 Part 0). Any number of accounts
+// can be connected at once, one per Moodle base URL.
+// ---------------------------------------------------------------------------
+function setMoodleStatusLine(msg, isError) {
+  const el = document.getElementById('set-moodle-status-line');
+  if (!el) return;
+  if (!msg) {
+    el.classList.add('hidden');
+    el.textContent = '';
+    return;
+  }
+  el.textContent = msg;
+  el.style.color = isError ? 'var(--danger)' : 'var(--muted)';
+  el.classList.remove('hidden');
+}
+
+// One row per connected account: label/baseUrl + its own Disconnect button.
+// Built fresh on every refreshMoodleAccounts() call, so no stale-listener risk
+// (mirrors renderLocalImportRow's pattern — a new element per render, not a
+// reused one needing rewireButton).
+function renderMoodleAccountRow(account) {
+  const el = document.createElement('div');
+  el.style.cssText =
+    'display:flex;align-items:center;justify-content:space-between;gap:0.5rem;' +
+    'padding:0.3rem 0;border-bottom:1px solid var(--border);';
+
+  const label = document.createElement('span');
+  label.textContent = account.label ? `${account.label} — ${account.baseUrl}` : account.baseUrl;
+  label.style.cssText =
+    'font-size:0.85rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+
+  const disconnectBtn = document.createElement('button');
+  disconnectBtn.type = 'button';
+  disconnectBtn.className = 'btn btn-small btn-danger';
+  disconnectBtn.textContent = 'Disconnect';
+  disconnectBtn.addEventListener('click', () => {
+    withBusy(disconnectBtn, 'Disconnecting…', async () => {
+      try {
+        await window.moodleAuth.removeAccount(account.baseUrl);
+        setMoodleStatusLine(`Disconnected ${account.baseUrl}.`, false);
+      } catch (e) {
+        setMoodleStatusLine(e.message || 'Could not disconnect.', true);
+      }
+      await refreshMoodleAccounts();
+    });
+  });
+
+  el.appendChild(label);
+  el.appendChild(disconnectBtn);
+  return el;
+}
+
+// Re-reads the account list from storage and re-renders it, showing/hiding
+// the "Import courses…" button depending on whether any account exists.
+async function refreshMoodleAccounts() {
+  const listEl = document.getElementById('set-moodle-accounts-list');
+  const importBtn = document.getElementById('set-moodle-import');
+  if (!window.moodleAuth) {
+    listEl.textContent = 'Unavailable';
+    return [];
+  }
+
+  let accounts = [];
+  try {
+    accounts = await window.moodleAuth.listAccounts();
+  } catch (e) {
+    setMoodleStatusLine(e.message || 'Could not read stored accounts.', true);
+  }
+
+  listEl.innerHTML = '';
+  if (accounts.length === 0) {
+    const empty = document.createElement('span');
+    empty.textContent = 'No accounts connected.';
+    empty.style.cssText = 'font-size:0.85rem;color:var(--muted);';
+    listEl.appendChild(empty);
+  } else {
+    accounts.forEach((a) => listEl.appendChild(renderMoodleAccountRow(a)));
+  }
+  if (importBtn) importBtn.classList.toggle('hidden', accounts.length === 0);
+  return accounts;
+}
+
+function setupMoodleSettings() {
+  refreshMoodleAccounts();
+
+  const form = document.getElementById('set-moodle-add-form');
+  const urlInput = document.getElementById('set-moodle-add-url');
+
+  const openAddForm = () => {
+    setMoodleStatusLine('');
+    form.classList.remove('hidden');
+    urlInput.value = '';
+    urlInput.focus();
+  };
+  const closeAddForm = () => {
+    form.classList.add('hidden');
+    urlInput.value = '';
+  };
+
+  rewireButton('set-moodle-add', openAddForm);
+  rewireButton('set-moodle-add-cancel', closeAddForm);
+
+  rewireButton('set-moodle-add-confirm', async (btn) => {
+    setMoodleStatusLine('');
+    const baseUrl = urlInput.value;
+    if (!baseUrl || !baseUrl.trim()) return;
+    const cleanUrl = baseUrl.trim().replace(/\/+$/, '');
+    if (!/^https?:\/\//i.test(cleanUrl)) {
+      setMoodleStatusLine('Enter a full URL, starting with https://', true);
+      return;
+    }
+
+    await withBusy(btn, 'Connecting…', async () => {
+      let captured;
+      try {
+        captured = await window.moodleAuth.captureToken(cleanUrl);
+      } catch (e) {
+        setMoodleStatusLine(e.message || 'Moodle sign-in was cancelled.', true);
+        return;
+      }
+
+      // Verify the token works AND get a display label before storing
+      // anything — an unverified token is not stored at all.
+      let label;
+      try {
+        const client = window.LectioMoodleClient.createMoodleClient({
+          baseUrl: cleanUrl,
+          token: captured.wstoken,
+        });
+        const info = await client.getSiteInfo();
+        label = info.fullname || info.username || undefined;
+      } catch (e) {
+        setMoodleStatusLine(`Could not verify the connection: ${e.message || 'unknown error'}`, true);
+        return;
+      }
+
+      try {
+        await window.moodleAuth.addAccount(cleanUrl, captured.wstoken, label);
+        setMoodleStatusLine(label ? `Connected as ${label}.` : 'Connected.', false);
+      } catch (e) {
+        setMoodleStatusLine(e.message || 'Could not store the Moodle token.', true);
+        return;
+      }
+
+      closeAddForm();
+      await refreshMoodleAccounts();
+    });
+  });
+
+  // Enter submits, Escape cancels — the input is the whole point of this
+  // form, so both should work without reaching for the mouse.
+  urlInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('set-moodle-add-confirm').click();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeAddForm();
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Moodle import: pick an account + Moodle course + target Lectio course, then
+// fetch that course's contents and run them through the pure core mapper
+// (Phase 16 Part B). Stops once the mapped weeks are in memory — Part C owns
+// the per-week triage/confirm UI that turns them into readings and tasks.
+// ---------------------------------------------------------------------------
+
+// Transient Moodle import session data — never persisted, reset each time
+// the import modal is (re)opened. `mapped` is set once the course-content
+// fetch completes; Part C's triage modal reads it. `accountBaseUrl` is the
+// source tag passed to mapCourseContents so items from different accounts
+// never collide on moodleModuleId.
+// `draft` marks an import into the New Semester modal's unsaved draft rather
+// than a live semester: the target course lives in state.editingSemester.courses
+// keyed to a course row, and nothing is persisted until Create is clicked.
+// The triage step must read it before writing items anywhere.
+const moodleImport = {
+  accountBaseUrl: null,
+  client: null,
+  courses: [],
+  selectedCourseId: null,
+  mapped: null,
+  draft: false,
+  returnToSemesterModal: false,
+};
+
+// Shared guard for every "Import from Moodle" entry point (Settings, the
+// dashboard per-course icon, the Courses tab footer). If no account is
+// connected, offers to open Settings — where Part A's "Moodle accounts"
+// section already lives — instead of silently opening an empty picker.
+// Returns true when it's safe to proceed.
+async function ensureMoodleAccountOrPrompt() {
+  let accounts = [];
+  try {
+    accounts = await window.moodleAuth.listAccounts();
+  } catch (e) {
+    accounts = [];
+  }
+  if (accounts.length > 0) return true;
+  if (confirm('No Moodle account is connected yet. Connect one in Settings now?')) {
+    openSettingsModal();
+  }
+  return false;
+}
+
+// Fetches + populates the Moodle-course dropdown for one connected account.
+// Called once when the modal opens (with the first/only account) and again
+// whenever the account dropdown changes.
+async function loadMoodleCoursesForAccount(baseUrl) {
+  const errorEl = document.getElementById('moodle-course-error');
+  const loadingEl = document.getElementById('moodle-course-loading');
+  const selectRow = document.getElementById('moodle-course-select-row');
+  const nextBtn = document.getElementById('moodle-course-next');
+
+  errorEl.classList.add('hidden');
+  loadingEl.textContent = 'Loading your courses…';
+  loadingEl.classList.remove('hidden');
+  selectRow.classList.add('hidden');
+  nextBtn.disabled = true;
+  moodleImport.client = null;
+  moodleImport.courses = [];
+
+  let stored;
+  try {
+    stored = await window.moodleAuth.getAccountToken(baseUrl);
+  } catch (e) {
+    stored = null;
+  }
+  if (!stored) {
+    loadingEl.classList.add('hidden');
+    errorEl.textContent = "Could not read that account's token. Reconnect it in Settings.";
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  try {
+    const client = window.LectioMoodleClient.createMoodleClient({
+      baseUrl: stored.baseUrl,
+      token: stored.wstoken,
+    });
+    const info = await client.getSiteInfo();
+    const courses = await client.getEnrolledCourses(info.userid);
+    moodleImport.accountBaseUrl = baseUrl;
+    moodleImport.client = client;
+    moodleImport.courses = courses;
+
+    const select = document.getElementById('moodle-course-select');
+    select.innerHTML = courses
+      .map((c) => `<option value="${c.id}">${escapeHtml(c.fullname || c.shortname || ('Course ' + c.id))}</option>`)
+      .join('');
+
+    loadingEl.classList.add('hidden');
+    selectRow.classList.remove('hidden');
+    nextBtn.disabled = courses.length === 0;
+    if (courses.length === 0) {
+      errorEl.textContent = 'No enrolled courses were returned by Moodle for that account.';
+      errorEl.classList.remove('hidden');
+    }
+  } catch (e) {
+    loadingEl.classList.add('hidden');
+    errorEl.textContent = e.message || 'Could not reach Moodle.';
+    errorEl.classList.remove('hidden');
+  }
+}
+
+function closeMoodleCourseModal() {
+  document.getElementById('moodle-course-overlay').classList.add('hidden');
+  // A create-mode import is launched from the still-unsaved New Semester
+  // modal, whose draft (form values + course rows) lives only in that modal's
+  // DOM — closeModal() merely hides it, so bringing it back here, on every
+  // close path (Cancel, backdrop, completed fetch), is what stops an
+  // in-progress semester from being stranded behind the picker.
+  if (moodleImport.returnToSemesterModal) {
+    moodleImport.returnToSemesterModal = false;
+    document.getElementById('modal-overlay').classList.remove('hidden');
+  }
+}
+
+async function openMoodleCourseModal({ presetCourseId, draftMode = false } = {}) {
+  const overlay = document.getElementById('moodle-course-overlay');
+  const errorEl = document.getElementById('moodle-course-error');
+  const loadingEl = document.getElementById('moodle-course-loading');
+  const accountRow = document.getElementById('moodle-course-account-row');
+  const selectRow = document.getElementById('moodle-course-select-row');
+  const targetRow = document.getElementById('moodle-course-target-row');
+  const newNameRow = document.getElementById('moodle-course-newname-row');
+  const nextBtn = document.getElementById('moodle-course-next');
+
+  errorEl.classList.add('hidden');
+  accountRow.classList.add('hidden');
+  selectRow.classList.add('hidden');
+  targetRow.classList.add('hidden');
+  newNameRow.classList.add('hidden');
+  nextBtn.disabled = true;
+  moodleImport.accountBaseUrl = null;
+  moodleImport.client = null;
+  moodleImport.courses = [];
+  moodleImport.mapped = null;
+  moodleImport.draft = draftMode;
+  moodleImport.returnToSemesterModal = draftMode;
+
+  overlay.classList.remove('hidden');
+  loadingEl.textContent = 'Loading your Moodle accounts…';
+  loadingEl.classList.remove('hidden');
+
+  // Everything downstream writes into a loaded semester (a new target course
+  // is pushed onto state.semester.courses), so without one there is nothing
+  // to import into — bail before spending a Moodle round trip. Draft mode is
+  // exempt: it writes into the New Semester modal's draft, which is the case
+  // where there deliberately isn't a loaded semester yet.
+  if (!draftMode && !state.semester) {
+    loadingEl.classList.add('hidden');
+    errorEl.textContent = 'Open or create a semester first, then import into it.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  let accounts = [];
+  try {
+    accounts = await window.moodleAuth.listAccounts();
+  } catch (e) {
+    accounts = [];
+  }
+  if (accounts.length === 0) {
+    loadingEl.classList.add('hidden');
+    errorEl.textContent = 'Connect a Moodle account in Settings first.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  const accountSelect = document.getElementById('moodle-course-account');
+  accountSelect.innerHTML = accounts
+    .map((a) => `<option value="${escapeHtml(a.baseUrl)}">${escapeHtml(a.label ? `${a.label} — ${a.baseUrl}` : a.baseUrl)}</option>`)
+    .join('');
+  // Only worth asking when there's an actual choice — one account is the
+  // common case and shouldn't force an extra click.
+  accountRow.classList.toggle('hidden', accounts.length <= 1);
+
+  targetRow.classList.remove('hidden');
+  populateMoodleTargetSelect(draftMode);
+  const targetSelect = document.getElementById('moodle-course-target');
+  if (presetCourseId) {
+    // Called from a specific course's own import action — skip the picker,
+    // the target is already known.
+    targetSelect.value = presetCourseId;
+    targetSelect.disabled = true;
+    newNameRow.classList.add('hidden');
+  } else {
+    targetSelect.disabled = false;
+    newNameRow.classList.remove('hidden'); // shown by default since "+ New course" is the default target
+  }
+
+  await loadMoodleCoursesForAccount(accountSelect.value);
+}
+
+// Existing Lectio courses in the current semester, plus the fixed "+ New course" option.
+function populateMoodleTargetSelect(draftMode) {
+  const select = document.getElementById('moodle-course-target');
+  const existing = draftMode
+    ? draftCourseRows()
+    : (state.semester ? state.semester.courses : []);
+  select.innerHTML =
+    '<option value="__new__">+ New course</option>' +
+    existing.map((c) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('');
+}
+
+// The courses on offer while creating a semester are the modal's own rows —
+// they don't exist as course objects until Create is clicked, so state.semester
+// can't be consulted. Blank rows are skipped (submitModal drops them too), and
+// a row that has never been imported into gets an id minted here so a draft
+// course can be keyed to it; an id that ends up unused is simply ignored by
+// submitModal, which mints a fresh one for any row it can't match.
+function draftCourseRows() {
+  return [...document.querySelectorAll('#ns-courses .ns-course-row')]
+    .map((row) => {
+      const name = row.querySelector('.ns-course-name').value.trim();
+      if (!name) return null;
+      if (!row.dataset.courseId) row.dataset.courseId = uid('course');
+      return { id: row.dataset.courseId, name };
+    })
+    .filter(Boolean);
+}
+
+function setupMoodleImport() {
+  const importBtn = document.getElementById('set-moodle-import');
+  if (importBtn) {
+    importBtn.addEventListener('click', () => {
+      closeSettingsModal();
+      openMoodleCourseModal();
+    });
+  }
+
+  document.getElementById('moodle-course-cancel').addEventListener('click', closeMoodleCourseModal);
+  document.getElementById('moodle-course-overlay').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('moodle-course-overlay')) closeMoodleCourseModal();
+  });
+
+  // Switching accounts re-fetches that account's course list.
+  document.getElementById('moodle-course-account').addEventListener('change', (e) => {
+    loadMoodleCoursesForAccount(e.target.value);
+  });
+
+  // New-course name field only matters (and is only shown) when "+ New course" is picked.
+  document.getElementById('moodle-course-target').addEventListener('change', (e) => {
+    document.getElementById('moodle-course-newname-row').classList.toggle('hidden', e.target.value !== '__new__');
+  });
+
+  document.getElementById('moodle-course-next').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const errorEl = document.getElementById('moodle-course-error');
+    errorEl.classList.add('hidden');
+
+    const moodleCourseId = parseInt(document.getElementById('moodle-course-select').value, 10);
+    const targetValue = document.getElementById('moodle-course-target').value;
+    const newName = document.getElementById('moodle-course-newname').value.trim();
+
+    if (targetValue === '__new__' && !newName) {
+      errorEl.textContent = 'Enter a name for the new course.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    await withBusy(btn, 'Fetching…', async () => {
+      try {
+        const contents = await moodleImport.client.getCourseContents(moodleCourseId);
+        // Tag every item with the source account's baseUrl so two accounts'
+        // items never collide on moodleModuleId.
+        moodleImport.mapped = window.LectioMoodle.mapCourseContents(contents, {
+          source: moodleImport.accountBaseUrl,
+        });
+        moodleImport.selectedCourseId = moodleCourseId;
+      } catch (err) {
+        errorEl.textContent = err.message || 'Could not fetch course content.';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      // Resolve (or create) the target Lectio course now, before handing off
+      // to Part C's triage modal — a fresh course must exist so the triage
+      // UI always has a real course id to attach items to. New courses follow
+      // the same palette-by-position rule as the semester editor's rows.
+      let targetCourse;
+      if (moodleImport.draft) {
+        // Create mode: mirror importCourseFromModal's draft handling — the
+        // course object goes in state.editingSemester.courses (so submitModal
+        // keeps whatever the triage step attaches) with a matching row in the
+        // modal. Nothing is persisted or rendered; Create does that.
+        if (!state.editingSemester.courses) state.editingSemester.courses = [];
+        if (targetValue === '__new__') {
+          const idx = document.querySelectorAll('#ns-courses .ns-course-row').length;
+          targetCourse = {
+            id: uid('course'),
+            name: newName,
+            color: DEFAULT_COLORS[idx % DEFAULT_COLORS.length],
+            readings: [],
+            tasks: [],
+          };
+          state.editingSemester.courses.push(targetCourse);
+          addCourseField(targetCourse);
+        } else {
+          targetCourse = state.editingSemester.courses.find((c) => c.id === targetValue);
+          if (!targetCourse) {
+            // A row the user typed but never imported into has no draft entry
+            // yet — promote it to one, keyed to the row, so the triage step
+            // has a real course object to attach items to.
+            const row = [...document.querySelectorAll('#ns-courses .ns-course-row')].find(
+              (r) => r.dataset.courseId === targetValue
+            );
+            if (row) {
+              targetCourse = {
+                id: targetValue,
+                name: row.querySelector('.ns-course-name').value.trim(),
+                color: row.querySelector('.ns-course-color').value,
+                readings: [],
+                tasks: [],
+              };
+              state.editingSemester.courses.push(targetCourse);
+            }
+          }
+        }
+      } else if (targetValue === '__new__') {
+        const idx = state.semester.courses.length;
+        targetCourse = addCourse(state.semester, {
+          name: newName,
+          color: DEFAULT_COLORS[idx % DEFAULT_COLORS.length],
+        });
+        persist();
+        renderDashboard();
+        renderPlanner();
+      } else {
+        targetCourse = state.semester.courses.find((c) => c.id === targetValue);
+      }
+
+      if (!targetCourse || !moodleImport.mapped) {
+        errorEl.textContent = 'Something went wrong preparing the import.';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      closeMoodleCourseModal();
+      // Hand the mapped weeks to the triage screen, which owns turning them
+      // into readings/tasks. closeMoodleCourseModal() runs first so a
+      // create-mode import's New Semester modal is already restored behind it.
+      openMoodleTriageModal(targetCourse, moodleImport.mapped, moodleImport.accountBaseUrl);
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Moodle import, per-week triage (Phase 16 Part C). One decision per week —
+// Skip / Reading / Task — applied to every item that week contains, created
+// through PlannerCore.addItem so Moodle-sourced items go through the same
+// core logic (and default statuses) as hand-added ones.
+//
+// Deliberate non-goal: addItem has no field for moodleModuleId/moodleSource,
+// so those stay on the in-memory mapped items for this session's
+// disambiguation only and are NOT persisted onto the created reading/task.
+// Storing them for a future re-sync would change core's stored shape, and
+// merge/dedup between accounts is still an open product decision.
+// ---------------------------------------------------------------------------
+
+// The semester whose start date and length the week suggestions are measured
+// against. A create-mode import has no saved semester yet — its start date and
+// length are still unsaved values in the New Semester form — so read them from
+// there rather than from state.semester, which at that moment is whatever
+// semester happens to be open behind the modal (or nothing at all).
+function moodleTriageSemesterContext() {
+  if (!moodleImport.draft) return state.semester;
+  return {
+    startDate: document.getElementById('ns-start').value,
+    weeks: parseInt(document.getElementById('ns-weeks').value, 10) || 15,
+  };
+}
+
+// Given a semester's startDate (YYYY-MM-DD) and a Moodle dateRange
+// { startDay, startMonth, ... } (no year), guess which Lectio week (1-based)
+// the section falls in. Moodle's semester runs across a single calendar-year
+// boundary at most, so: try the semester start's year first; if that lands the
+// section date before the semester start, try start year + 1 instead (a winter
+// semester starting in October, with a "13. Januar" section, is next calendar
+// year). Returns a 1-based week clamped to [1, semester.weeks], or null when
+// there's no dateRange — or no usable start date — to work from at all.
+function suggestWeekFromDateRange(semester, dateRange) {
+  if (!dateRange || !semester || !semester.startDate) return null;
+  const start = new Date(semester.startDate + 'T00:00:00');
+  if (Number.isNaN(start.getTime())) return null;
+  const startYear = start.getFullYear();
+  const candidates = [startYear, startYear + 1].map(
+    (year) => new Date(year, dateRange.startMonth - 1, dateRange.startDay)
+  );
+  // Prefer the earliest candidate that is on/after the semester start.
+  let sectionDate = candidates.find((d) => d >= start);
+  if (!sectionDate) sectionDate = candidates[0]; // both before start — best effort
+  const diffDays = Math.floor((sectionDate - start) / (1000 * 60 * 60 * 24));
+  const week = Math.floor(diffDays / 7) + 1;
+  return Math.max(1, Math.min(semester.weeks, week));
+}
+
+// One row per mapped Moodle week: section name, item count, a mode select
+// (Skip / Reading / Task), and a week-number input pre-filled from
+// suggestWeekFromDateRange (editable — the user has the final say, especially
+// when dateRange was null or the guess landed outside the semester).
+function renderMoodleTriageRow(week, semester) {
+  const el = document.createElement('div');
+  el.style.cssText =
+    'display:flex;align-items:center;gap:0.75rem;padding:0.6rem 0;border-bottom:1px solid var(--border);';
+
+  const info = document.createElement('div');
+  info.style.cssText = 'flex:1;min-width:0;';
+  const title = document.createElement('div');
+  title.textContent = week.sectionName || ('Section ' + week.moodleSection);
+  title.style.cssText = 'font-size:0.9rem;color:var(--text);';
+  const sub = document.createElement('div');
+  sub.textContent = week.items.length + (week.items.length === 1 ? ' item' : ' items');
+  sub.style.cssText = 'font-size:0.75rem;color:var(--muted);';
+  info.appendChild(title);
+  info.appendChild(sub);
+
+  const weekInput = document.createElement('input');
+  weekInput.type = 'number';
+  weekInput.min = '1';
+  weekInput.max = String(semester.weeks);
+  weekInput.style.cssText =
+    'width:4.5rem;padding:0.3rem;border:1px solid var(--border);border-radius:6px;' +
+    'font-size:0.85rem;color:var(--text);background:var(--surface);';
+  const suggested = suggestWeekFromDateRange(semester, week.dateRange);
+  weekInput.value = suggested || '';
+  weekInput.placeholder = 'Wk';
+
+  const modeSelect = document.createElement('select');
+  modeSelect.style.cssText =
+    'padding:0.3rem 0.4rem;border:1px solid var(--border);border-radius:6px;' +
+    'font-size:0.85rem;color:var(--text);background:var(--surface);';
+  modeSelect.innerHTML =
+    '<option value="skip">Skip</option>' +
+    '<option value="reading">Reading</option>' +
+    '<option value="task">Task</option>';
+
+  el.appendChild(info);
+  el.appendChild(weekInput);
+  el.appendChild(modeSelect);
+
+  return {
+    el,
+    getDecision: () => ({
+      week,
+      mode: modeSelect.value,
+      targetWeek: parseInt(weekInput.value, 10),
+    }),
+  };
+}
+
+function closeMoodleTriageModal() {
+  document.getElementById('moodle-triage-overlay').classList.add('hidden');
+}
+
+function openMoodleTriageModal(targetCourse, mapped, accountBaseUrl) {
+  const overlay = document.getElementById('moodle-triage-overlay');
+  const listEl = document.getElementById('moodle-triage-list');
+  const errorEl = document.getElementById('moodle-triage-error');
+  const sourceEl = document.getElementById('moodle-triage-source');
+  const confirmBtn = document.getElementById('moodle-triage-confirm');
+
+  errorEl.classList.add('hidden');
+  sourceEl.textContent = accountBaseUrl ? `From ${accountBaseUrl}` : '';
+  listEl.innerHTML = '';
+  confirmBtn.disabled = false;
+  confirmBtn.textContent = 'Import selected';
+
+  const sem = moodleTriageSemesterContext();
+  const isDraft = moodleImport.draft;
+  const rows = mapped.weeks.map((week) => {
+    const row = renderMoodleTriageRow(week, sem);
+    listEl.appendChild(row.el);
+    return row;
+  });
+
+  // Assigned (not addEventListener) so re-running the import replaces these
+  // handlers instead of stacking them, mirroring openLocalImportModal.
+  document.getElementById('moodle-triage-cancel').onclick = () => closeMoodleTriageModal();
+  overlay.onclick = (e) => {
+    if (e.target === overlay) closeMoodleTriageModal();
+  };
+
+  confirmBtn.onclick = async () => {
+    errorEl.classList.add('hidden');
+    const decisions = rows.map((r) => r.getDecision()).filter((d) => d.mode !== 'skip');
+
+    // Validate every non-skipped row up front so a bad week number can never
+    // leave a half-finished import behind.
+    const invalid = decisions.find(
+      (d) => !Number.isInteger(d.targetWeek) || d.targetWeek < 1 || d.targetWeek > sem.weeks
+    );
+    if (invalid) {
+      errorEl.textContent = `Enter a valid week (1–${sem.weeks}) for "${invalid.week.sectionName || 'that section'}".`;
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    await withBusy(confirmBtn, 'Importing…', async () => {
+      let created = 0;
+      decisions.forEach((d) => {
+        d.week.items.forEach((item) => {
+          addItem(targetCourse, d.mode, { title: item.name, week: d.targetWeek });
+          created += 1;
+        });
+      });
+      // A create-mode import writes into the unsaved draft course, which the
+      // New Semester modal still owns — saving and re-rendering there would
+      // persist whichever semester happens to be loaded behind it. Create does
+      // that work when the user submits the form.
+      if (!isDraft) {
+        persist();
+        render();
+      }
+      closeMoodleTriageModal();
+      alert(`Imported ${created} item(s) into "${targetCourse.name}".`);
+    });
+  };
+
+  overlay.classList.remove('hidden');
 }
 
 // Hide both account windows (used by sign-out / delete, where the sign-in

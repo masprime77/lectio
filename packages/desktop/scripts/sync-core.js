@@ -10,11 +10,13 @@
 // sibling makes `<script src="...">` work identically under `npm start`/
 // `npm run dev` and in the packaged app.
 //
-// All three files are dual-mode (window globals in the browser, module.exports in
+// All files are dual-mode (window globals in the browser, module.exports in
 // Node): planner-core → window.PlannerCore, migrate → window.PlannerMigrate
 // (used by supabase-storage.js's get() to apply the same migration as fs/mobile),
 // conflict → window.PlannerConflict (used by supabase-storage.js's save() to
-// detect cloud write conflicts, the same logic the mobile adapter uses).
+// detect cloud write conflicts, the same logic the mobile adapter uses),
+// moodle → window.LectioMoodle (the type-agnostic Moodle mapper), moodle-client
+// → window.LectioMoodleClient (the Moodle Web Services REST client).
 //
 // The copies are git-ignored; they're regenerated on prestart/predev/prebuild.
 const fs = require('fs');
@@ -24,6 +26,8 @@ const files = [
   ['@lectio/core/planner-core', 'planner-core.js'],
   ['@lectio/core/storage/migrate', 'migrate.js'],
   ['@lectio/core/storage/conflict', 'conflict.js'],
+  ['@lectio/core/integrations/moodle', 'moodle.js'],
+  ['@lectio/core/integrations/moodle-client', 'moodle-client.js'],
 ];
 for (const [spec, name] of files) {
   fs.copyFileSync(require.resolve(spec), path.join(__dirname, '..', name));
