@@ -57,11 +57,12 @@ contextBridge.exposeInMainWorld('settings', {
   onOpen: (callback) => ipcRenderer.on('open-settings', () => callback()),
 });
 
-// Moodle bridge: secure token storage plus the SSO capture flow. Exactly one
-// connection at a time for now — no multi-account support here yet.
+// Moodle bridge: multi-account secure token storage plus the SSO capture
+// flow. One entry per Moodle base URL — see main.js's addMoodleAccount.
 contextBridge.exposeInMainWorld('moodleAuth', {
-  getToken: () => ipcRenderer.invoke('moodle-get-token'),
-  setToken: (baseUrl, wstoken) => ipcRenderer.invoke('moodle-set-token', { baseUrl, wstoken }),
-  clearToken: () => ipcRenderer.invoke('moodle-clear-token'),
+  listAccounts: () => ipcRenderer.invoke('moodle-list-accounts'),
+  getAccountToken: (baseUrl) => ipcRenderer.invoke('moodle-get-account-token', baseUrl),
+  addAccount: (baseUrl, wstoken, label) => ipcRenderer.invoke('moodle-add-account', { baseUrl, wstoken, label }),
+  removeAccount: (baseUrl) => ipcRenderer.invoke('moodle-remove-account', baseUrl),
   captureToken: (baseUrl) => ipcRenderer.invoke('moodle-capture-token', baseUrl),
 });
