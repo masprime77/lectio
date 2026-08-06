@@ -3723,6 +3723,18 @@ function openMoodleTriageModal(targetCourse, mapped, accountBaseUrl) {
       .map((r) => r.getDecision())
       .filter((d) => d.mode !== 'skip' && d.items.length > 0);
 
+    // Every row defaults to Skip, so a click here with nothing changed would
+    // otherwise "succeed" at creating zero items — the triage modal closes,
+    // a native confirm() dialog is easy to miss or click through, and a draft
+    // course row shows no item count, so the whole run can look like the
+    // button did nothing at all. Block it here instead, the same way an
+    // invalid week number already is, so the user gets a visible reason.
+    if (decisions.length === 0) {
+      errorEl.textContent = 'Choose Reading or Task for at least one week before importing.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
     // Validate every contributing row up front so a bad week number can never
     // leave a half-finished import behind.
     const invalid = decisions.find(
