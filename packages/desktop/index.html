@@ -493,7 +493,22 @@
       <h2 id="moodle-triage-title">Import weeks</h2>
       <p id="moodle-triage-source" style="font-size:0.8rem;color:var(--muted);margin:-0.5rem 0 0.75rem;"></p>
       <p id="moodle-triage-error" class="hidden" style="font-size:0.85rem;color:var(--danger);margin:-0.5rem 0 0.75rem;"></p>
-      <div id="moodle-triage-list"></div>
+
+      <!-- Batch controls (Part D): set every week's mode in one click, and
+           select/clear every item across all weeks. Both are starting points —
+           any row (or item) can still be adjusted by hand afterwards. -->
+      <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;padding-bottom:0.5rem;border-bottom:1px solid var(--border);">
+        <span style="font-size:0.75rem;color:var(--muted);">All weeks:</span>
+        <button type="button" id="moodle-triage-all-skip" class="btn btn-small">Skip</button>
+        <button type="button" id="moodle-triage-all-reading" class="btn btn-small">Reading</button>
+        <button type="button" id="moodle-triage-all-task" class="btn btn-small">Task</button>
+        <span style="flex:1;"></span>
+        <button type="button" id="moodle-triage-expand-all" class="btn btn-small">Expand all</button>
+        <button type="button" id="moodle-triage-select-all" class="btn btn-small">Select all</button>
+        <button type="button" id="moodle-triage-clear-all" class="btn btn-small">Clear all</button>
+      </div>
+
+      <div id="moodle-triage-list" style="max-height:50vh;overflow-y:auto;"></div>
       <div class="modal-actions">
         <button type="button" id="moodle-triage-cancel" class="btn">Cancel</button>
         <button type="button" id="moodle-triage-confirm" class="btn btn-primary">Import selected</button>

@@ -3491,14 +3491,31 @@ function suggestWeekFromDateRange(semester, dateRange) {
   return Math.max(1, Math.min(semester.weeks, week));
 }
 
-// One row per mapped Moodle week: section name, item count, a mode select
-// (Skip / Reading / Task), and a week-number input pre-filled from
-// suggestWeekFromDateRange (editable — the user has the final say, especially
-// when dateRange was null or the guess landed outside the semester).
+// One row per mapped Moodle week: a disclosure chevron, section name, item
+// count, a week-number input pre-filled from suggestWeekFromDateRange
+// (editable — the user has the final say, especially when dateRange was null
+// or the guess landed outside the semester), and a mode select
+// (Skip / Reading / Task). Expanding the row reveals every item in the week
+// with its own checkbox, all ticked by default so an untouched row behaves
+// exactly as it did before per-item selection existed (Part D).
+//
+// The returned object is the row's whole API: the modal drives batch changes
+// and the week-number cascade through it rather than reaching into the DOM.
+// `onWeekInput` is a mutable hook the modal fills in once the full row list
+// exists, since a row can't know its own index at construction time.
 function renderMoodleTriageRow(week, semester) {
   const el = document.createElement('div');
-  el.style.cssText =
-    'display:flex;align-items:center;gap:0.75rem;padding:0.6rem 0;border-bottom:1px solid var(--border);';
+  el.style.cssText = 'border-bottom:1px solid var(--border);';
+
+  const header = document.createElement('div');
+  header.style.cssText = 'display:flex;align-items:center;gap:0.75rem;padding:0.6rem 0;';
+
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'icon-btn';
+  toggle.innerHTML = icon('chevron-right');
+  toggle.title = 'Show items';
+  toggle.style.cssText = 'flex:none;transition:transform 0.15s;';
 
   const info = document.createElement('div');
   info.style.cssText = 'flex:1;min-width:0;';
@@ -3506,7 +3523,6 @@ function renderMoodleTriageRow(week, semester) {
   title.textContent = week.sectionName || ('Section ' + week.moodleSection);
   title.style.cssText = 'font-size:0.9rem;color:var(--text);';
   const sub = document.createElement('div');
-  sub.textContent = week.items.length + (week.items.length === 1 ? ' item' : ' items');
   sub.style.cssText = 'font-size:0.75rem;color:var(--muted);';
   info.appendChild(title);
   info.appendChild(sub);
@@ -3531,18 +3547,108 @@ function renderMoodleTriageRow(week, semester) {
     '<option value="reading">Reading</option>' +
     '<option value="task">Task</option>';
 
-  el.appendChild(info);
-  el.appendChild(weekInput);
-  el.appendChild(modeSelect);
+  header.appendChild(toggle);
+  header.appendChild(info);
+  header.appendChild(weekInput);
+  header.appendChild(modeSelect);
+  el.appendChild(header);
 
-  return {
+  // Per-item checkboxes, collapsed by default so a long course stays scannable.
+  const itemsEl = document.createElement('div');
+  itemsEl.className = 'hidden';
+  itemsEl.style.cssText =
+    'display:flex;flex-direction:column;gap:0.35rem;padding:0 0 0.6rem 2.1rem;';
+  const checkboxes = week.items.map((item) => {
+    const label = document.createElement('label');
+    label.style.cssText =
+      'display:flex;align-items:center;gap:0.5rem;font-size:0.8rem;color:var(--text);cursor:pointer;';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = true;
+    // width:auto overrides the modal's `.modal label input { width: 100% }`
+    // rule, which is meant for its stacked text fields — inherited here it
+    // stretches the checkbox across the row and squeezes the name to nothing.
+    cb.style.cssText = 'flex:none;width:auto;margin:0;';
+    const name = document.createElement('span');
+    name.textContent = item.name;
+    name.style.cssText =
+      'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    label.appendChild(cb);
+    label.appendChild(name);
+    itemsEl.appendChild(label);
+    cb.addEventListener('change', updateSub);
+    return cb;
+  });
+  el.appendChild(itemsEl);
+
+  // The collapsed row still has to say how much is selected, otherwise a
+  // partial selection would be invisible without expanding every week.
+  function updateSub() {
+    const total = checkboxes.length;
+    const picked = checkboxes.filter((cb) => cb.checked).length;
+    const noun = total === 1 ? 'item' : 'items';
+    sub.textContent = picked === total ? `${total} ${noun}` : `${picked} of ${total} ${noun}`;
+  }
+  updateSub();
+
+  function setExpanded(open) {
+    itemsEl.classList.toggle('hidden', !open);
+    toggle.style.transform = open ? 'rotate(90deg)' : '';
+    toggle.title = open ? 'Hide items' : 'Show items';
+  }
+
+  toggle.addEventListener('click', () => {
+    setExpanded(itemsEl.classList.contains('hidden'));
+    // Let the modal re-label its expand/collapse-all button, so toggling the
+    // last collapsed row by hand doesn't leave it offering "Expand all".
+    if (api.onToggle) api.onToggle();
+  });
+
+  const api = {
     el,
+    onWeekInput: null,
+    onToggle: null,
+    isExpanded: () => !itemsEl.classList.contains('hidden'),
+    setExpanded,
     getDecision: () => ({
       week,
       mode: modeSelect.value,
       targetWeek: parseInt(weekInput.value, 10),
+      items: week.items.filter((_, i) => checkboxes[i].checked),
     }),
+    setMode: (mode) => {
+      modeSelect.value = mode;
+    },
+    getWeekValue: () => parseInt(weekInput.value, 10),
+    setWeekValue: (n) => {
+      weekInput.value = String(n);
+    },
+    setAllItemsSelected: (checked) => {
+      checkboxes.forEach((cb) => {
+        cb.checked = checked;
+      });
+      updateSub();
+    },
   };
+
+  weekInput.addEventListener('input', () => {
+    if (api.onWeekInput) api.onWeekInput();
+  });
+
+  return api;
+}
+
+// Weeks in a Moodle course are almost always consecutive, so typing the week
+// number for one row fills the rest in sequence rather than making the user
+// type every one. Only rows *below* the edited one move — anything already
+// corrected above it stays put — and editing an earlier row re-runs the
+// cascade from there.
+function cascadeMoodleTriageWeeks(rows, fromIndex, maxWeeks) {
+  const base = rows[fromIndex].getWeekValue();
+  if (!Number.isInteger(base) || base < 1) return; // mid-edit or cleared
+  for (let j = fromIndex + 1; j < rows.length; j += 1) {
+    rows[j].setWeekValue(Math.min(maxWeeks, base + (j - fromIndex)));
+  }
 }
 
 function closeMoodleTriageModal() {
@@ -3569,6 +3675,22 @@ function openMoodleTriageModal(targetCourse, mapped, accountBaseUrl) {
     listEl.appendChild(row.el);
     return row;
   });
+  // One button covers both directions: it reads the rows' current state, so it
+  // offers "Collapse all" only once everything really is open — including when
+  // the last row was opened by its own chevron rather than by this button.
+  const expandBtn = document.getElementById('moodle-triage-expand-all');
+  const syncExpandLabel = () => {
+    const allOpen = rows.length > 0 && rows.every((r) => r.isExpanded());
+    expandBtn.textContent = allOpen ? 'Collapse all' : 'Expand all';
+  };
+
+  // A row can't know its own index until the whole list exists, so the cascade
+  // hook is attached here rather than inside the row factory.
+  rows.forEach((row, i) => {
+    row.onWeekInput = () => cascadeMoodleTriageWeeks(rows, i, sem.weeks);
+    row.onToggle = syncExpandLabel;
+  });
+  syncExpandLabel();
 
   // Assigned (not addEventListener) so re-running the import replaces these
   // handlers instead of stacking them, mirroring openLocalImportModal.
@@ -3577,11 +3699,43 @@ function openMoodleTriageModal(targetCourse, mapped, accountBaseUrl) {
     if (e.target === overlay) closeMoodleTriageModal();
   };
 
+  expandBtn.onclick = () => {
+    const allOpen = rows.length > 0 && rows.every((r) => r.isExpanded());
+    rows.forEach((r) => r.setExpanded(!allOpen));
+    syncExpandLabel();
+  };
+
+  const setAllModes = (mode) => rows.forEach((r) => r.setMode(mode));
+  document.getElementById('moodle-triage-all-skip').onclick = () => setAllModes('skip');
+  document.getElementById('moodle-triage-all-reading').onclick = () => setAllModes('reading');
+  document.getElementById('moodle-triage-all-task').onclick = () => setAllModes('task');
+  document.getElementById('moodle-triage-select-all').onclick = () =>
+    rows.forEach((r) => r.setAllItemsSelected(true));
+  document.getElementById('moodle-triage-clear-all').onclick = () =>
+    rows.forEach((r) => r.setAllItemsSelected(false));
+
   confirmBtn.onclick = async () => {
     errorEl.classList.add('hidden');
-    const decisions = rows.map((r) => r.getDecision()).filter((d) => d.mode !== 'skip');
+    // A week contributes only if it isn't skipped AND still has items ticked.
+    // Filtering before validation is deliberate: a week nobody selected
+    // anything in shouldn't be able to block the import over its week number.
+    const decisions = rows
+      .map((r) => r.getDecision())
+      .filter((d) => d.mode !== 'skip' && d.items.length > 0);
 
-    // Validate every non-skipped row up front so a bad week number can never
+    // Every row defaults to Skip, so a click here with nothing changed would
+    // otherwise "succeed" at creating zero items — the triage modal closes,
+    // a native confirm() dialog is easy to miss or click through, and a draft
+    // course row shows no item count, so the whole run can look like the
+    // button did nothing at all. Block it here instead, the same way an
+    // invalid week number already is, so the user gets a visible reason.
+    if (decisions.length === 0) {
+      errorEl.textContent = 'Choose Reading or Task for at least one week before importing.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    // Validate every contributing row up front so a bad week number can never
     // leave a half-finished import behind.
     const invalid = decisions.find(
       (d) => !Number.isInteger(d.targetWeek) || d.targetWeek < 1 || d.targetWeek > sem.weeks
@@ -3595,7 +3749,7 @@ function openMoodleTriageModal(targetCourse, mapped, accountBaseUrl) {
     await withBusy(confirmBtn, 'Importing…', async () => {
       let created = 0;
       decisions.forEach((d) => {
-        d.week.items.forEach((item) => {
+        d.items.forEach((item) => {
           addItem(targetCourse, d.mode, { title: item.name, week: d.targetWeek });
           created += 1;
         });
@@ -3609,7 +3763,18 @@ function openMoodleTriageModal(targetCourse, mapped, accountBaseUrl) {
         render();
       }
       closeMoodleTriageModal();
-      alert(`Imported ${created} item(s) into "${targetCourse.name}".`);
+      // Importing several courses in a row is the common case, so offer to go
+      // straight back to the picker instead of making the user reopen it from
+      // Settings each time. Draft mode re-enters the same way it was entered:
+      // hide the New Semester modal first, then reopen the picker against the
+      // draft, so its target list and write path stay pointed at the draft.
+      const again = confirm(
+        `Imported ${created} item(s) into "${targetCourse.name}".\n\nImport another course?`
+      );
+      if (again) {
+        if (isDraft) closeModal();
+        openMoodleCourseModal({ draftMode: isDraft });
+      }
     });
   };
 
