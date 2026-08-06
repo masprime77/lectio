@@ -22,6 +22,7 @@ import { SortButton, SortMenu } from '../../src/components/SortMenu';
 import { StudyFab } from '../../src/components/StudyFab';
 import { SwipeableRow } from '../../src/components/SwipeableRow';
 import * as transfer from '../../src/lib/transfer';
+import { ensureMoodleAccountOrPrompt } from '../../src/moodle/ensure-account';
 import type { Course, Semester } from '../../types/lectio-core';
 
 /**
@@ -114,6 +115,13 @@ export default function CoursesScreen() {
       {
         text: 'Edit',
         onPress: () => router.push(`/semester/course-form?id=${id}&courseId=${course.id}`),
+      },
+      {
+        text: 'Import from Moodle',
+        onPress: async () => {
+          if (!(await ensureMoodleAccountOrPrompt(router))) return;
+          router.push(`/moodle-import?semesterId=${id}&courseId=${course.id}`);
+        },
       },
       { text: 'Move up', onPress: () => moveCourse(course.id, -1) },
       { text: 'Move down', onPress: () => moveCourse(course.id, +1) },
