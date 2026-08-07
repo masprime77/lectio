@@ -67,6 +67,22 @@ export default function SettingsScreen() {
         <Text style={[styles.chevron, { color: theme.muted }]}>›</Text>
       </Pressable>
 
+      <Text style={[styles.sectionTitle, { color: theme.muted }]}>Legal</Text>
+      <Pressable
+        style={[styles.row, { backgroundColor: theme.surface, borderColor: theme.border }]}
+        onPress={() => router.push('/settings/legal/impressum')}
+      >
+        <Text style={[styles.rowText, { color: theme.text }]}>Impressum</Text>
+        <Text style={[styles.chevron, { color: theme.muted }]}>›</Text>
+      </Pressable>
+      <Pressable
+        style={[styles.row, { backgroundColor: theme.surface, borderColor: theme.border }]}
+        onPress={() => router.push('/settings/legal/datenschutz')}
+      >
+        <Text style={[styles.rowText, { color: theme.text }]}>Privacy Policy</Text>
+        <Text style={[styles.chevron, { color: theme.muted }]}>›</Text>
+      </Pressable>
+
       <Text style={[styles.version, { color: theme.muted }]}>Lectio v{appVersion}</Text>
     </ScrollView>
   );
