@@ -994,6 +994,15 @@ body.electron-app .header-inner { padding-left: 80px; }
 .modal-actions-left  { display: flex; gap: 0.5rem; }
 .modal-actions-right { display: flex; gap: 0.5rem; }
 
+.legal-notice {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 0.75rem 0 0;
+  line-height: 1.4;
+}
+.legal-notice a { color: var(--primary); text-decoration: none; }
+.legal-notice a:hover { text-decoration: underline; }
+
 /* Modal tabs */
 .modal-tabs {
   display: flex;

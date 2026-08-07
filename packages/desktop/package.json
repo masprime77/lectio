@@ -105,6 +105,13 @@
       {
         "from": "semesters/",
         "to": "semesters/"
+      },
+      {
+        "from": "../../docs/legal",
+        "to": "legal",
+        "filter": [
+          "**/*.html"
+        ]
       }
     ],
     "publish": {

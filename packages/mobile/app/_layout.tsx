@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -17,21 +17,24 @@ function AppShell() {
   const theme = useTheme();
   const scheme = useColorScheme();
   const { session, loading, connectionError, retryConnection } = useAuth();
-  const segments = useSegments();
+  const pathname = usePathname();
   const router = useRouter();
   const { start } = useTutorial();
   const firstRunChecked = useRef(false);
 
   // Redirect to /sign-in when not authenticated, back to / when authenticated.
+  // The legal-document screens (linked from the sign-up form itself) are
+  // exempted from the gate so they're reachable before a session exists.
   useEffect(() => {
     if (loading) return;
-    const inSignIn = segments[0] === 'sign-in';
-    if (!session && !inSignIn) {
+    const inSignIn = pathname === '/sign-in';
+    const inLegalDocs = pathname.startsWith('/settings/legal/');
+    if (!session && !inSignIn && !inLegalDocs) {
       router.replace('/sign-in');
     } else if (session && inSignIn) {
       router.replace('/');
     }
-  }, [session, loading, segments]);
+  }, [session, loading, pathname]);
 
   // First-run trigger: once authenticated and not loading, show the tutorial
   // if it hasn't been seen. Guarded to fire only once per launch and only when
@@ -89,6 +92,7 @@ function AppShell() {
           <Stack.Screen name="moodle-import" options={{ presentation: 'modal', title: 'Import from Moodle', headerShown: false }} />
           <Stack.Screen name="moodle-triage" options={{ presentation: 'modal', title: 'Import weeks', headerShown: false }} />
           <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+          <Stack.Screen name="settings/legal/[doc]" options={{ title: 'Legal' }} />
           <Stack.Screen name="moodle" options={{ title: 'Moodle' }} />
           <Stack.Screen name="feedback" options={{ title: 'Feedback' }} />
           <Stack.Screen name="profile" options={{ title: 'Profile' }} />

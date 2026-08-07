@@ -23,4 +23,9 @@ config.resolver.nodeModulesPaths = [
 //    @lectio/core resolves deterministically.
 config.resolver.disableHierarchicalLookup = true;
 
+// 4. Treat the bundled legal-document fragments as assets (like images), so
+//    require()'ing one returns a module id that expo-asset can resolve to a
+//    local file URI at runtime, instead of Metro trying to parse it as source.
+config.resolver.assetExts = [...config.resolver.assetExts, 'html'];
+
 module.exports = config;

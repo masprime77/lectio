@@ -66,6 +66,53 @@ function sendToRenderer(channel, payload) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Legal documents (Impressum / Datenschutzerklärung)
+//
+// The finalized HTML is generated content that lives at the repo root
+// (docs/legal/), shared with the mobile app rather than duplicated per
+// platform. In dev it's read straight from that folder; in a packaged build
+// it's copied alongside the app via the "legal" extraResources entry (see
+// package.json's build config) since docs/ isn't part of the app bundle.
+// English is the only UI language today (no locale toggle exists anywhere
+// in the app), so the .en.html variants are used; the .de.html originals
+// stay available in docs/legal/ if a language toggle is ever added.
+const LEGAL_DOCS = {
+  impressum: { file: 'impressum.en.html', title: 'Impressum' },
+  privacy: { file: 'datenschutzerklaerung.en.html', title: 'Privacy Policy' },
+};
+
+function getLegalDocsDir() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'legal')
+    : path.join(__dirname, '..', '..', 'docs', 'legal');
+}
+
+function openLegalDocWindow(docKey) {
+  const doc = LEGAL_DOCS[docKey];
+  if (!doc) return;
+
+  const filePath = path.join(getLegalDocsDir(), doc.file);
+  const fragment = fs.readFileSync(filePath, 'utf-8');
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+             max-width: 680px; margin: 40px auto; padding: 0 20px; line-height: 1.5; }
+      h1 { font-size: 1.4em; }
+      h2 { font-size: 1.1em; }
+    </style></head><body>${fragment}</body></html>`;
+
+  const win = new BrowserWindow({
+    width: 720,
+    height: 800,
+    title: doc.title,
+    webPreferences: { contextIsolation: true, nodeIntegration: false },
+  });
+  win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+}
+
+ipcMain.handle('open-legal-doc', (event, docKey) => openLegalDocWindow(docKey));
+
 // Application menu with File → Save (Cmd/Ctrl+S). Save is handled in the
 // renderer, so the menu item just forwards the request over IPC.
 function buildAppMenu() {
@@ -113,6 +160,13 @@ function buildAppMenu() {
     { role: 'editMenu' },
     { role: 'viewMenu' },
     { role: 'windowMenu' },
+    {
+      label: 'Legal',
+      submenu: [
+        { label: 'Impressum', click: () => openLegalDocWindow('impressum') },
+        { label: 'Privacy Policy', click: () => openLegalDocWindow('privacy') },
+      ],
+    },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
