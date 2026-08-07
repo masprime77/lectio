@@ -233,6 +233,96 @@ export function prepareImportedCourse(
   makeId?: (prefix: string) => string
 ): Course;
 
+// ---------------------------------------------------------------------------
+// integrations/moodle-client surface (the Moodle Web Services REST client)
+// ---------------------------------------------------------------------------
+
+export interface MoodleSiteInfo {
+  userid: number;
+  fullname?: string;
+  username?: string;
+  [k: string]: unknown;
+}
+
+export interface MoodleCourse {
+  id: number;
+  fullname?: string;
+  shortname?: string;
+  [k: string]: unknown;
+}
+
+export class MoodleApiError extends Error {
+  errorcode?: string;
+  wsfunction?: string;
+}
+
+export function createMoodleClient(config: {
+  baseUrl: string;
+  token: string;
+  fetchImpl?: typeof fetch;
+}): {
+  getSiteInfo(): Promise<MoodleSiteInfo>;
+  getEnrolledCourses(userId: number): Promise<MoodleCourse[]>;
+  getCourseContents(courseId: number): Promise<MoodleSection[]>;
+};
+
+// ---------------------------------------------------------------------------
+// integrations/moodle surface (the pure Moodle content mapper)
+// ---------------------------------------------------------------------------
+
+export interface MoodleModule {
+  id: number;
+  name: string;
+  modname: string;
+  url?: string;
+  visible?: number;
+  uservisible?: boolean;
+  [k: string]: unknown;
+}
+
+export interface MoodleSection {
+  section: number;
+  name: string;
+  visible?: number;
+  uservisible?: boolean;
+  modules: MoodleModule[];
+  [k: string]: unknown;
+}
+
+export interface MoodleMappedItem {
+  name: string;
+  url?: string;
+  moodleModuleId: number;
+  moodleSource?: string;
+}
+
+export interface MoodleDateRange {
+  startDay: number;
+  startMonth: number;
+  endDay: number;
+  endMonth: number;
+}
+
+export interface MoodleWeek {
+  moodleSection: number;
+  sectionName: string;
+  dateRange: MoodleDateRange | null;
+  items: MoodleMappedItem[];
+}
+
+export interface MoodleMappedContent {
+  weeks: MoodleWeek[];
+}
+
+export function isModuleImportable(mod: MoodleModule): boolean;
+export function isSectionVisible(section: MoodleSection): boolean;
+export function mapModuleToItem(mod: MoodleModule, source?: string): MoodleMappedItem;
+export function parseGermanDateRangeSectionName(name: string): MoodleDateRange | null;
+export function mapCourseContents(
+  sections: MoodleSection[],
+  options?: { includeEmptyWeeks?: boolean; source?: string }
+): MoodleMappedContent;
+
 // planner-core's "." export is a CommonJS object; expose it as a default too.
 declare const core: {
   DEFAULT_READING_TAGS: Tag[];

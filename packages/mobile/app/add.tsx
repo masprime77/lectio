@@ -27,6 +27,7 @@ import { SemesterFields } from '../src/add/SemesterFields';
 import { CourseFields } from '../src/add/CourseFields';
 import { TagsFields } from '../src/add/TagsFields';
 import * as transfer from '../src/lib/transfer';
+import { ensureMoodleAccountOrPrompt } from '../src/moodle/ensure-account';
 import type { Semester, SemesterSummary } from '../types/lectio-core';
 
 const TABS = ['Semester', 'Course', 'Tags'];
@@ -147,6 +148,11 @@ export default function AddScreen() {
       .catch((err) => Alert.alert('Import failed', err instanceof Error ? err.message : String(err)));
   }
 
+  async function handleImportFromMoodle(targetSemesterId: string) {
+    if (!(await ensureMoodleAccountOrPrompt(router))) return;
+    router.push(`/moodle-import?semesterId=${targetSemesterId}`);
+  }
+
   const needsSemester = active !== 'Semester';
 
   return (
@@ -180,6 +186,10 @@ export default function AddScreen() {
                   <ImportRow
                     label="Import a course from a file"
                     onPress={() => handleImportCourse(semesterId)}
+                  />
+                  <ImportRow
+                    label="Import a course from Moodle"
+                    onPress={() => handleImportFromMoodle(semesterId)}
                   />
                 </>
               ) : (

@@ -20,6 +20,12 @@
       ],
       "@lectio/core/integrations/lectio-file": [
         "./types/lectio-core.d.ts"
+      ],
+      "@lectio/core/integrations/moodle-client": [
+        "./types/lectio-core.d.ts"
+      ],
+      "@lectio/core/integrations/moodle": [
+        "./types/lectio-core.d.ts"
       ]
     }
   },

@@ -42,6 +42,15 @@ export default function SettingsScreen() {
         <Text style={[styles.chevron, { color: theme.muted }]}>›</Text>
       </Pressable>
 
+      <Text style={[styles.sectionTitle, { color: theme.muted }]}>Integrations</Text>
+      <Pressable
+        style={[styles.row, { backgroundColor: theme.surface, borderColor: theme.border }]}
+        onPress={() => router.push('/moodle')}
+      >
+        <Text style={[styles.rowText, { color: theme.text }]}>Moodle</Text>
+        <Text style={[styles.chevron, { color: theme.muted }]}>›</Text>
+      </Pressable>
+
       <Text style={[styles.sectionTitle, { color: theme.muted }]}>About</Text>
       <Pressable
         style={[styles.row, { backgroundColor: theme.surface, borderColor: theme.border }]}
