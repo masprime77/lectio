@@ -203,8 +203,14 @@ the Applications shortcut, then launch it like any native Mac app.
 
 ### First launch on macOS (Gatekeeper)
 
-macOS builds are signed but **not notarized** (no paid Apple Developer ID), so
-Gatekeeper blocks a freshly downloaded copy the first time. Do this once:
+Releases are signed with a real Apple Developer ID certificate and
+notarized by Apple, so a freshly downloaded copy opens normally — no
+Gatekeeper warning, no manual step required.
+
+If a build was ever produced without notarization credentials configured
+(see [`docs/MACOS_SIGNING.md`](docs/MACOS_SIGNING.md) for the fallback
+path), Gatekeeper shows "unidentified developer" instead. In that case,
+do this once:
 
 > **First launch:** right-click **Lectio** in Applications → **Open** →
 > **Open**. If macOS still refuses (e.g. *"is damaged and can't be opened"*),
@@ -213,10 +219,6 @@ Gatekeeper blocks a freshly downloaded copy the first time. Do this once:
 > ```bash
 > xattr -dr com.apple.quarantine "/Applications/Lectio.app"
 > ```
-
-This is only needed on first launch; updates after that open normally. For why
-this happens — and how the persistent self-signed certificate keeps auto-update
-working on the free path — see [`docs/MACOS_SIGNING.md`](docs/MACOS_SIGNING.md).
 
 ### First launch on Windows (SmartScreen)
 
@@ -241,11 +243,10 @@ a blue *"Windows protected your PC"* warning. Do this once:
 This is the Windows equivalent of macOS Gatekeeper above; once you've allowed it,
 updates after that launch normally.
 
-To produce a fully **signed + notarized** build instead — so downloads open with
-no prompt at all — set `APPLE_TEAM_ID` (plus the Apple ID and Developer ID cert
-env vars) before building; the signing hooks then defer to electron-builder and
-notarize automatically. The signing model (self-signed free path vs. notarized)
-is documented in [`docs/MACOS_SIGNING.md`](docs/MACOS_SIGNING.md).
+Windows builds remain unsigned (see Phase 17 in the roadmap for the
+signing-cert decision); macOS builds are fully signed and notarized as of
+this release — see [`docs/MACOS_SIGNING.md`](docs/MACOS_SIGNING.md) for
+how the credentials are configured and the self-signed fallback behavior.
 
 ## Updating the app icon
 
@@ -302,7 +303,8 @@ lectio/
 │   │   │   └── generate-dmg-background.js
 │   │   ├── build/
 │   │   │   ├── afterPack.js          # ad-hoc/self-signed sign the .app (free distribution path)
-│   │   │   └── afterSign.js          # Notarization hook (runs only if APPLE_TEAM_ID set)
+│   │   │   ├── afterSign.js          # Notarization hook (runs only if APPLE_TEAM_ID set)
+│   │   │   └── entitlements.mac.plist  # Hardened Runtime entitlements (required for notarization)
 │   │   └── semesters/
 │   │       └── example.json      # Bundled example semester (starter data)
 │   └── mobile/         # @lectio/mobile — the Expo / React Native app (iOS + Android)
