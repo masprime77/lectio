@@ -1,7 +1,12 @@
 # macOS code signing & auto-update
 
-Lectio's macOS builds are signed with a **persistent self-signed code-signing
-certificate** so that in-app auto-update works on the free (non-Apple) path.
+Lectio's macOS builds are signed with a **real Apple Developer ID Application
+certificate** and notarized via `@electron/notarize` when `APPLE_TEAM_ID` /
+`CSC_LINK` and friends are configured in CI — see
+["Real signing + notarization"](#real-signing--notarization-primary-path)
+below. A **persistent self-signed code-signing certificate** is kept as an
+automatic fallback, so in-app auto-update still works on the free (non-Apple)
+path if the real credentials are ever absent.
 
 ## Why this is needed
 
@@ -31,11 +36,50 @@ app's **designated requirement (DR)**.
 A self-signed certificate gives us that stable identity for free. It is **not**
 Apple notarization — Gatekeeper still shows "unidentified developer" on first
 launch, which the Homebrew cask's `postflight` (or a manual right-click → Open)
-clears. For full notarization (and no Gatekeeper warning), set `APPLE_TEAM_ID`
-+ certs instead; that path still takes over automatically (see
-`packages/desktop/build/`).
+clears. Real notarization (no Gatekeeper warning at all) is the default
+configured path in CI — see
+["Real signing + notarization"](#real-signing--notarization-primary-path)
+below.
 
-## One-time setup
+## Real signing + notarization (primary path)
+
+This is the path CI uses today. It needs:
+
+- A **Developer ID Application** certificate, which requires an Apple
+  Developer Program membership, exported as a `.p12`.
+- An **app-specific password** for the Apple ID used to notarize, generated at
+  [appleid.apple.com](https://appleid.apple.com/).
+
+Those map to five GitHub repo secrets (Settings → Secrets and variables →
+Actions):
+
+- `CSC_LINK` — base64 of the Developer ID Application `.p12`
+- `CSC_KEY_PASSWORD` — the `.p12` export password
+- `APPLE_TEAM_ID` — the Apple Developer Team ID
+- `APPLE_ID` — the Apple ID used to notarize
+- `APPLE_ID_PASSWORD` — an app-specific password for that Apple ID
+
+electron-builder reads `CSC_LINK`/`CSC_KEY_PASSWORD` automatically and signs
+with the Developer ID Application cert; `packages/desktop/build/afterSign.js`
+then notarizes automatically once `APPLE_TEAM_ID` is set. No further
+configuration is needed at release time — set the five secrets once and every
+tagged release signs and notarizes.
+
+Notarization only succeeds because **Hardened Runtime** is enabled with the
+entitlements Electron's JIT needs
+(`packages/desktop/build/entitlements.mac.plist`) — Apple rejects a build
+that isn't hardened-runtime-signed. That config lives in
+`packages/desktop/package.json`'s `build.mac` block, not in the release
+workflow.
+
+With this path, downloaded builds open with **no Gatekeeper warning at all**,
+for any user — unlike the self-signed fallback below.
+
+## Self-signed fallback (if real credentials are unavailable)
+
+This path only takes effect when `CSC_LINK`/`APPLE_TEAM_ID` are **not** set
+(per the `||` check in `packages/desktop/build/afterPack.js`) — e.g. a fork,
+or before the five secrets above are configured.
 
 1. **Generate the certificate** on a Mac:
 
