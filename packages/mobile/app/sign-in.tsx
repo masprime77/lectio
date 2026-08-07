@@ -149,6 +149,24 @@ export default function SignInScreen() {
               <Text style={[styles.btnOutlineText, { color: theme.accent }]}>Create account</Text>
             </Pressable>
 
+            <Text style={[styles.legalNotice, { color: theme.muted }]}>
+              By creating an account you agree to our{' '}
+              <Text
+                style={[styles.legalLink, { color: theme.accent }]}
+                onPress={() => router.push('/settings/legal/datenschutz')}
+              >
+                Privacy Policy
+              </Text>{' '}
+              and{' '}
+              <Text
+                style={[styles.legalLink, { color: theme.accent }]}
+                onPress={() => router.push('/settings/legal/impressum')}
+              >
+                Legal Notice
+              </Text>
+              .
+            </Text>
+
             <View style={styles.divider}>
               <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
               <Text style={[styles.dividerText, { color: theme.muted }]}>or</Text>
@@ -190,6 +208,8 @@ const styles = StyleSheet.create({
   },
   error: { color: '#e53e3e', fontSize: 13, textAlign: 'center' },
   link: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  legalNotice: { fontSize: 12, textAlign: 'center', lineHeight: 17, marginTop: 4 },
+  legalLink: { fontWeight: '600' },
   notice: {
     borderRadius: 10,
     borderWidth: StyleSheet.hairlineWidth,

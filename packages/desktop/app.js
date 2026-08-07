@@ -4203,6 +4203,15 @@ function setupSignIn() {
     run(lectioAuth.signIn);
   });
   createBtn.addEventListener('click', () => run(lectioAuth.signUp));
+
+  document.getElementById('signin-privacy-link').addEventListener('click', (e) => {
+    e.preventDefault();
+    window.legalDocs.open('privacy');
+  });
+  document.getElementById('signin-impressum-link').addEventListener('click', (e) => {
+    e.preventDefault();
+    window.legalDocs.open('impressum');
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -57,6 +57,12 @@ contextBridge.exposeInMainWorld('settings', {
   onOpen: (callback) => ipcRenderer.on('open-settings', () => callback()),
 });
 
+// Legal bridge: opens the Impressum / Privacy Policy windows built in main.js
+// from the sign-in screen's links (docKey is 'impressum' | 'privacy').
+contextBridge.exposeInMainWorld('legalDocs', {
+  open: (docKey) => ipcRenderer.invoke('open-legal-doc', docKey),
+});
+
 // Moodle bridge: multi-account secure token storage plus the SSO capture
 // flow. One entry per Moodle base URL — see main.js's addMoodleAccount.
 contextBridge.exposeInMainWorld('moodleAuth', {
