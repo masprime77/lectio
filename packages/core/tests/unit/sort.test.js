@@ -50,17 +50,14 @@ describe('sortedCourses', () => {
     ]);
   });
 
-  it('progress sorts respect study mode', () => {
-    // In study mode only r-studied counts; r-summarized drops to 0%.
+  it('progress sorts count every done-section tag alike', () => {
+    // Both tags are in the done section, so both courses sit at 100% and the
+    // sort falls through to a stable order rather than favouring "studied".
     const cs = [
       { id: 'c-1', name: 'Summarized', readings: [{ status: 'r-summarized' }], tasks: [] },
       { id: 'c-2', name: 'Studied', readings: [{ status: 'r-studied' }], tasks: [] },
     ];
-    expect(names(core.sortedCourses(cs, semester(), 'progress-desc', true))).toEqual([
-      'Studied',
-      'Summarized',
-    ]);
-    expect(names(core.sortedCourses(cs, semester(), 'progress-desc', false))).toEqual([
+    expect(names(core.sortedCourses(cs, semester(), 'progress-desc'))).toEqual([
       'Summarized',
       'Studied',
     ]);

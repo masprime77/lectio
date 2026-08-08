@@ -474,15 +474,11 @@ function sortedCourses(courses) {
   const copy = [...courses];
   if (state.sortOrder === 'progress-asc')
     return copy.sort(
-      (a, b) =>
-        courseProgress(a, state.semester, state.studyMode) -
-        courseProgress(b, state.semester, state.studyMode)
+      (a, b) => courseProgress(a, state.semester) - courseProgress(b, state.semester)
     );
   if (state.sortOrder === 'progress-desc')
     return copy.sort(
-      (a, b) =>
-        courseProgress(b, state.semester, state.studyMode) -
-        courseProgress(a, state.semester, state.studyMode)
+      (a, b) => courseProgress(b, state.semester) - courseProgress(a, state.semester)
     );
   // alpha-asc, week-asc and week-desc all use alphabetical (A → Z) order.
   // Any unknown/removed order (e.g. a stale 'alpha-desc') also lands here.
@@ -501,26 +497,20 @@ function sortedCoursesForWeekView(courses) {
 
 // Returns { readings: {done, total}, tasks: {done, total} } for one course.
 // Mirrors the logic of courseProgress() but split by type.
-function courseBreakdown(course, sem, studyMode) {
+function courseBreakdown(course, sem) {
   const readings = (course && course.readings) || [];
   const tasks    = (course && course.tasks)    || [];
 
-  let doneR, doneT;
-  if (studyMode) {
-    doneR = readings.filter((r) => r.status === 'r-studied').length;
-    doneT = tasks.filter((t)   => t.status === 't-studied').length;
-  } else {
-    const rTags    = getReadingTags(sem || {});
-    const tTags    = getTaskTags(sem    || {});
-    const rDoneIds = new Set(rTags.filter((t) => t.section === 'done').map((t) => t.id));
-    const tDoneIds = new Set(tTags.filter((t) => t.section === 'done').map((t) => t.id));
-    doneR = readings.filter(
-      (r) => rDoneIds.has(r.status) || (r.status === '__deleted__' && r._ghostSection === 'done')
-    ).length;
-    doneT = tasks.filter(
-      (t) => tDoneIds.has(t.status) || (t.status === '__deleted__' && t._ghostSection === 'done')
-    ).length;
-  }
+  const rTags    = getReadingTags(sem || {});
+  const tTags    = getTaskTags(sem    || {});
+  const rDoneIds = new Set(rTags.filter((t) => t.section === 'done').map((t) => t.id));
+  const tDoneIds = new Set(tTags.filter((t) => t.section === 'done').map((t) => t.id));
+  const doneR = readings.filter(
+    (r) => rDoneIds.has(r.status) || (r.status === '__deleted__' && r._ghostSection === 'done')
+  ).length;
+  const doneT = tasks.filter(
+    (t) => tDoneIds.has(t.status) || (t.status === '__deleted__' && t._ghostSection === 'done')
+  ).length;
 
   return {
     readings: { done: doneR, total: readings.length },
@@ -556,7 +546,7 @@ function renderDashboard() {
     bars = '<div class="week-empty">No courses yet.</div>';
   } else {
     sortedCourses(sem.courses).forEach((course) => {
-      const pct = courseProgress(course, sem, state.studyMode);
+      const pct = courseProgress(course, sem);
       let rowClass = 'progress-row';
       if (state.focusedCourseId) {
         rowClass += state.focusedCourseId === course.id
@@ -589,7 +579,7 @@ function renderDashboard() {
     let totalRDone = 0, totalRAll = 0, totalTDone = 0, totalTAll = 0;
     let rows = '';
     sortedCourses(sem.courses).forEach((course) => {
-      const bd = courseBreakdown(course, sem, state.studyMode);
+      const bd = courseBreakdown(course, sem);
       totalRDone += bd.readings.done;
       totalRAll  += bd.readings.total;
       totalTDone += bd.tasks.done;
