@@ -17,7 +17,7 @@
 // network. packages/desktop/node_modules is git-ignored and rebuilt each
 // prebuild; predev/prestart remove it so `npm start`/dev keep using the live
 // workspace packages instead of these snapshots.
-const { execFileSync } = require('child_process');
+const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -25,17 +25,19 @@ const repoRoot = path.resolve(__dirname, '..', '..', '..');
 const rootModules = path.join(repoRoot, 'node_modules');
 const destModules = path.join(__dirname, '..', 'node_modules');
 
-// Windows' CreateProcess can't run .cmd/.bat shims via execFileSync without
-// shell: true, and npm on PATH there is npm.cmd — resolve it explicitly.
-const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+// Run npm through a shell rather than spawning the binary directly: on Windows
+// npm on PATH is the npm.cmd shim, and since Node's CVE-2024-27980 hardening
+// spawn/execFile refuse a .cmd/.bat outright (EINVAL, pid 0) unless they go
+// through a shell. execSync gives us that on both platforms, and cmd.exe/sh
+// resolve the right npm from PATH. The command is a fixed literal — nothing is
+// interpolated into it — so there is no quoting or injection concern. (Passing
+// an args array alongside shell:true would work too, but that combination is
+// deprecated as of Node 22: args are concatenated, not escaped. See DEP0190.)
+const NPM_LS = 'npm ls --omit=dev --all --parseable --workspace @lectio/desktop';
 
 let out;
 try {
-  out = execFileSync(
-    npmCommand,
-    ['ls', '--omit=dev', '--all', '--parseable', '--workspace', '@lectio/desktop'],
-    { cwd: repoRoot, encoding: 'utf8' }
-  );
+  out = execSync(NPM_LS, { cwd: repoRoot, encoding: 'utf8' });
 } catch (err) {
   // npm ls exits non-zero on benign warnings but still prints the tree on stdout.
   out = err.stdout ? err.stdout.toString() : '';
