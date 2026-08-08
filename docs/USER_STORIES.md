@@ -346,19 +346,6 @@ Test references use the form `file › test name`.
 
 ---
 
-## Study Mode
-
-**US-038 — Study Mode**
-- As a student, I want to toggle Study Mode so that progress shows only items I have deeply studied.
-- Acceptance criteria:
-  - [ ] A "Study Mode" toggle button in the header switches the mode on/off and persists across restarts.
-  - [ ] While on, only items tagged with the "studied" tag id (`r-studied` / `t-studied`) count toward progress.
-  - [ ] The status dropdown gains a distinct green "Studied" shortcut at the bottom while Study Mode is on.
-  - [ ] Turning Study Mode off restores the normal progress calculation without modifying any item.
-- Linked tests: `tests/unit/progress.test.js › counts only studied tags for readings and tasks`; `tests/unit/progress.test.js › does NOT count other done-section tags when study mode is on`; `tests/unit/progress.test.js › does not count ghost items when study mode is on`; `tests/unit/progress.test.js › omitting the third arg behaves identically to studyMode=false` (header toggle + dropdown shortcut verified manually)
-
----
-
 ## Sort
 
 **US-039 — Sort control**
@@ -404,7 +391,7 @@ Test references use the form `file › test name`.
   - [ ] A "Breakdown" toggle button in the dashboard header opens an inline panel.
   - [ ] The panel shows separate mini-bars for readings and tasks per course with done/total counts.
   - [ ] A "Total" summary row summarises the whole semester.
-  - [ ] The panel respects the current sort order and Study Mode.
+  - [ ] The panel respects the current sort order.
 - Linked tests: _none (UI; verified manually)_
 
 ---
@@ -502,7 +489,6 @@ Test references use the form `file › test name`.
 | US-035 | Session restore     | — (Electron smoke)                           | not covered   |
 | US-036 | Tags                | semester-manager.test.js, ipc.test.js, progress.test.js, status.test.js | covered |
 | US-037 | Tags                | status.test.js                               | partial       |
-| US-038 | Study Mode          | progress.test.js                             | partial       |
 | US-039 | Sort                | —                                            | not covered   |
 | US-040 | Focus mode          | —                                            | not covered   |
 | US-041 | Views               | —                                            | not covered   |
@@ -512,7 +498,7 @@ Test references use the form `file › test name`.
 | US-045 | Feedback            | —                                            | not covered   |
 | US-046 | Distribution        | — (gated by CI)                              | not covered   |
 
-**Coverage summary:** 12 covered, 6 partial, 28 not covered (46 stories). The
+**Coverage summary:** 12 covered, 5 partial, 28 not covered (45 stories). The
 Vitest suite focuses on the pure logic and filesystem/IPC layers in `lib/`
 (100% lines and functions; threshold 70%). UI, Electron-process, and packaging
 behaviours are validated manually or with hidden-window Electron smoke tests.

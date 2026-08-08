@@ -60,7 +60,6 @@ is a dead end. This is the single biggest usability gap.
 ### Phase 9 — Port deferred desktop features to mobile
 Bring the mobile app to feature parity. Each is its own PR; core logic mostly
 exists already, so these are mostly UI.
-- **Study Mode** toggle (core's `courseProgress(course, semester, true)`).
 - **Custom tag editor** — add/rename/delete/reorder/recolor (core: addTag,
   editTag, deleteTag, reorderTags, isProtectedTag); respect protected tags and
   the ghosting behavior on delete.

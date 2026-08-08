@@ -12,7 +12,6 @@ import {
 import { storage } from '../../../../src/storage';
 import { saveWithConflict } from '../../../../src/sync/saveWithConflict';
 import { useSortOrder } from '../../../../src/lib/use-sort-order';
-import { useStudyMode } from '../../../../src/study/StudyModeProvider';
 import { useTheme } from '../../../../src/theme';
 import { ExportIcon } from '../../../../src/components/ExportIcon';
 import { Fab } from '../../../../src/components/Fab';
@@ -39,7 +38,6 @@ function sortedItems(items: PlannerItem[], order: SortOrder): PlannerItem[] {
 export default function CourseDetailScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { studyMode } = useStudyMode();
   const { id, courseId } = useLocalSearchParams<{ id: string; courseId: string }>();
   const [semester, setSemester] = useState<Semester | null>(null);
   const [editing, setEditing] = useState(false);
@@ -73,8 +71,7 @@ export default function CourseDetailScreen() {
   );
 
   // Set an item's tag to the one picked in the sheet, persist, and re-render.
-  // Writes the same item.status id the desktop's tag menu writes. Study Mode
-  // (future) can reuse this directly — picking the Studied tag is just a pick.
+  // Writes the same item.status id the desktop's tag menu writes.
   const applyStatus = useCallback(
     (kind: Kind, itemId: string | undefined, tagId: string) => {
       if (!semester || !itemId) return;
@@ -184,7 +181,7 @@ export default function CourseDetailScreen() {
 
   const readingTags = getReadingTags(semester!);
   const taskTags = getTaskTags(semester!);
-  const progress = courseProgress(course, semester!, studyMode);
+  const progress = courseProgress(course, semester!);
   const hasItems = course.readings.length > 0 || course.tasks.length > 0;
 
   const renderItem = (kind: Kind, item: PlannerItem, tags: Tag[]) => {

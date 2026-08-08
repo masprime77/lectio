@@ -35,7 +35,7 @@ npm run typecheck --workspace @lectio/mobile   # tsc --noEmit del móvil
 ### 01 — Core: breakdown + sort + setItemStatus (`01-core-breakdown-sort`)
 
 - [X] **[CI]** `breakdown.test.js`: curso mixto da done/total correcto por tipo; curso vacío → `{done:0,total:0}`.
-- [X] **[CI]** `courseBreakdown` en studyMode cuenta solo `*-studied`; un ghost (`__deleted__` + `_ghostSection:'done'`) cuenta como done en modo normal pero **no** en studyMode.
+- [X] **[CI]** `courseBreakdown` cuenta todo tag de la sección `done`; un ghost (`__deleted__` + `_ghostSection:'done'`) cuenta como done.
 - [X] **[CI]** `sort.test.js`: cada valor de `SORT_ORDER`; progress-asc/desc por `courseProgress`; alpha-asc/desc por nombre; week-asc/desc caen a alfabético A→Z.
 - [X] **[CI]** `sortedCourses` **no muta** el array de entrada (otra referencia, orden original preservado).
 - [X] **[CI]** `setItemStatus` asigna el tag, limpia `_ghostSection`, devuelve `null` si id desconocido.
@@ -84,18 +84,9 @@ npm run typecheck --workspace @lectio/mobile   # tsc --noEmit del móvil
 - [X] **[M]** (móvil/desktop) El `status` escrito coincide con el del desktop para la misma elección.
 - [X] **[M]** (móvil) Long-press sigue permitiendo editar/borrar; el swipe y el batch-edit siguen funcionando.
 
-### 06 — Study Mode (`06-mobile-study-mode`)
-
-- [X] **[CI]** Sin dependencias nuevas; core intacto.
-- [X] **[M]** (móvil) Activar Study Mode → las barras de la lista y el % del detalle bajan a contar **solo** ítems Studied.
-- [X] **[M]** (móvil) Desactivar → los números vuelven.
-- [X] **[M]** (móvil) El ajuste **sobrevive** a forzar cierre y relanzar.
-- [X] **[M]** (móvil/desktop) Alternar Study Mode **no** cambia ningún tag ni el JSON (exportar antes/después → idéntico).
-
 ### 07 — Controles de ordenación (`07-mobile-sort`)
 
 - [X] **[M]** (móvil) Cada orden reordena la lista de cursos igual que el desktop.
-- [X] **[M]** (móvil) Los órdenes por progreso respetan Study Mode cuando está activo.
 - [X] **[M]** (móvil) La elección **persiste** entre relanzamientos.
 - [X] **[M]** (móvil/desktop) Ordenar **no** modifica el JSON (exportar antes/después → idéntico).
 - [X] **[M]** (móvil) `week-asc/desc` caen a alfabético para el orden de cursos (no hay vista semanal en móvil aún).
@@ -105,7 +96,6 @@ npm run typecheck --workspace @lectio/mobile   # tsc --noEmit del móvil
 
 - [X] **[M]** (móvil) Activar "Breakdown" muestra mini-barras de Readings y Tasks con done/total correctos por curso.
 - [X] **[M]** (móvil/desktop) Los números coinciden con el panel del desktop para el mismo semestre.
-- [X] **[M]** (móvil) Study Mode (cuando está activo) reduce los conteos del breakdown a ítems Studied.
 - [X] **[M]** (móvil) El toggle es por-pantalla y la vista por defecto sigue siendo la lista limpia.
 
 ### 09 — Settings (tuerca) con Profile (`09-mobile-settings`)
@@ -153,7 +143,7 @@ npm run typecheck --workspace @lectio/mobile   # tsc --noEmit del móvil
 ## Pruebas de regresión cruzada (correr al final de toda la serie)
 
 - [X] **[M]** (móvil↔desktop) Un semestre creado en móvil se ve correcto en desktop y al revés (mismo JSON).
-- [X] **[M]** (móvil) Flujo completo de cuenta nueva: sign-in → tutorial → crear semestre (calendario) → cursos → ítems con tags → Study Mode → Sort → Breakdown → exportar → feedback.
-- [X] **[M]** (móvil) Tags custom + ghosting + Study Mode conviven sin romper el progreso.
-- [X] **[M]** (móvil) Reabrir la app aterriza en el último semestre, con Study Mode y Sort recordados.
+- [X] **[M]** (móvil) Flujo completo de cuenta nueva: sign-in → tutorial → crear semestre (calendario) → cursos → ítems con tags → Sort → Breakdown → exportar → feedback.
+- [X] **[M]** (móvil) Tags custom + ghosting conviven sin romper el progreso.
+- [X] **[M]** (móvil) Reabrir la app aterriza en el último semestre, con el Sort recordado.
 - [X] **[CI]** Suite completa de Vitest verde y typecheck del móvil en 0 tras integrar todo en `dev`.

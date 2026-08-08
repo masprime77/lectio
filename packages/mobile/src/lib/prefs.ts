@@ -1,4 +1,4 @@
-// Device-local UI preferences (last-opened semester, study mode, sort order,
+// Device-local UI preferences (last-opened semester, sort order,
 // tutorial-seen) backed by AsyncStorage. Mirrors the desktop renderer's
 // readPref/writePref semantics: reads never throw (fallback on error) and
 // writes fail silently. This is UI state only — it must never be written into
@@ -7,7 +7,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const K = {
   lastSemesterId: 'lectio:pref:lastSemesterId',
-  studyMode: 'lectio:pref:studyMode',
   sortOrder: 'lectio:pref:sortOrder',
   tutorialSeen: 'lectio:pref:tutorialSeen',
 } as const;
@@ -41,10 +40,6 @@ export const prefs = {
   getLastSemesterId: () => getString(K.lastSemesterId),
   setLastSemesterId: (id: string) => setString(K.lastSemesterId, id),
   clearLastSemesterId: () => remove(K.lastSemesterId),
-
-  // study mode (boolean)
-  getStudyMode: async () => (await getString(K.studyMode)) === 'true',
-  setStudyMode: (on: boolean) => setString(K.studyMode, on ? 'true' : 'false'),
 
   // sort order (validated by the caller against core SORT_ORDERS)
   getSortOrder: () => getString(K.sortOrder),
