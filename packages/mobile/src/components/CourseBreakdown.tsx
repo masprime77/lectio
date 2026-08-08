@@ -7,19 +7,17 @@ import type { Course, Semester } from '../../types/lectio-core';
 /**
  * Per-course readings-vs-tasks breakdown: two mini progress lines showing
  * Readings done/total and Tasks done/total, mirroring the desktop's Breakdown
- * panel. Counts honor Study Mode (Studied-only) via core's courseBreakdown.
+ * panel. Counts come from core's courseBreakdown (done-section tags).
  */
 export function CourseBreakdown({
   course,
   semester,
-  studyMode,
 }: {
   course: Course;
   semester: Semester;
-  studyMode: boolean;
 }) {
   const theme = useTheme();
-  const bd = courseBreakdown(course, semester, studyMode);
+  const bd = courseBreakdown(course, semester);
   const color = course.color || theme.accent;
 
   return (

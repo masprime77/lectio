@@ -56,61 +56,45 @@
     return semester && Array.isArray(semester.courses) ? semester.courses : [];
   }
 
-  // Percentage complete for a course. By default an item counts when its tag
-  // belongs to the "done" section (ghost items via their remembered section).
-  // When `studyMode` is true, only items explicitly tagged "r-studied" /
-  // "t-studied" count — a pure calculation overlay, the tags are not modified.
-  function courseProgress(course, semester, studyMode) {
+  // Percentage complete for a course. An item counts when its tag belongs to
+  // the "done" section (ghost items count via their remembered section).
+  function courseProgress(course, semester) {
     const readings = (course && course.readings) || [];
     const tasks = (course && course.tasks) || [];
     const total = readings.length + tasks.length;
     if (total === 0) return 0;
 
-    let doneR, doneT;
-
-    if (studyMode) {
-      // In study mode, only the "studied" tag counts.
-      doneR = readings.filter((r) => r.status === 'r-studied').length;
-      doneT = tasks.filter((t) => t.status === 't-studied').length;
-    } else {
-      const rTags = getReadingTags(semester || {});
-      const tTags = getTaskTags(semester || {});
-      const rDoneIds = new Set(rTags.filter((t) => t.section === 'done').map((t) => t.id));
-      const tDoneIds = new Set(tTags.filter((t) => t.section === 'done').map((t) => t.id));
-      doneR = readings.filter(
-        (r) => rDoneIds.has(r.status) || (r.status === '__deleted__' && r._ghostSection === 'done')
-      ).length;
-      doneT = tasks.filter(
-        (t) => tDoneIds.has(t.status) || (t.status === '__deleted__' && t._ghostSection === 'done')
-      ).length;
-    }
+    const rTags = getReadingTags(semester || {});
+    const tTags = getTaskTags(semester || {});
+    const rDoneIds = new Set(rTags.filter((t) => t.section === 'done').map((t) => t.id));
+    const tDoneIds = new Set(tTags.filter((t) => t.section === 'done').map((t) => t.id));
+    const doneR = readings.filter(
+      (r) => rDoneIds.has(r.status) || (r.status === '__deleted__' && r._ghostSection === 'done')
+    ).length;
+    const doneT = tasks.filter(
+      (t) => tDoneIds.has(t.status) || (t.status === '__deleted__' && t._ghostSection === 'done')
+    ).length;
 
     return Math.round(((doneR + doneT) / total) * 100);
   }
 
   // Per-course done/total split by type. Mirrors courseProgress but separated;
   // an item counts as done when its tag is in the 'done' section (or it is a
-  // ghost remembering a 'done' section). In studyMode only 'r-studied' /
-  // 't-studied' count. Returns { readings:{done,total}, tasks:{done,total} }.
-  function courseBreakdown(course, semester, studyMode) {
+  // ghost remembering a 'done' section).
+  // Returns { readings:{done,total}, tasks:{done,total} }.
+  function courseBreakdown(course, semester) {
     const readings = (course && course.readings) || [];
     const tasks = (course && course.tasks) || [];
-    let doneR, doneT;
-    if (studyMode) {
-      doneR = readings.filter((r) => r.status === 'r-studied').length;
-      doneT = tasks.filter((t) => t.status === 't-studied').length;
-    } else {
-      const rTags = getReadingTags(semester || {});
-      const tTags = getTaskTags(semester || {});
-      const rDoneIds = new Set(rTags.filter((t) => t.section === 'done').map((t) => t.id));
-      const tDoneIds = new Set(tTags.filter((t) => t.section === 'done').map((t) => t.id));
-      doneR = readings.filter(
-        (r) => rDoneIds.has(r.status) || (r.status === '__deleted__' && r._ghostSection === 'done')
-      ).length;
-      doneT = tasks.filter(
-        (t) => tDoneIds.has(t.status) || (t.status === '__deleted__' && t._ghostSection === 'done')
-      ).length;
-    }
+    const rTags = getReadingTags(semester || {});
+    const tTags = getTaskTags(semester || {});
+    const rDoneIds = new Set(rTags.filter((t) => t.section === 'done').map((t) => t.id));
+    const tDoneIds = new Set(tTags.filter((t) => t.section === 'done').map((t) => t.id));
+    const doneR = readings.filter(
+      (r) => rDoneIds.has(r.status) || (r.status === '__deleted__' && r._ghostSection === 'done')
+    ).length;
+    const doneT = tasks.filter(
+      (t) => tDoneIds.has(t.status) || (t.status === '__deleted__' && t._ghostSection === 'done')
+    ).length;
     return {
       readings: { done: doneR, total: readings.length },
       tasks: { done: doneT, total: tasks.length },
@@ -128,18 +112,14 @@
   ];
 
   // Return a NEW sorted array of courses (never mutates input). Progress sorts
-  // use courseProgress with the given studyMode. 'week-asc'/'week-desc' fall
-  // back to alphabetical A→Z for course ordering (weeks reorder elsewhere).
-  function sortedCourses(courses, semester, sortOrder, studyMode) {
+  // use courseProgress. 'week-asc'/'week-desc' fall back to alphabetical A→Z
+  // for course ordering (weeks reorder elsewhere).
+  function sortedCourses(courses, semester, sortOrder) {
     const copy = [...(courses || [])];
     if (sortOrder === 'progress-asc')
-      return copy.sort(
-        (a, b) => courseProgress(a, semester, studyMode) - courseProgress(b, semester, studyMode)
-      );
+      return copy.sort((a, b) => courseProgress(a, semester) - courseProgress(b, semester));
     if (sortOrder === 'progress-desc')
-      return copy.sort(
-        (a, b) => courseProgress(b, semester, studyMode) - courseProgress(a, semester, studyMode)
-      );
+      return copy.sort((a, b) => courseProgress(b, semester) - courseProgress(a, semester));
     // alpha-asc, week-asc and week-desc all use alphabetical (A → Z) order.
     // Any unknown/removed order (e.g. a stale 'alpha-desc') also lands here.
     return copy.sort((a, b) => a.name.localeCompare(b.name));

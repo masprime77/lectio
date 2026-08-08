@@ -100,11 +100,7 @@ export function reorderTags(
   orderedIds: string[]
 ): void;
 export function getCourses(semester: Semester): Course[];
-export function courseProgress(
-  course: Course,
-  semester: Semester,
-  studyMode?: boolean
-): number;
+export function courseProgress(course: Course, semester: Semester): number;
 export interface CourseBreakdown {
   readings: { done: number; total: number };
   tasks: { done: number; total: number };
@@ -116,16 +112,11 @@ export type SortOrder =
   | 'week-asc'
   | 'week-desc';
 export const SORT_ORDERS: SortOrder[];
-export function courseBreakdown(
-  course: Course,
-  semester: Semester,
-  studyMode?: boolean
-): CourseBreakdown;
+export function courseBreakdown(course: Course, semester: Semester): CourseBreakdown;
 export function sortedCourses(
   courses: Course[],
   semester: Semester,
-  sortOrder: SortOrder,
-  studyMode?: boolean
+  sortOrder: SortOrder
 ): Course[];
 export function setItemStatus(
   course: Course,
@@ -330,7 +321,7 @@ declare const core: {
   getReadingTags(semester: Semester): Tag[];
   getTaskTags(semester: Semester): Tag[];
   getCourses(semester: Semester): Course[];
-  courseProgress(course: Course, semester: Semester, studyMode?: boolean): number;
+  courseProgress(course: Course, semester: Semester): number;
   uid(prefix: string): string;
 };
 export default core;

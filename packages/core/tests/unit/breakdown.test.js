@@ -33,35 +33,25 @@ describe('courseBreakdown', () => {
     });
   });
 
-  it('counts only *-studied tags in study mode', () => {
-    // r-summarized and t-done are in the done section but not "studied".
+  it('counts every done-section tag, not just the studied one', () => {
     const c = course(
       [{ status: 'r-summarized' }, { status: 'r-studied' }],
       [{ status: 't-done' }, { status: 't-studied' }]
     );
-    expect(core.courseBreakdown(c, semester(), true)).toEqual({
-      readings: { done: 1, total: 2 },
-      tasks: { done: 1, total: 2 },
-    });
-    // Same course with study mode off: all four count as done.
-    expect(core.courseBreakdown(c, semester(), false)).toEqual({
+    expect(core.courseBreakdown(c, semester())).toEqual({
       readings: { done: 2, total: 2 },
       tasks: { done: 2, total: 2 },
     });
   });
 
-  it('counts ghost items via their remembered section in normal mode only', () => {
+  it('counts ghost items via their remembered section', () => {
     const c = course(
       [{ status: '__deleted__', _ghostSection: 'done' }],
       [{ status: '__deleted__', _ghostSection: 'done' }]
     );
-    expect(core.courseBreakdown(c, semester(), false)).toEqual({
+    expect(core.courseBreakdown(c, semester())).toEqual({
       readings: { done: 1, total: 1 },
       tasks: { done: 1, total: 1 },
-    });
-    expect(core.courseBreakdown(c, semester(), true)).toEqual({
-      readings: { done: 0, total: 1 },
-      tasks: { done: 0, total: 1 },
     });
   });
 
