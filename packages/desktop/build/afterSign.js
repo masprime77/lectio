@@ -12,7 +12,15 @@
 //     @electron/notarize's codesign check against an unsigned app and crash
 //     with a cryptic "code has no resources but signature indicates they must
 //     be present" error. Fail loudly instead, naming what's missing.
-//   - all five set: notarize as before.
+//   - all five set but the app isn't actually Developer-ID-signed:
+//     electron-builder silently no-ops signing when it can't find/import a
+//     usable identity from CSC_LINK/CSC_KEY_PASSWORD (it logs "skipped macOS
+//     application code signing" and carries on), leaving the same ad-hoc
+//     bundle and the same cryptic @electron/notarize crash. Verify the real
+//     signature up front and fail with a message naming the likely cause.
+//   - all five set and actually signed: notarize as before.
+const { spawnSync } = require('child_process');
+
 const REQUIRED_SIGNING_VARS = [
   'CSC_LINK',
   'CSC_KEY_PASSWORD',
@@ -40,6 +48,25 @@ exports.default = async function afterSign(context) {
 
   const appName = context.packager.appInfo.productFilename;
   const appPath = `${appOutDir}/${appName}.app`;
+
+  // All five secrets are set, but that doesn't prove electron-builder managed
+  // to import an identity from them — when it can't, it skips signing and the
+  // bundle stays ad-hoc (Signature=adhoc, TeamIdentifier=not set). Notarizing
+  // that crashes deep inside @electron/notarize's own codesign check, so check
+  // for the expected Developer ID signature here instead. `codesign -d` writes
+  // its details to stderr and can exit 0 on an ad-hoc bundle, so inspect the
+  // output rather than the exit status.
+  const codesignCheck = spawnSync('codesign', ['-dvvv', appPath], { encoding: 'utf8' });
+  const signingInfo = `${codesignCheck.stdout || ''}${codesignCheck.stderr || ''}`;
+  if (!signingInfo.includes(`TeamIdentifier=${process.env.APPLE_TEAM_ID}`)) {
+    throw new Error(
+      `afterSign: all five signing secrets are set, but ${appPath} is not actually signed ` +
+        `with the "${process.env.APPLE_TEAM_ID}" Developer ID identity. This usually means ` +
+        `CSC_LINK is not valid base64 of a "Developer ID Application" .p12 export, or ` +
+        `CSC_KEY_PASSWORD doesn't match its export password. See docs/MACOS_SIGNING.md.\n\n` +
+        `codesign output:\n${signingInfo || '(no output captured)'}`
+    );
+  }
 
   // Lazy-require so @electron/notarize is only needed when actually notarizing.
   const { notarize } = require('@electron/notarize');
