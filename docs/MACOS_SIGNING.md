@@ -73,6 +73,16 @@ that was never Developer-ID-signed would otherwise crash inside
 missing secret. With a partial set, the hook throws and names exactly which
 of the five secrets are present and which are missing.
 
+With all five set, the hook additionally runs `codesign -dvvv` on the packaged
+`.app` and refuses to notarize unless the signature carries
+`TeamIdentifier=<APPLE_TEAM_ID>` — electron-builder logs "skipped macOS
+application code signing" and continues when it can't import an identity, so
+the bundle would otherwise reach `@electron/notarize` still ad-hoc signed. The
+two usual causes are `CSC_LINK` not being base64 of a **Developer ID
+Application** certificate (a Development or Mac App Distribution cert won't
+do) and `CSC_KEY_PASSWORD` not matching the `.p12` export password; the error
+includes the raw `codesign` output so the actual state is visible in the CI log.
+
 Notarization only succeeds because **Hardened Runtime** is enabled with the
 entitlements Electron's JIT needs
 (`packages/desktop/build/entitlements.mac.plist`) — Apple rejects a build
