@@ -5,6 +5,10 @@
   (`CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_TEAM_ID`, `APPLE_ID`,
   `APPLE_ID_PASSWORD`) are configured, instead of silently attempting to
   notarize an unsigned app and crashing with a cryptic codesign error.
+- Fixed: `packages/desktop/scripts/bundle-deps.js` now resolves `npm.cmd` on
+  Windows before spawning it, fixing a `spawnSync npm ENOENT` failure during
+  `prebuild:win` (Windows can't execute the `npm.cmd` shell shim via
+  `execFileSync` without `shell: true`).
 
 ## v1.0.0
 
