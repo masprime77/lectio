@@ -21,6 +21,7 @@ import { ConflictProvider } from '../src/sync/ConflictProvider';
 import { PomodoroProvider } from '../src/pomodoro/PomodoroProvider';
 import { ConflictDialog } from '../src/sync/ConflictDialog';
 import { prefs } from '../src/lib/prefs';
+import { useOrientationLock } from '../src/lib/use-orientation-lock';
 import { useTheme } from '../src/theme';
 
 // Foreground behavior: while the app is open, PomodoroProvider already shows
@@ -50,6 +51,7 @@ if (Platform.OS === 'android') {
 
 function AppShell() {
   const theme = useTheme();
+  useOrientationLock();
   const scheme = useColorScheme();
   const { session, loading, connectionError, retryConnection } = useAuth();
   const pathname = usePathname();
