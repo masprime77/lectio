@@ -15,6 +15,7 @@ import { useSortOrder } from '../../../../src/lib/use-sort-order';
 import { useTheme } from '../../../../src/theme';
 import { ExportIcon } from '../../../../src/components/ExportIcon';
 import { Fab } from '../../../../src/components/Fab';
+import { PomodoroFab } from '../../../../src/pomodoro/PomodoroFab';
 import { ProgressBar } from '../../../../src/components/ProgressBar';
 import { SortButton, SortMenu } from '../../../../src/components/SortMenu';
 import { SwipeableRow } from '../../../../src/components/SwipeableRow';
@@ -336,6 +337,7 @@ export default function CourseDetailScreen() {
           sortedItems(course.tasks, sortOrder).map((t) => renderItem('task', t, taskTags))
         )}
       </ScrollView>
+      <PomodoroFab semester={semester} defaultCourseId={courseId} />
       {/* The "+" opens the add-sheet on the Tags tab; readings/tasks are added
           from the per-section "+ Add" controls next to the Readings/Tasks headers. */}
       <Fab onPress={() => router.push(`/add?context=tags&id=${id}`)} />
@@ -359,7 +361,7 @@ export default function CourseDetailScreen() {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  content: { padding: 16, paddingBottom: 112 },
+  content: { padding: 16, paddingBottom: 180 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 14, marginRight: 4 },
   summary: {
     padding: 16,
