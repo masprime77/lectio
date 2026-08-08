@@ -25,10 +25,14 @@ const repoRoot = path.resolve(__dirname, '..', '..', '..');
 const rootModules = path.join(repoRoot, 'node_modules');
 const destModules = path.join(__dirname, '..', 'node_modules');
 
+// Windows' CreateProcess can't run .cmd/.bat shims via execFileSync without
+// shell: true, and npm on PATH there is npm.cmd — resolve it explicitly.
+const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+
 let out;
 try {
   out = execFileSync(
-    'npm',
+    npmCommand,
     ['ls', '--omit=dev', '--all', '--parseable', '--workspace', '@lectio/desktop'],
     { cwd: repoRoot, encoding: 'utf8' }
   );
