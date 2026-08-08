@@ -65,6 +65,14 @@ then notarizes automatically once `APPLE_TEAM_ID` is set. No further
 configuration is needed at release time — set the five secrets once and every
 tagged release signs and notarizes.
 
+`packages/desktop/build/afterSign.js` fails loudly if only some of the five
+secrets are configured: electron-builder invokes the `afterSign` hook
+regardless of whether real signing actually happened, so notarizing an app
+that was never Developer-ID-signed would otherwise crash inside
+`@electron/notarize` with a cryptic codesign error instead of pointing at the
+missing secret. With a partial set, the hook throws and names exactly which
+of the five secrets are present and which are missing.
+
 Notarization only succeeds because **Hardened Runtime** is enabled with the
 entitlements Electron's JIT needs
 (`packages/desktop/build/entitlements.mac.plist`) — Apple rejects a build
