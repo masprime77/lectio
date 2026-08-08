@@ -5,6 +5,11 @@
   (`CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_TEAM_ID`, `APPLE_ID`,
   `APPLE_ID_PASSWORD`) are configured, instead of silently attempting to
   notarize an unsigned app and crashing with a cryptic codesign error.
+- Fixed: with all five signing secrets set, `afterSign.js` now verifies the
+  packaged `.app` actually carries the expected `TeamIdentifier` before calling
+  `notarize()`, so a failed certificate import (wrong cert type or mismatched
+  `.p12` password) fails with a specific, actionable error instead of crashing
+  inside `@electron/notarize`'s codesign check.
 - Fixed: `packages/desktop/scripts/bundle-deps.js` now resolves `npm.cmd` on
   Windows before spawning it, fixing a `spawnSync npm ENOENT` failure during
   `prebuild:win` (Windows can't execute the `npm.cmd` shell shim via
