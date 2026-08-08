@@ -9,6 +9,16 @@
 // Session + durations persist to AsyncStorage via `prefs` (device-local).
 // The only thing written into the semester is the resulting studyTime, and
 // that goes through saveWithConflict like every other mobile write.
+//
+// A local (device-scheduled, not push) notification is scheduled for the
+// session's endsAt every time it changes, and cancelled/rescheduled on every
+// pause, resume, skip and stop via applySession — the one choke point every
+// transition already flows through. That's what makes a phase-completion
+// alert arrive even when the app is fully backgrounded: it's the OS firing
+// the notification it was told about, not this file's JS running late.
+// Crediting study time is untouched and still only happens in completePhase;
+// the scheduled notification is a pure heads-up and never itself writes
+// studyTime, so there's no risk of double-crediting from adding it.
 import {
   createContext,
   useCallback,
@@ -19,6 +29,7 @@ import {
   type ReactNode,
 } from 'react';
 import { Alert, AppState } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import {
   addStudyTime,
   advanceSession,
@@ -78,12 +89,67 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   sessionRef.current = session;
   settingsRef.current = settings;
 
-  const applySession = useCallback((next: PomodoroSession) => {
-    sessionRef.current = next;
-    setSession(next);
-    setRemaining(remainingSeconds(next));
-    void prefs.setPomodoroSession(JSON.stringify(next));
+  // At most one phase-completion notification is ever outstanding — this is
+  // its id, so every transition can cancel the previous one before scheduling
+  // (or not scheduling) the next.
+  const notificationIdRef = useRef<string | null>(null);
+
+  // Keep at most one scheduled notification in sync with the session: cancel
+  // whatever was there, then — only for a running (not idle, not paused)
+  // session — schedule one for its deadline. This is what makes the alert
+  // arrive even if the app is fully backgrounded or the JS timer never runs;
+  // the OS delivers it regardless. Permission is requested lazily here, on
+  // first use, rather than at app launch, so the app doesn't prompt before
+  // the person has touched the timer feature at all. A denial is not an
+  // error: the in-app Alert (already in completePhase) still covers the
+  // foreground case, so this silently no-ops rather than throwing.
+  const syncScheduledNotification = useCallback(async (next: PomodoroSession) => {
+    if (notificationIdRef.current) {
+      await Notifications.cancelScheduledNotificationAsync(notificationIdRef.current).catch(
+        () => {}
+      );
+      notificationIdRef.current = null;
+    }
+    if (next.phase === 'idle' || next.pausedAt != null) return;
+
+    const { status: existing } = await Notifications.getPermissionsAsync();
+    let granted = existing === 'granted';
+    if (!granted) {
+      const { status: requested } = await Notifications.requestPermissionsAsync();
+      granted = requested === 'granted';
+    }
+    if (!granted) return;
+
+    const body =
+      next.phase === 'work'
+        ? 'Focus block complete — take a break.'
+        : next.phase === 'shortBreak'
+          ? 'Break over — back to it.'
+          : 'Long break over — back to it.';
+
+    try {
+      notificationIdRef.current = await Notifications.scheduleNotificationAsync({
+        content: { title: 'Lectio', body, sound: true },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: new Date(next.endsAt),
+        },
+      });
+    } catch (err) {
+      console.warn('pomodoro: could not schedule notification', err);
+    }
   }, []);
+
+  const applySession = useCallback(
+    (next: PomodoroSession) => {
+      sessionRef.current = next;
+      setSession(next);
+      setRemaining(remainingSeconds(next));
+      void prefs.setPomodoroSession(JSON.stringify(next));
+      void syncScheduledNotification(next);
+    },
+    [syncScheduledNotification]
+  );
 
   // Credit studied seconds to the session's course. No-ops for free study.
   // Re-reads the semester from storage rather than trusting a screen's copy —
@@ -135,6 +201,16 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
     (async () => {
+      // `notificationIdRef` is process-local and starts back at null on every
+      // launch, so after a force-quit or crash mid-session it has no way to
+      // know the id of whatever the *previous* process scheduled — the OS
+      // keeps a scheduled notification alive independent of this app's JS
+      // running at all. A blanket cancel guarantees a clean slate before
+      // anything below reasons about what should be scheduled; nothing else
+      // in the app schedules notifications, so this can't collide with an
+      // unrelated feature.
+      await Notifications.cancelAllScheduledNotificationsAsync().catch(() => {});
+
       const [rawSettings, rawSession] = await Promise.all([
         prefs.getPomodoroSettings(),
         prefs.getPomodoroSession(),
@@ -162,12 +238,19 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
       sessionRef.current = restored;
       setSession(restored);
       setRemaining(remainingSeconds(restored));
-      if (restored.phase !== 'idle' && isPhaseComplete(restored)) completePhase(restored);
+      if (restored.phase !== 'idle' && isPhaseComplete(restored)) {
+        completePhase(restored);
+      } else if (restored.phase !== 'idle') {
+        // Still running (or paused): re-establish the notification — or the
+        // deliberate lack of one, if paused — now that any orphaned one from
+        // a previous process has been cleared above.
+        void syncScheduledNotification(restored);
+      }
     })();
     return () => {
       active = false;
     };
-  }, [completePhase]);
+  }, [completePhase, syncScheduledNotification]);
 
   // 1s repaint while a session is running. Nothing decrements here.
   useEffect(() => {
