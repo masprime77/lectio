@@ -2546,7 +2546,7 @@ async function submitModal() {
 
 // ---------------------------------------------------------------------------
 // Tags tab: per-semester reading/task tag management (add, rename, recolor,
-// delete, reorder). Protected tags (pending/studied) lock their name, deletion
+// delete, reorder). The protected "pending" tags lock their name, deletion
 // and position. Edits mutate the semester object and persist immediately.
 // ---------------------------------------------------------------------------
 function renderTagsEditor(semester) {

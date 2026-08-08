@@ -33,15 +33,13 @@ describe('tag defaults', () => {
 });
 
 describe('isProtectedTag', () => {
-  it('protects the pending and studied tags of each kind', () => {
-    ['r-pending', 'r-studied', 't-pending', 't-studied'].forEach((id) =>
-      expect(core.isProtectedTag(id)).toBe(true)
-    );
+  it('protects the pending tag of each kind', () => {
+    ['r-pending', 't-pending'].forEach((id) => expect(core.isProtectedTag(id)).toBe(true));
   });
 
-  it('treats custom and intermediate tags as unprotected', () => {
-    ['r-seen', 'r-summarized', 't-done', 'rt-123', 'whatever'].forEach((id) =>
-      expect(core.isProtectedTag(id)).toBe(false)
+  it('treats studied, intermediate, and custom tags as unprotected', () => {
+    ['r-studied', 't-studied', 'r-seen', 'r-summarized', 't-done', 'rt-123', 'whatever'].forEach(
+      (id) => expect(core.isProtectedTag(id)).toBe(false)
     );
   });
 });
@@ -93,6 +91,15 @@ describe('deleteTag', () => {
 
   it('returns false for an unknown tag', () => {
     expect(core.deleteTag(semester(), 'reading', 'ghost')).toBe(false);
+  });
+
+  it('deletes the studied tag and ghosts its items into the done section', () => {
+    const sem = semester();
+    sem.courses = [{ id: 'c1', readings: [{ id: 'r1', week: 1, status: 'r-studied' }], tasks: [] }];
+    expect(core.deleteTag(sem, 'reading', 'r-studied')).toBe(true);
+    expect(sem.readingTags.map((t) => t.id)).not.toContain('r-studied');
+    expect(sem.courses[0].readings[0].status).toBe('__deleted__');
+    expect(sem.courses[0].readings[0]._ghostSection).toBe('done');
   });
 
   it('removes the tag and ghosts items still wearing it', () => {
