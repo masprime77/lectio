@@ -496,6 +496,32 @@ body.electron-app .header-inner { padding-left: 80px; }
 }
 .progress-fill { height: 100%; border-radius: 5px; transition: width 0.3s; }
 
+/* Studied time under each dashboard bar (click to edit inline) */
+.progress-study {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.2rem;
+}
+.progress-study-value {
+  font-size: 0.72rem;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 0 0.15rem;
+}
+.progress-study-value:hover { background: var(--hover); color: var(--text); }
+
+.study-time-input {
+  font-size: 0.72rem;
+  width: 7ch;
+  padding: 0 0.2rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+.study-time-input--invalid { border-color: var(--danger); }
+
 /* Dashboard header row (title + breakdown button) */
 .dashboard-header {
   display: flex;
@@ -886,6 +912,15 @@ body.electron-app .header-inner { padding-left: 80px; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.course-column-header-time {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.course-column-header-time:hover { color: var(--text); }
 .course-column-body {
   padding: 0 0.9rem 0.9rem;
   overflow-y: auto;

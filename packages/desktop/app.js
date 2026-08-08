@@ -603,6 +603,10 @@ function renderDashboard() {
           <div class="progress-bar">
             <div class="progress-fill" style="width:${pct}%;background:${course.color}"></div>
           </div>
+          <div class="progress-study">
+            <span class="progress-study-value" data-course-id="${escapeHtml(course.id)}"
+                  title="Click to edit studied time">${formatHoursMinutes(getCourseStudySeconds(course))} studied</span>
+          </div>
         </div>`;
     });
   }
@@ -710,6 +714,14 @@ function renderDashboard() {
       state.focusedCourseId = state.focusedCourseId === id ? null : id;
       renderDashboard();
       renderPlanner();
+    });
+  });
+
+  // Click a studied-time value to edit it inline.
+  root.querySelectorAll('.progress-study-value').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      editStudyTimeInline(el, el.getAttribute('data-course-id'));
     });
   });
 
@@ -888,6 +900,14 @@ function renderCourseView() {
     nameSpan.title = course.name;
     nameSpan.style.color = course.color;
     header.appendChild(nameSpan);
+
+    // Total studied time (click to edit).
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'course-column-header-time';
+    timeSpan.textContent = formatHoursMinutes(getCourseStudySeconds(course));
+    timeSpan.title = 'Studied time — click to edit';
+    timeSpan.addEventListener('click', () => editStudyTimeInline(timeSpan, course.id));
+    header.appendChild(timeSpan);
 
     // Edit (opens the semester editor, the existing way to rename/recolor a course)
     const editBtn = document.createElement('button');
@@ -2181,6 +2201,54 @@ function renderPomodoroControl() {
     `<span class="pomodoro-clock">${formatClock(remainingSeconds(s))}</span>` +
     `<span class="pomodoro-label">${escapeHtml(label)}</span>`;
   btn.title = paused ? 'Resume' : 'Pause';
+}
+
+// Swap a studied-time label for an inline text input. Mirrors
+// editItemDueDate()'s pattern — commit on blur/Enter, cancel on Escape —
+// because Electron has no window.prompt().
+function editStudyTimeInline(labelEl, courseId) {
+  if (!state.semester || !courseId) return;
+  const course = state.semester.courses.find((c) => c.id === courseId);
+  if (!course) return;
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'study-time-input';
+  input.value = formatHoursMinutes(getCourseStudySeconds(course));
+  input.title = 'e.g. "2h 15m", "90m", or a number of minutes';
+  input.setAttribute('aria-label', `Studied time for ${course.name}`);
+
+  const commit = () => {
+    const seconds = parseHoursMinutesInput(input.value);
+    if (seconds === null) {
+      // Unparseable: keep the editor open and flag it rather than silently
+      // discarding what was typed.
+      input.classList.add('study-time-input--invalid');
+      input.addEventListener('input', () => input.classList.remove('study-time-input--invalid'), {
+        once: true,
+      });
+      input.focus();
+      return;
+    }
+    setStudyTime(course, seconds);
+    persist();
+    render();
+  };
+
+  const cancel = () => {
+    input.removeEventListener('blur', commit);
+    input.replaceWith(labelEl);
+  };
+
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') input.blur();
+    if (e.key === 'Escape') cancel();
+  });
+
+  labelEl.replaceWith(input);
+  input.focus();
+  input.select();
 }
 
 // Shown when there are no semester files left.
