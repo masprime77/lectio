@@ -2,8 +2,14 @@
 
 Feature-level user stories for Lectio, with acceptance criteria and
 links to the automated tests that cover them. UI-only behaviours (rendering,
-DOM interaction, theming) are validated manually and noted as such; the
-extracted core logic in `lib/` is covered by the Vitest suite under `tests/`.
+DOM interaction, theming) are validated manually and noted as such; the shared
+core logic in `@lectio/core` (`packages/core/src/`) is covered by the Vitest
+suite under `packages/core/tests/`.
+
+These stories describe the **desktop app**, which remains the feature-complete
+reference. A **mobile app** (`@lectio/mobile`, Expo) now exists too but mirrors
+only a subset of these stories; mobile feature parity is tracked in
+[`PENDING_FEATURES.md`](PENDING_FEATURES.md).
 
 Test references use the form `file › test name`.
 
@@ -326,9 +332,9 @@ Test references use the form `file › test name`.
 - Acceptance criteria:
   - [ ] Each semester stores `readingTags` and `taskTags` arrays; new semesters receive the default tag sets.
   - [ ] Tags have `id`, `name`, `color`, and `section` (`pending`/`done`); done-section tags count toward progress.
-  - [ ] Protected tag ids (`r-pending`, `r-studied`, `t-pending`, `t-studied`) cannot be renamed or deleted.
+  - [ ] Protected tag ids (`r-pending`, `t-pending`) cannot be renamed or deleted; every other tag, including `studied`, is fully editable.
   - [ ] Legacy semesters are migrated on load: default tags added and status strings rewritten to tag ids.
-- Linked tests: `tests/unit/semester-manager.test.js › get-semester returns parsed JSON with default tags migrated in`; `tests/unit/semester-manager.test.js › migrateStatusToTagId rewrites legacy status strings to tag ids`; `tests/integration/ipc.test.js › get-semester migrates legacy reading/task statuses to tag ids`; `tests/unit/progress.test.js › counts readings whose tag is in the done section`; `tests/unit/status.test.js › isProtectedTag protects the pending and studied tags of each kind`
+- Linked tests: `tests/unit/semester-manager.test.js › get-semester returns parsed JSON with default tags migrated in`; `tests/unit/semester-manager.test.js › migrateStatusToTagId rewrites legacy status strings to tag ids`; `tests/integration/ipc.test.js › get-semester migrates legacy reading/task statuses to tag ids`; `tests/unit/progress.test.js › counts readings whose tag is in the done section`; `tests/unit/status.test.js › isProtectedTag protects the pending tag of each kind`
 
 **US-037 — Tag management UI**
 - As a student, I want to add, rename, recolor, and reorder tags from the semester editor so that I can keep my tag set up to date.
@@ -340,16 +346,17 @@ Test references use the form `file › test name`.
 
 ---
 
-## Study Mode
+## Study Timer
 
-**US-038 — Study Mode**
-- As a student, I want to toggle Study Mode so that progress shows only items I have deeply studied.
+**US-038 — Pomodoro study timer**
+- As a student, I want to run a Pomodoro-style study timer against a course so that my study time is tracked automatically on whichever device I am using.
 - Acceptance criteria:
-  - [ ] A "Study Mode" toggle button in the header switches the mode on/off and persists across restarts.
-  - [ ] While on, only items tagged with the "studied" tag id (`r-studied` / `t-studied`) count toward progress.
-  - [ ] The status dropdown gains a distinct green "Studied" shortcut at the bottom while Study Mode is on.
-  - [ ] Turning Study Mode off restores the normal progress calculation without modifying any item.
-- Linked tests: `tests/unit/progress.test.js › counts only studied tags for readings and tasks`; `tests/unit/progress.test.js › does NOT count other done-section tags when study mode is on`; `tests/unit/progress.test.js › does not count ghost items when study mode is on`; `tests/unit/progress.test.js › omitting the third arg behaves identically to studyMode=false` (header toggle + dropdown shortcut verified manually)
+  - [ ] A timer control on each app opens a setup sheet to pick a course (or "Free study") and set focus, short-break and long-break lengths plus how many focus blocks precede a long break; the durations persist as defaults.
+  - [ ] Starting the timer morphs the control into a live countdown; tapping/clicking pauses and resumes, with separate skip and stop controls.
+  - [ ] Remaining time is derived from the session deadline, so a backgrounded, suspended or restarted app resumes showing the correct time.
+  - [ ] A completed focus block adds its full length to the course's studied time; a stopped or skipped block adds the elapsed time when it exceeds 30 seconds; free-study sessions are not tracked.
+  - [ ] Total studied time per course is shown on both apps and can be corrected by hand, with the difference recorded as an adjustment.
+- Linked tests: `packages/core/tests/unit/pomodoro-core.test.js` (settings clamping, phase transitions and long-break cadence, pause/resume, deadline arithmetic, session rehydration, study-time accumulation and adjustment, formatting and parsing). The timer UI on both platforms is verified manually.
 
 ---
 
@@ -398,7 +405,7 @@ Test references use the form `file › test name`.
   - [ ] A "Breakdown" toggle button in the dashboard header opens an inline panel.
   - [ ] The panel shows separate mini-bars for readings and tasks per course with done/total counts.
   - [ ] A "Total" summary row summarises the whole semester.
-  - [ ] The panel respects the current sort order and Study Mode.
+  - [ ] The panel respects the current sort order.
 - Linked tests: _none (UI; verified manually)_
 
 ---
@@ -496,7 +503,7 @@ Test references use the form `file › test name`.
 | US-035 | Session restore     | — (Electron smoke)                           | not covered   |
 | US-036 | Tags                | semester-manager.test.js, ipc.test.js, progress.test.js, status.test.js | covered |
 | US-037 | Tags                | status.test.js                               | partial       |
-| US-038 | Study Mode          | progress.test.js                             | partial       |
+| US-038 | Study Timer         | pomodoro-core.test.js                        | partial       |
 | US-039 | Sort                | —                                            | not covered   |
 | US-040 | Focus mode          | —                                            | not covered   |
 | US-041 | Views               | —                                            | not covered   |

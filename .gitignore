@@ -5,8 +5,28 @@ npm-debug.log*
 .claude/
 dist/
 coverage/
-assets/logo_raw/
-semesters/dev-test-semester.json
+packages/desktop/assets/logo_raw/
+packages/desktop/semesters/dev-test-semester.json
+.idea/
+
+# Supabase CLI
+supabase/.branches
+supabase/.temp
+supabase/.env
+**/.env
+
+# Vendored copies of @lectio/core for the renderer (see scripts/sync-core.js)
+packages/desktop/planner-core.js
+packages/desktop/pomodoro-core.js
+packages/desktop/migrate.js
+packages/desktop/conflict.js
+packages/desktop/moodle.js
+packages/desktop/moodle-client.js
+
+# Vendored supabase-js UMD bundle + generated renderer config (see scripts/sync-supabase.js).
+# The config holds the publishable anon key, kept out of git like the mobile .env.
+packages/desktop/supabase.js
+packages/desktop/supabase-config.js
 
 
 # Secrets / credentials (defensive — none used today)
@@ -23,3 +43,7 @@ credentials.*
 config/secrets.*
 # Output of scripts/gen-macos-signing-cert.sh (self-signed cert material)
 macos-signing/
+# Raw Moodle API responses from local Phase-13 PoC runs (spikes/moodle-poc)
+spikes/moodle-poc/output/
+# Mapper output from inspect-course.js — also real course data
+spikes/moodle-poc/inspect-result.json

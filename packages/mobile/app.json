@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "Lectio",
+    "slug": "lectio",
+    "version": "1.8.8",
+    "orientation": "default",
+    "scheme": "lectio",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.masprime77.lectio",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.masprime77.lectio",
+      "edgeToEdgeEnabled": true
+    },
+    "plugins": [
+      "expo-router",
+      "@react-native-community/datetimepicker",
+      "expo-sharing",
+      "expo-web-browser",
+      "expo-apple-authentication",
+      "expo-secure-store",
+      "expo-asset",
+      "expo-notifications",
+      "expo-screen-orientation"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/68cf77ab-e519-4e77-b02d-5159ccd1f9c3"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "68cf77ab-e519-4e77-b02d-5159ccd1f9c3"
+      }
+    },
+    "owner": "masprime77"
+  }
+}
