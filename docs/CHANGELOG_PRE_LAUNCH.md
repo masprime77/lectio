@@ -1,3 +1,13 @@
+# Pre-launch development history
+
+This file archives the internal development changelog from before the
+official 1.0.0 public launch (tags v1.0.0–v1.9.0). Several entries in this
+range are diagnostic or test-only releases with no functional changes.
+These builds were never publicly announced. For the live changelog going
+forward, see [`RELEASE_NOTES.md`](RELEASE_NOTES.md).
+
+---
+
 ## Unreleased
 
 - Replaced the mobile sign-in screen's two plain custom-styled provider buttons with **brand-compliant native buttons** (`app/sign-in.tsx`): "Continue with Apple" now renders Apple's own `expo-apple-authentication` `AppleAuthenticationButton` (black in light mode, white in dark mode, per Apple's App Store Review requirement to use their rendered component rather than a custom one), and "Continue with Google" now renders Google's pre-approved multicolor "G" logo asset (`assets/google-signin-light.png`/`google-signin-dark.png`, swapped by `useColorScheme()`) inside a plain `Pressable`, laid out with `resizeMode="contain"` so the logo's aspect ratio is preserved regardless of source pixel size. `handleProvider('google' | 'apple')` and the underlying `signInWithGoogle`/`signInWithApple` calls in `useAuth()` are unchanged — this is a visual swap only. The now-unused `btnProvider`/`btnProviderText` styles were removed and replaced with `googleBtn`/`googleBtnImage`/`appleBtn`.
