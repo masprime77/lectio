@@ -1,0 +1,256 @@
+// App-wide Pomodoro timer. Lives in a provider (not a screen) because mobile
+// screens unmount as you navigate, while the timer must survive navigation.
+//
+// The session's `endsAt` is authoritative (see @lectio/core/pomodoro-core), so
+// the 1s interval below only triggers a re-render and the AppState listener
+// only forces a recompute on foreground — neither has to reconstruct lost time
+// after the OS throttles or suspends the app.
+//
+// Session + durations persist to AsyncStorage via `prefs` (device-local).
+// The only thing written into the semester is the resulting studyTime, and
+// that goes through saveWithConflict like every other mobile write.
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import { Alert, AppState } from 'react-native';
+import {
+  addStudyTime,
+  advanceSession,
+  clampPomodoroSettings,
+  createIdleSession,
+  elapsedWorkSeconds,
+  isPaused,
+  isPhaseComplete,
+  pauseSession,
+  phaseDurationSeconds,
+  rehydrateSession,
+  remainingSeconds,
+  resumeSession,
+  skipPhase,
+  startSession,
+} from '@lectio/core/pomodoro-core';
+import { getCourses as getCoursesFromCore } from '@lectio/core/planner-core';
+import { storage } from '../storage';
+import { saveWithConflict } from '../sync/saveWithConflict';
+import { prefs } from '../lib/prefs';
+import type { PomodoroSession, PomodoroSettings, Semester } from '../../types/lectio-core';
+
+interface PomodoroContextValue {
+  session: PomodoroSession;
+  settings: PomodoroSettings;
+  /** Seconds left in the current phase; recomputed on every tick. */
+  remaining: number;
+  running: boolean;
+  paused: boolean;
+  start: (opts: {
+    settings: PomodoroSettings;
+    courseId: string | null;
+    semesterId: string | null;
+  }) => Promise<void>;
+  togglePause: () => void;
+  skip: () => void;
+  stop: () => void;
+}
+
+const PomodoroContext = createContext<PomodoroContextValue | null>(null);
+
+export function usePomodoro(): PomodoroContextValue {
+  const ctx = useContext(PomodoroContext);
+  if (!ctx) throw new Error('usePomodoro must be used inside <PomodoroProvider>');
+  return ctx;
+}
+
+export function PomodoroProvider({ children }: { children: ReactNode }) {
+  const [settings, setSettings] = useState<PomodoroSettings>(() => clampPomodoroSettings(null));
+  const [session, setSession] = useState<PomodoroSession>(() => createIdleSession());
+  const [remaining, setRemaining] = useState(0);
+
+  // The interval callback reads these through refs so it never needs to be
+  // torn down and rebuilt on every state change.
+  const sessionRef = useRef(session);
+  const settingsRef = useRef(settings);
+  sessionRef.current = session;
+  settingsRef.current = settings;
+
+  const applySession = useCallback((next: PomodoroSession) => {
+    sessionRef.current = next;
+    setSession(next);
+    setRemaining(remainingSeconds(next));
+    void prefs.setPomodoroSession(JSON.stringify(next));
+  }, []);
+
+  // Credit studied seconds to the session's course. No-ops for free study.
+  // Re-reads the semester from storage rather than trusting a screen's copy —
+  // the provider outlives every screen, so it may hold no semester at all.
+  const creditStudyTime = useCallback(async (s: PomodoroSession, seconds: number) => {
+    if (!s.courseId || !s.semesterId || seconds <= 0) return;
+    try {
+      const semester: Semester | null = await storage.get(s.semesterId);
+      if (!semester) return;
+      const next: Semester = JSON.parse(JSON.stringify(semester));
+      const course = getCoursesFromCore(next).find((c) => c.id === s.courseId);
+      if (!course) return;
+      addStudyTime(course, seconds, { source: 'pomodoro' });
+      await saveWithConflict(s.semesterId, next);
+    } catch (err) {
+      console.warn('pomodoro: could not credit study time', err);
+    }
+  }, []);
+
+  // Advance past a finished phase, crediting a completed focus block in full.
+  const completePhase = useCallback(
+    (s: PomodoroSession) => {
+      const finishedPhase = s.phase;
+      if (finishedPhase === 'work') {
+        void creditStudyTime(s, phaseDurationSeconds('work', settingsRef.current));
+      }
+      const next = advanceSession(s, settingsRef.current);
+      applySession(next);
+      if (AppState.currentState === 'active') {
+        const body =
+          finishedPhase === 'work'
+            ? 'Focus block complete — take a break.'
+            : 'Break over — back to it.';
+        Alert.alert('Study timer', body);
+      }
+    },
+    [applySession, creditStudyTime]
+  );
+
+  // Recompute now: advance if the deadline passed, otherwise just repaint.
+  const refresh = useCallback(() => {
+    const s = sessionRef.current;
+    if (s.phase === 'idle') return;
+    if (isPhaseComplete(s)) completePhase(s);
+    else setRemaining(remainingSeconds(s));
+  }, [completePhase]);
+
+  // Restore persisted settings + session on mount.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const [rawSettings, rawSession] = await Promise.all([
+        prefs.getPomodoroSettings(),
+        prefs.getPomodoroSession(),
+      ]);
+      if (!active) return;
+      let parsedSettings: unknown = null;
+      let parsedSession: unknown = null;
+      try {
+        parsedSettings = rawSettings ? JSON.parse(rawSettings) : null;
+      } catch {
+        parsedSettings = null;
+      }
+      try {
+        parsedSession = rawSession ? JSON.parse(rawSession) : null;
+      } catch {
+        parsedSession = null;
+      }
+      const nextSettings = clampPomodoroSettings(parsedSettings as Partial<PomodoroSettings>);
+      settingsRef.current = nextSettings;
+      setSettings(nextSettings);
+
+      // rehydrateSession collapses anything stale or malformed to idle, but
+      // returns an expired *work* phase intact so its time is still credited.
+      const restored = rehydrateSession(parsedSession);
+      sessionRef.current = restored;
+      setSession(restored);
+      setRemaining(remainingSeconds(restored));
+      if (restored.phase !== 'idle' && isPhaseComplete(restored)) completePhase(restored);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [completePhase]);
+
+  // 1s repaint while a session is running. Nothing decrements here.
+  useEffect(() => {
+    if (session.phase === 'idle' || isPaused(session)) return;
+    const id = setInterval(refresh, 1000);
+    return () => clearInterval(id);
+  }, [session.phase, session.pausedAt, session.endsAt, refresh]);
+
+  // Foreground recompute: the interval may have been throttled or stopped
+  // entirely while backgrounded, so re-derive from the deadline on return.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') refresh();
+    });
+    return () => sub.remove();
+  }, [refresh]);
+
+  const start = useCallback(
+    async (opts: {
+      settings: PomodoroSettings;
+      courseId: string | null;
+      semesterId: string | null;
+    }) => {
+      const clamped = clampPomodoroSettings(opts.settings);
+      settingsRef.current = clamped;
+      setSettings(clamped);
+      await prefs.setPomodoroSettings(JSON.stringify(clamped));
+      applySession(
+        startSession(clamped, {
+          courseId: opts.courseId,
+          semesterId: opts.courseId ? opts.semesterId : null,
+        })
+      );
+    },
+    [applySession]
+  );
+
+  const togglePause = useCallback(() => {
+    const s = sessionRef.current;
+    if (s.phase === 'idle') return;
+    applySession(isPaused(s) ? resumeSession(s) : pauseSession(s));
+  }, [applySession]);
+
+  // Skipping or stopping mid-focus still credits what was actually worked,
+  // ignored under 30s so a mis-tap does not litter the session log.
+  const creditPartial = useCallback(
+    (s: PomodoroSession) => {
+      if (s.phase !== 'work') return;
+      const elapsed = elapsedWorkSeconds(s, settingsRef.current);
+      if (elapsed >= 30) void creditStudyTime(s, elapsed);
+    },
+    [creditStudyTime]
+  );
+
+  const skip = useCallback(() => {
+    const s = sessionRef.current;
+    if (s.phase === 'idle') return;
+    creditPartial(s);
+    applySession(skipPhase(s, settingsRef.current));
+  }, [applySession, creditPartial]);
+
+  const stop = useCallback(() => {
+    const s = sessionRef.current;
+    if (s.phase === 'idle') return;
+    creditPartial(s);
+    applySession(createIdleSession());
+  }, [applySession, creditPartial]);
+
+  return (
+    <PomodoroContext.Provider
+      value={{
+        session,
+        settings,
+        remaining,
+        running: session.phase !== 'idle' && !isPaused(session),
+        paused: isPaused(session),
+        start,
+        togglePause,
+        skip,
+        stop,
+      }}
+    >
+      {children}
+    </PomodoroContext.Provider>
+  );
+}

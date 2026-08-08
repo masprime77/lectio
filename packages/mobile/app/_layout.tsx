@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from '../src/auth/AuthProvider';
 import { TutorialProvider, useTutorial } from '../src/tutorial/TutorialProvider';
 import { TutorialOverlay } from '../src/tutorial/TutorialOverlay';
 import { ConflictProvider } from '../src/sync/ConflictProvider';
+import { PomodoroProvider } from '../src/pomodoro/PomodoroProvider';
 import { ConflictDialog } from '../src/sync/ConflictDialog';
 import { prefs } from '../src/lib/prefs';
 import { useTheme } from '../src/theme';
@@ -126,7 +127,9 @@ export default function RootLayout() {
     <AuthProvider>
       <TutorialProvider>
         <ConflictProvider>
-          <AppShell />
+          <PomodoroProvider>
+            <AppShell />
+          </PomodoroProvider>
         </ConflictProvider>
       </TutorialProvider>
     </AuthProvider>
