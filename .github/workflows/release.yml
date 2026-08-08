@@ -37,11 +37,20 @@ jobs:
       # signing identity, which is what lets Squirrel.Mac auto-update between
       # builds. Without the secret this step is skipped and the build falls back
       # to ad-hoc signing. See docs/MACOS_SIGNING.md.
+      #
+      # Skipped entirely when CSC_LINK is configured: on the real Developer ID
+      # path afterPack no-ops, so MAC_SIGN_IDENTITY would go unused anyway, and
+      # this step makes its own keychain the DEFAULT one — which risks shadowing
+      # the Developer ID identity electron-builder imports from CSC_LINK.
       - name: Import self-signed signing certificate
         env:
           MAC_CSC_P12_BASE64: ${{ secrets.MAC_CSC_P12_BASE64 }}
           MAC_CSC_PASSWORD: ${{ secrets.MAC_CSC_PASSWORD }}
-        if: ${{ env.MAC_CSC_P12_BASE64 != '' }}
+          # The secrets context isn't available in a step-level `if`, so surface
+          # "is real signing configured?" as a plain env flag (same trick the
+          # MAC_CSC_P12_BASE64 check below already relies on).
+          HAS_REAL_SIGNING: ${{ secrets.CSC_LINK != '' }}
+        if: ${{ env.MAC_CSC_P12_BASE64 != '' && env.HAS_REAL_SIGNING != 'true' }}
         run: |
           set -euo pipefail
           KEYCHAIN=build.keychain
@@ -73,9 +82,14 @@ jobs:
           # GitHub token so electron-builder can publish release assets,
           # including the latest-mac.yml metadata electron-updater reads.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Don't let electron-builder hunt for an Apple identity via keychain
-          # search; it still uses CSC_LINK explicitly below when present.
-          CSC_IDENTITY_AUTO_DISCOVERY: false
+          # false disables macOS code signing outright in electron-builder — it
+          # does NOT merely stop the keychain search, and it wins even when
+          # CSC_LINK is set (the build then logs "skipped macOS application code
+          # signing ... CSC_IDENTITY_AUTO_DISCOVERY=false" and ships an ad-hoc
+          # bundle). So only disable it on the free path, where afterPack.js does
+          # the signing; when CSC_LINK is configured, leave discovery on so
+          # electron-builder actually signs with the Developer ID cert it imports.
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' && 'true' || 'false' }}
           # Real Developer ID signing + notarization (preferred path). When all
           # of these are set, electron-builder signs with the Developer ID
           # Application cert (Hardened Runtime + entitlements now configured
