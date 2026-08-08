@@ -1,5 +1,6 @@
 ## Unreleased
 
+- Added a **tablet breakpoint hook** (`useIsTablet`, `src/lib/use-tablet.ts`) that reports whether the mobile app's viewport is at least 768pt wide — the foundation for an upcoming iPad two-pane layout — and **unlocked landscape rotation on iPad only**: iPhone remains locked to portrait via a new `useOrientationLock` hook (wired into `AppShell` in `_layout.tsx`), while iPad is left free to rotate so a real side-by-side pane can use the extra landscape width. `expo-screen-orientation` was added (`npx expo install`, SDK 56-compatible `~56.0.5`) and `app.json`'s `expo.orientation` changed from `"portrait"` to `"default"` to allow rotation at the config level, with per-device locking enforced at runtime instead.
 - Added a **Support** link (GitHub Issues) to the landing page footer, next to the existing Source/Releases links.
 - Marked the landing page's macOS Gatekeeper warning (`.mac-note`) with a `TODO` comment so it's easy to find and remove once real Apple notarization secrets are configured in CI and a signed release has shipped — the warning itself is still accurate today and was left unchanged.
 - Linked the existing **Legal Notice** and **Privacy Policy** documents (English versions) from the landing page footer.
