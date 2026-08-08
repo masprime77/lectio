@@ -16,6 +16,17 @@ const state = {
   breakdownOpen: false, // progress breakdown panel visibility
   tutorialStep: 0,   // current step index (0-based)
   tutorialActive: false, // whether the overlay is visible
+  // Pomodoro study timer. `session` is core's deadline-based state; `settings`
+  // and the live session both persist to settings.json (device-local UI state
+  // — never into the semester blob). `intervalId` only drives repaints.
+  // The idle session is built through `window.PomodoroCore` rather than the
+  // destructured alias below: that `const` is declared further down this file
+  // and would still be in its temporal dead zone here.
+  pomodoro: {
+    settings: null,
+    session: window.PomodoroCore.createIdleSession(),
+    intervalId: null,
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -345,6 +356,34 @@ const {
   courseProgress, uid, addCourse, deleteCourse, addItem,
 } = window.PlannerCore;
 
+// Pomodoro timer + study time. `isRunning`/`isPaused` are aliased because
+// app.js is global-scoped and those names are too generic to claim.
+// getCourseStudySeconds / setStudyTime / formatHoursMinutes /
+// parseHoursMinutesInput are unused until the course-view work lands.
+const {
+  clampPomodoroSettings,
+  createIdleSession,
+  startSession,
+  remainingSeconds,
+  isRunning: pomodoroIsRunning,
+  isPaused: pomodoroIsPaused,
+  isPhaseComplete,
+  pauseSession,
+  resumeSession,
+  elapsedWorkSeconds,
+  advanceSession,
+  skipPhase,
+  phaseLabel,
+  rehydrateSession,
+  phaseDurationSeconds,
+  addStudyTime,
+  getCourseStudySeconds,
+  setStudyTime,
+  formatClock,
+  formatHoursMinutes,
+  parseHoursMinutesInput,
+} = window.PomodoroCore;
+
 // ---------------------------------------------------------------------------
 // Tabler icons (inline SVG — no external dependency, works offline)
 // ---------------------------------------------------------------------------
@@ -383,6 +422,14 @@ const ICONS = {
     '<path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M11.5 21h-4.5a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v5m-5 6h7m-3 -3l3 3l-3 3" />',
   'file-import':
     '<path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M5 13v-8a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-5.5m-9.5 -2h7m-3 -3l-3 3l3 3" />',
+  clock:
+    '<path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M12 7v5l3 3" />',
+  'player-pause':
+    '<path d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z" /><path d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z" />',
+  'player-play': '<path d="M7 4v16l13 -8z" />',
+  'player-stop':
+    '<path d="M5 5m0 2a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2z" />',
+  'player-skip-forward': '<path d="M4 5v14l12 -7z" /><path d="M20 5l0 14" />',
 };
 
 function icon(name) {
@@ -1635,6 +1682,7 @@ async function init() {
 
   setupViewToggle();
   setupSort();
+  setupPomodoro();
   setupTheme();
   setupModal();
   setupNewBtn();
@@ -1868,6 +1916,263 @@ function setupSort() {
       renderPlanner();
     }
   });
+}
+
+// ---------------------------------------------------------------------------
+// Pomodoro study timer
+//
+// The session's deadline (`endsAt`) is the source of truth, so the interval
+// below is only a repaint trigger — a suspended machine self-corrects on wake.
+// Session + durations persist to settings.json (device-local); only the
+// resulting studied time is written into the semester.
+// ---------------------------------------------------------------------------
+
+const POMODORO_TICK_MS = 1000;
+
+async function readSettingsFile() {
+  if (!window.settings) return {};
+  return (await window.settings.get()) || {};
+}
+
+async function writeSettingsPatch(patch) {
+  if (!window.settings) return;
+  const current = await readSettingsFile();
+  await window.settings.save({ ...current, ...patch });
+}
+
+async function setupPomodoro() {
+  const saved = await readSettingsFile();
+  state.pomodoro.settings = clampPomodoroSettings(saved.pomodoro);
+  state.pomodoro.session = rehydrateSession(saved.pomodoroSession);
+
+  document.getElementById('pomodoro-btn')
+    .addEventListener('click', onPomodoroPrimaryClick);
+  document.getElementById('pomodoro-stop-btn')
+    .addEventListener('click', () => stopPomodoro(true));
+  document.getElementById('pomodoro-skip-btn')
+    .addEventListener('click', onPomodoroSkip);
+
+  const overlay = document.getElementById('pomodoro-overlay');
+  const closeBtn = document.getElementById('pomodoro-close');
+  closeBtn.innerHTML = icon('x');
+  closeBtn.addEventListener('click', closePomodoroModal);
+  document.getElementById('pomodoro-cancel').addEventListener('click', closePomodoroModal);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closePomodoroModal();
+  });
+  document.getElementById('pomodoro-start').addEventListener('click', startPomodoroFromModal);
+
+  // A session restored from a previous launch keeps running.
+  if (state.pomodoro.session.phase !== 'idle') {
+    // A work phase that expired while the app was closed still owes its time.
+    if (isPhaseComplete(state.pomodoro.session)) handlePomodoroPhaseComplete();
+    if (state.pomodoro.session.phase !== 'idle') startPomodoroTicking();
+  }
+  renderPomodoroControl();
+}
+
+function persistPomodoroSession() {
+  writeSettingsPatch({ pomodoroSession: state.pomodoro.session }).catch((err) =>
+    console.warn('pomodoro session save failed', err)
+  );
+}
+
+function onPomodoroPrimaryClick() {
+  const s = state.pomodoro.session;
+  if (s.phase === 'idle') {
+    openPomodoroModal();
+    return;
+  }
+  state.pomodoro.session = pomodoroIsPaused(s) ? resumeSession(s) : pauseSession(s);
+  persistPomodoroSession();
+  renderPomodoroControl();
+}
+
+function onPomodoroSkip() {
+  const s = state.pomodoro.session;
+  if (s.phase === 'idle') return;
+  // Skipping out of a focus block still credits the time actually worked.
+  if (s.phase === 'work') creditElapsedWork(s);
+  state.pomodoro.session = skipPhase(s, state.pomodoro.settings);
+  if (state.pomodoro.session.phase === 'idle') stopPomodoroTicking();
+  persistPomodoroSession();
+  renderPomodoroControl();
+}
+
+function openPomodoroModal() {
+  const select = document.getElementById('pomodoro-course-select');
+  select.innerHTML = '<option value="">Free study (no course)</option>';
+  if (state.semester) {
+    sortedCourses(state.semester.courses).forEach((c) => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name;
+      select.appendChild(opt);
+    });
+  }
+  // Preselect the focused course when the user is already concentrating on one.
+  if (state.focusedCourseId) select.value = state.focusedCourseId;
+
+  const s = state.pomodoro.settings;
+  document.getElementById('pomodoro-work-min').value = s.workMinutes;
+  document.getElementById('pomodoro-short-min').value = s.shortBreakMinutes;
+  document.getElementById('pomodoro-long-min').value = s.longBreakMinutes;
+  document.getElementById('pomodoro-count').value = s.pomodorosUntilLongBreak;
+
+  document.getElementById('pomodoro-hint').textContent = state.semester
+    ? 'Time is added to the chosen course when a focus block finishes. Free study is not tracked.'
+    : 'Open a semester first to track time against a course.';
+
+  document.getElementById('pomodoro-overlay').classList.remove('hidden');
+  document.getElementById('pomodoro-start').focus();
+}
+
+function closePomodoroModal() {
+  document.getElementById('pomodoro-overlay').classList.add('hidden');
+}
+
+async function startPomodoroFromModal() {
+  const settings = clampPomodoroSettings({
+    workMinutes: document.getElementById('pomodoro-work-min').value,
+    shortBreakMinutes: document.getElementById('pomodoro-short-min').value,
+    longBreakMinutes: document.getElementById('pomodoro-long-min').value,
+    pomodorosUntilLongBreak: document.getElementById('pomodoro-count').value,
+  });
+  state.pomodoro.settings = settings;
+
+  const courseId = document.getElementById('pomodoro-course-select').value || null;
+  state.pomodoro.session = startSession(settings, {
+    courseId,
+    semesterId: courseId ? state.semesterId : null,
+  });
+
+  await writeSettingsPatch({
+    pomodoro: settings,
+    pomodoroSession: state.pomodoro.session,
+  });
+
+  closePomodoroModal();
+  startPomodoroTicking();
+  renderPomodoroControl();
+}
+
+function startPomodoroTicking() {
+  stopPomodoroTicking();
+  state.pomodoro.intervalId = setInterval(onPomodoroTick, POMODORO_TICK_MS);
+}
+
+function stopPomodoroTicking() {
+  if (state.pomodoro.intervalId) clearInterval(state.pomodoro.intervalId);
+  state.pomodoro.intervalId = null;
+}
+
+// Repaint only. `endsAt` is authoritative, so nothing here decrements state.
+function onPomodoroTick() {
+  if (isPhaseComplete(state.pomodoro.session)) handlePomodoroPhaseComplete();
+  renderPomodoroControl();
+}
+
+function handlePomodoroPhaseComplete() {
+  const finished = state.pomodoro.session;
+  const finishedPhase = finished.phase;
+  if (finishedPhase === 'work') {
+    // A completed block always credits its full configured length, even if the
+    // app was closed or asleep when the deadline passed.
+    creditStudySeconds(finished, phaseDurationSeconds('work', state.pomodoro.settings));
+  }
+  notifyPomodoroPhase(finishedPhase);
+  state.pomodoro.session = advanceSession(finished, state.pomodoro.settings);
+  if (state.pomodoro.session.phase === 'idle') stopPomodoroTicking();
+  persistPomodoroSession();
+}
+
+// Credit however much of the current focus block has actually elapsed. Used
+// when a block is stopped or skipped part-way; ignored under 30s so an
+// accidental start-then-stop does not litter the session log.
+function creditElapsedWork(session) {
+  const elapsed = elapsedWorkSeconds(session, state.pomodoro.settings);
+  if (elapsed >= 30) creditStudySeconds(session, elapsed);
+}
+
+// Write studied seconds onto the session's course. No-ops for a free-study
+// session, and refuses to write if the loaded semester is no longer the one the
+// session was started against — otherwise switching semesters mid-session would
+// credit the wrong course.
+function creditStudySeconds(session, seconds) {
+  if (!session.courseId || !session.semesterId) return;
+  if (!state.semester || state.semesterId !== session.semesterId) return;
+  const course = state.semester.courses.find((c) => c.id === session.courseId);
+  if (!course) return;
+  addStudyTime(course, seconds, { source: 'pomodoro' });
+  persist();
+  renderDashboard();
+  if (state.view === 'course') renderPlanner();
+}
+
+// Stop the session. `creditPartial` is true for the user-facing stop button so
+// a part-finished focus block still counts.
+function stopPomodoro(creditPartial) {
+  const s = state.pomodoro.session;
+  if (s.phase === 'idle') return;
+  if (creditPartial && s.phase === 'work') creditElapsedWork(s);
+  stopPomodoroTicking();
+  state.pomodoro.session = createIdleSession();
+  persistPomodoroSession();
+  renderPomodoroControl();
+}
+
+// Best-effort desktop notification on a phase change. Never throws — the
+// renderer may have no Notification permission, and this is not critical.
+function notifyPomodoroPhase(finishedPhase) {
+  try {
+    if (typeof Notification === 'undefined') return;
+    const body = {
+      work: 'Focus block complete — take a break.',
+      shortBreak: 'Break over — back to it.',
+      longBreak: 'Long break over — back to it.',
+    }[finishedPhase];
+    if (body) new Notification('Lectio', { body });
+  } catch (e) {
+    /* notifications unavailable — non-critical */
+  }
+}
+
+function renderPomodoroControl() {
+  const btn = document.getElementById('pomodoro-btn');
+  const stopBtn = document.getElementById('pomodoro-stop-btn');
+  const skipBtn = document.getElementById('pomodoro-skip-btn');
+  if (!btn) return;
+  const s = state.pomodoro.session;
+  const idle = s.phase === 'idle';
+
+  stopBtn.classList.toggle('hidden', idle);
+  skipBtn.classList.toggle('hidden', idle);
+  if (!idle) {
+    stopBtn.innerHTML = icon('player-stop');
+    skipBtn.innerHTML = icon('player-skip-forward');
+  }
+
+  btn.classList.remove('pomodoro-btn--work', 'pomodoro-btn--break', 'pomodoro-btn--paused');
+
+  if (idle) {
+    btn.innerHTML = `${icon('clock')}<span>Study timer</span>`;
+    btn.title = 'Start a study timer';
+    return;
+  }
+
+  const paused = pomodoroIsPaused(s);
+  const course =
+    s.courseId && state.semester ? state.semester.courses.find((c) => c.id === s.courseId) : null;
+  const label = s.phase === 'work' ? (course ? course.name : 'Free study') : phaseLabel(s.phase);
+
+  btn.classList.add(s.phase === 'work' ? 'pomodoro-btn--work' : 'pomodoro-btn--break');
+  if (paused) btn.classList.add('pomodoro-btn--paused');
+
+  btn.innerHTML =
+    `${icon(paused ? 'player-play' : 'player-pause')}` +
+    `<span class="pomodoro-clock">${formatClock(remainingSeconds(s))}</span>` +
+    `<span class="pomodoro-label">${escapeHtml(label)}</span>`;
+  btn.title = paused ? 'Resume' : 'Pause';
 }
 
 // Shown when there are no semester files left.

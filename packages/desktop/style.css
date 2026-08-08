@@ -276,7 +276,8 @@ body.electron-app .header-inner { padding-left: 80px; }
 .header-controls .collapse-btn,
 .header-controls .semester-select,
 .header-controls #sort-select,
-.header-controls .semester-action-btn {
+.header-controls .semester-action-btn,
+.header-controls .pomodoro-btn {
   height: 32px;
   box-sizing: border-box;
   padding-top: 0;
@@ -284,6 +285,48 @@ body.electron-app .header-inner { padding-left: 80px; }
   display: inline-flex;
   align-items: center;
 }
+/* --- Pomodoro study timer ------------------------------------------------ */
+.pomodoro-control { display: flex; align-items: center; gap: 0.25rem; }
+
+.pomodoro-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+.pomodoro-btn .pomodoro-clock {
+  font-variant-numeric: tabular-nums; /* stops the width jittering each second */
+  font-weight: 600;
+}
+.pomodoro-btn .pomodoro-label {
+  max-width: 10ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.75;
+}
+.pomodoro-btn--work {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.pomodoro-btn--break {
+  border-color: var(--st-done);
+  color: var(--st-done);
+}
+.pomodoro-btn--paused { opacity: 0.65; }
+.pomodoro-aux { padding: 0.2rem 0.3rem; }
+.pomodoro-aux .ti { width: 16px; height: 16px; }
+
+.pomodoro-modal { min-width: 380px; }
+.pomodoro-field { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 0.75rem; }
+.pomodoro-field > span { font-size: 0.8rem; color: var(--muted); }
+.pomodoro-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 0.75rem;
+}
+.pomodoro-hint { font-size: 0.75rem; color: var(--muted); margin: 0 0 0.5rem; }
+
 .selector-group { display: flex; gap: 0.25rem; align-items: center; }
 
 /* Semester action buttons: paired pill that visually attaches to the select */

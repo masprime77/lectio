@@ -109,6 +109,14 @@
           <button type="button" id="collapse-all-btn" class="collapse-btn" title="Collapse all weeks" aria-label="Collapse all weeks"></button>
           <button type="button" id="expand-current-btn" class="collapse-btn" title="Expand current week only" aria-label="Expand current week only"></button>
         </div>
+        <div class="pomodoro-control" id="pomodoro-control">
+          <button type="button" id="pomodoro-btn" class="btn btn-small pomodoro-btn"
+                  title="Start a study timer" aria-label="Start a study timer"></button>
+          <button type="button" id="pomodoro-skip-btn" class="icon-btn pomodoro-aux hidden"
+                  title="Skip to next phase" aria-label="Skip to next phase"></button>
+          <button type="button" id="pomodoro-stop-btn" class="icon-btn pomodoro-aux hidden"
+                  title="Stop timer" aria-label="Stop timer"></button>
+        </div>
         <select id="sort-select" title="Sort courses" aria-label="Sort courses">
           <option value="week-desc">Weeks: high to low</option>
           <option value="week-asc">Weeks: low to high</option>
@@ -282,6 +290,51 @@
           </div>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Pomodoro setup: choose a course and the session/break lengths. -->
+  <div id="pomodoro-overlay" class="modal-overlay hidden">
+    <div class="modal pomodoro-modal" role="dialog" aria-modal="true"
+         aria-labelledby="pomodoro-title">
+      <div class="settings-header">
+        <h2 id="pomodoro-title">Study timer</h2>
+        <button id="pomodoro-close" class="icon-btn" aria-label="Close"></button>
+      </div>
+
+      <label class="pomodoro-field">
+        <span>Course</span>
+        <select id="pomodoro-course-select"></select>
+      </label>
+
+      <div class="pomodoro-grid">
+        <label class="pomodoro-field">
+          <span>Focus (min)</span>
+          <input type="number" id="pomodoro-work-min" min="1" max="180" step="1" />
+        </label>
+        <label class="pomodoro-field">
+          <span>Short break (min)</span>
+          <input type="number" id="pomodoro-short-min" min="1" max="60" step="1" />
+        </label>
+        <label class="pomodoro-field">
+          <span>Long break (min)</span>
+          <input type="number" id="pomodoro-long-min" min="1" max="90" step="1" />
+        </label>
+        <label class="pomodoro-field">
+          <span>Focus blocks before long break</span>
+          <input type="number" id="pomodoro-count" min="1" max="12" step="1" />
+        </label>
+      </div>
+
+      <p class="pomodoro-hint" id="pomodoro-hint"></p>
+
+      <div class="modal-actions">
+        <div class="modal-actions-left"></div>
+        <div class="modal-actions-right">
+          <button type="button" id="pomodoro-cancel" class="btn">Cancel</button>
+          <button type="button" id="pomodoro-start" class="btn btn-primary">Start</button>
+        </div>
+      </div>
     </div>
   </div>
 
