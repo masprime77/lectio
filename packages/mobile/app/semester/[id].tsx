@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -17,8 +17,12 @@ import { storage } from '../../src/storage';
 import { saveWithConflict } from '../../src/sync/saveWithConflict';
 import { prefs } from '../../src/lib/prefs';
 import { useSortOrder } from '../../src/lib/use-sort-order';
+import { useIsTablet } from '../../src/lib/use-tablet';
 import { useTheme } from '../../src/theme';
 import { CourseBreakdown } from '../../src/components/CourseBreakdown';
+import { CourseDetailBody } from '../../src/components/course-detail/CourseDetailBody';
+import { CourseDetailHeaderActions } from '../../src/components/course-detail/CourseDetailHeaderActions';
+import { useCourseDetail } from '../../src/components/course-detail/useCourseDetail';
 import { ExportIcon } from '../../src/components/ExportIcon';
 import { Fab } from '../../src/components/Fab';
 import { PomodoroFab } from '../../src/pomodoro/PomodoroFab';
@@ -60,6 +64,8 @@ export default function CoursesScreen() {
   // Per-screen toggle (need not persist); default closed so the list stays
   // clean, mirroring the desktop's state.breakdownOpen.
   const [breakdownOpen, setBreakdownOpen] = useState(false);
+  const isTablet = useIsTablet();
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
 
   const reload = useCallback(() => {
     return storage
@@ -204,6 +210,85 @@ export default function CoursesScreen() {
   // semester JSON's on-disk course order is never touched.
   const visibleCourses = semester ? sortedCourses(courses, semester, sortOrder) : [];
 
+  useEffect(() => {
+    if (!isTablet) return;
+    if (selectedCourseId && courses.some((c) => c.id === selectedCourseId)) return;
+    setSelectedCourseId(courses[0]?.id ?? null);
+  }, [isTablet, courses, selectedCourseId]);
+
+  const detail = useCourseDetail(semester, selectedCourseId ?? '', persist);
+
+  const listEmpty = semester ? (
+    <View style={styles.emptyWrap}>
+      <Text style={{ color: theme.muted }}>No courses.</Text>
+      <Pressable
+        style={[styles.emptyBtn, { backgroundColor: theme.accent }]}
+        onPress={() => router.push(`/semester/course-form?id=${id}`)}
+      >
+        <Text style={styles.emptyBtnText}>Add a course</Text>
+      </Pressable>
+    </View>
+  ) : null;
+
+  const renderCourse = ({ item }: { item: Course }) => {
+    const progress = courseProgress(item, semester!);
+    return (
+      <SwipeableRow
+        enabled={!editing}
+        editColor={theme.accent}
+        onEdit={() => router.push(`/semester/course-form?id=${id}&courseId=${item.id}`)}
+        onDelete={() => confirmDeleteCourse(item)}
+      >
+        <Pressable
+          onPress={() => {
+            if (editing) {
+              toggleSelect(item.id);
+              return;
+            }
+            if (isTablet) {
+              setSelectedCourseId(item.id);
+              return;
+            }
+            router.push(`/semester/${id}/course/${item.id}`);
+          }}
+          onLongPress={editing ? undefined : () => showCourseActions(item)}
+          style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}
+        >
+          <View style={styles.cardHeader}>
+            {editing && (
+              <View
+                style={[
+                  styles.selectCircle,
+                  { borderColor: theme.border },
+                  selected.has(item.id) && {
+                    backgroundColor: theme.accent,
+                    borderColor: theme.accent,
+                  },
+                ]}
+              />
+            )}
+            <View
+              style={[styles.dot, { backgroundColor: item.color || theme.accent }]}
+            />
+            <Text style={[styles.cardTitle, { color: theme.text }]}>
+              {item.name}
+            </Text>
+          </View>
+          <ProgressBar value={progress} color={item.color} />
+          <Text style={[styles.meta, { color: theme.muted }]}>
+            {progress}% · {item.readings.length} readings · {item.tasks.length} tasks
+            {getCourseStudySeconds(item) > 0
+              ? ` · ${formatHoursMinutes(getCourseStudySeconds(item))} studied`
+              : ''}
+          </Text>
+          {breakdownOpen && (
+            <CourseBreakdown course={item} semester={semester!} />
+          )}
+        </Pressable>
+      </SwipeableRow>
+    );
+  };
+
   return (
     <>
       <Stack.Screen
@@ -259,77 +344,59 @@ export default function CoursesScreen() {
             ),
         }}
       />
-      <FlatList
-        style={{ backgroundColor: theme.background }}
-        contentContainerStyle={styles.list}
-        data={visibleCourses}
-        keyExtractor={(c) => c.id}
-        ListEmptyComponent={
-          semester ? (
-            <View style={styles.emptyWrap}>
-              <Text style={{ color: theme.muted }}>No courses.</Text>
-              <Pressable
-                style={[styles.emptyBtn, { backgroundColor: theme.accent }]}
-                onPress={() => router.push(`/semester/course-form?id=${id}`)}
-              >
-                <Text style={styles.emptyBtnText}>Add a course</Text>
-              </Pressable>
-            </View>
-          ) : null
-        }
-        renderItem={({ item }) => {
-          const progress = courseProgress(item, semester!);
-          return (
-            <SwipeableRow
-              enabled={!editing}
-              editColor={theme.accent}
-              onEdit={() => router.push(`/semester/course-form?id=${id}&courseId=${item.id}`)}
-              onDelete={() => confirmDeleteCourse(item)}
-            >
-              <Pressable
-                onPress={() =>
-                  editing
-                    ? toggleSelect(item.id)
-                    : router.push(`/semester/${id}/course/${item.id}`)
-                }
-                onLongPress={editing ? undefined : () => showCourseActions(item)}
-                style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}
-              >
-                <View style={styles.cardHeader}>
-                  {editing && (
-                    <View
-                      style={[
-                        styles.selectCircle,
-                        { borderColor: theme.border },
-                        selected.has(item.id) && {
-                          backgroundColor: theme.accent,
-                          borderColor: theme.accent,
-                        },
-                      ]}
-                    />
-                  )}
-                  <View
-                    style={[styles.dot, { backgroundColor: item.color || theme.accent }]}
-                  />
-                  <Text style={[styles.cardTitle, { color: theme.text }]}>
-                    {item.name}
+      {isTablet ? (
+        <View style={styles.splitRow}>
+          <View style={[styles.leftPane, { borderColor: theme.border }]}>
+            <FlatList
+              style={{ backgroundColor: theme.background }}
+              contentContainerStyle={styles.list}
+              data={visibleCourses}
+              keyExtractor={(c) => c.id}
+              ListEmptyComponent={listEmpty}
+              renderItem={renderCourse}
+            />
+          </View>
+          <View style={[styles.rightPane, { backgroundColor: theme.background }]}>
+            {detail.course ? (
+              <>
+                <View style={[styles.paneHeader, { borderColor: theme.border }]}>
+                  <Text
+                    style={[styles.paneTitle, { color: theme.text }]}
+                    numberOfLines={1}
+                  >
+                    {detail.course.name}
                   </Text>
+                  <CourseDetailHeaderActions
+                    editing={detail.editing}
+                    selectedCount={detail.selected.size}
+                    hasItems={detail.hasItems}
+                    onToggleEditing={detail.toggleEditing}
+                    onBatchDelete={detail.batchDelete}
+                    onExport={detail.handleExportCourse}
+                    onSortPress={() => detail.setSortMenuOpen(true)}
+                  />
                 </View>
-                <ProgressBar value={progress} color={item.color} />
-                <Text style={[styles.meta, { color: theme.muted }]}>
-                  {progress}% · {item.readings.length} readings · {item.tasks.length} tasks
-                  {getCourseStudySeconds(item) > 0
-                    ? ` · ${formatHoursMinutes(getCourseStudySeconds(item))} studied`
-                    : ''}
+                <CourseDetailBody result={detail} embedded />
+              </>
+            ) : (
+              <View style={styles.emptyDetail}>
+                <Text style={{ color: theme.muted }}>
+                  Select a course to see its readings and tasks.
                 </Text>
-                {breakdownOpen && (
-                  <CourseBreakdown course={item} semester={semester!} />
-                )}
-              </Pressable>
-            </SwipeableRow>
-          );
-        }}
-      />
+              </View>
+            )}
+          </View>
+        </View>
+      ) : (
+        <FlatList
+          style={{ backgroundColor: theme.background }}
+          contentContainerStyle={styles.list}
+          data={visibleCourses}
+          keyExtractor={(c) => c.id}
+          ListEmptyComponent={listEmpty}
+          renderItem={renderCourse}
+        />
+      )}
       <SortMenu
         visible={sortMenuOpen}
         current={sortOrder}
@@ -360,6 +427,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   emptyBtnText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+  splitRow: { flex: 1, flexDirection: 'row' },
+  leftPane: { width: 380, borderRightWidth: StyleSheet.hairlineWidth },
+  rightPane: { flex: 1 },
+  paneHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 12,
+  },
+  paneTitle: { fontSize: 20, fontWeight: '700', flexShrink: 1 },
+  emptyDetail: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 14, marginRight: 4 },
   card: {
     padding: 16,
