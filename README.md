@@ -76,9 +76,6 @@ item tags) — see [Mobile app](#mobile-app) and
   tags ("pending" / "studied") cannot be renamed or deleted but can be recolored.
   Custom tags can be added, renamed, recolored, and dragged to reorder in the
   Tags tab of the semester modal.
-- **Study Mode** — header toggle (persisted) that narrows progress to items
-  tagged "studied" only. A green "Studied" shortcut appears at the bottom of the
-  status dropdown while Study Mode is on.
 - **Sort control** — order courses by progress (↓/↑), alphabetically (A → Z /
   Z → A), or by week (↑/↓). Persists in `localStorage`; never rewrites the JSON
   file. Progress and alphabetical sorts apply to the dashboard and All Courses

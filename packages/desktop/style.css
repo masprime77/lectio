@@ -276,8 +276,7 @@ body.electron-app .header-inner { padding-left: 80px; }
 .header-controls .collapse-btn,
 .header-controls .semester-select,
 .header-controls #sort-select,
-.header-controls .semester-action-btn,
-.header-controls .study-mode-btn {
+.header-controls .semester-action-btn {
   height: 32px;
   box-sizing: border-box;
   padding-top: 0;
@@ -661,18 +660,6 @@ body.electron-app .header-inner { padding-left: 80px; }
   text-transform: capitalize;
 }
 
-/* Study Mode toggle */
-.study-mode-btn {
-  border-color: var(--border);
-  color: var(--muted);
-  transition: background 0.15s, color 0.15s;
-}
-.study-mode-btn.study-mode-on {
-  background: var(--primary);
-  color: var(--on-accent);
-  border-color: var(--primary);
-}
-
 /* Tag dropdown */
 .tag-dropdown-wrapper { position: relative; display: inline-block; }
 .tag-trigger {
@@ -731,13 +718,6 @@ body.electron-app .header-inner { padding-left: 80px; }
   margin-right: 0.5rem;
   vertical-align: middle;
 }
-.tag-menu-studied-label {
-  color: #22c55e;
-  border-top: 1px solid var(--border);
-  margin-top: 0.25rem;
-  padding-top: 0.5rem;
-}
-
 .icon-btn {
   border: none;
   background: none;

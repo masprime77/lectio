@@ -5,7 +5,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
 import { AuthProvider, useAuth } from '../src/auth/AuthProvider';
-import { StudyModeProvider } from '../src/study/StudyModeProvider';
 import { TutorialProvider, useTutorial } from '../src/tutorial/TutorialProvider';
 import { TutorialOverlay } from '../src/tutorial/TutorialOverlay';
 import { ConflictProvider } from '../src/sync/ConflictProvider';
@@ -125,13 +124,11 @@ const styles = StyleSheet.create({
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <StudyModeProvider>
-        <TutorialProvider>
-          <ConflictProvider>
-            <AppShell />
-          </ConflictProvider>
-        </TutorialProvider>
-      </StudyModeProvider>
+      <TutorialProvider>
+        <ConflictProvider>
+          <AppShell />
+        </ConflictProvider>
+      </TutorialProvider>
     </AuthProvider>
   );
 }

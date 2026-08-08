@@ -13,7 +13,6 @@ const state = {
   view: restoreView(), // 'week' | 'course' — restored from last session
   focusedCourseId: null, // null = normal All Courses layout; course id = focused mode
   sortOrder: restoreSort(), // course sort order — restored from last session
-  studyMode: restoreStudyMode(), // Study Mode overlay — restored from last session
   breakdownOpen: false, // progress breakdown panel visibility
   tutorialStep: 0,   // current step index (0-based)
   tutorialActive: false, // whether the overlay is visible
@@ -54,11 +53,6 @@ function restoreSort() {
     'week-asc', 'week-desc',
   ];
   return valid.includes(v) ? v : 'progress-desc';
-}
-
-// Restore the saved Study Mode toggle, defaulting to off.
-function restoreStudyMode() {
-  return readPref('studyMode') === 'true';
 }
 
 // Whether the user has already seen (finished/skipped) the tutorial.
@@ -1111,31 +1105,6 @@ function renderItemList(items, type, course, week) {
       });
     });
 
-    // In Study Mode, add a distinct "Studied" shortcut below Done. The studied
-    // tag still appears in the Done section above — this is an extra entry.
-    if (state.studyMode) {
-      const studiedId = type === 'reading' ? 'r-studied' : 't-studied';
-      const studiedTag = tags.find((t) => t.id === studiedId);
-      if (studiedTag) {
-        const sep = document.createElement('div');
-        sep.className = 'tag-menu-section-label tag-menu-studied-label';
-        sep.textContent = 'Studied';
-        menu.appendChild(sep);
-
-        const opt = document.createElement('button');
-        opt.className = 'tag-menu-option' + (item.status === studiedId ? ' active' : '');
-        opt.textContent = studiedTag.name;
-        opt.style.setProperty('--tag-color', studiedTag.color);
-        opt.addEventListener('click', (e) => {
-          e.stopPropagation();
-          item.status = studiedId;
-          persist();
-          render();
-        });
-        menu.appendChild(opt);
-      }
-    }
-
     trigger.addEventListener('click', (e) => {
       e.stopPropagation();
       const isOpen = !menu.classList.contains('hidden');
@@ -1413,14 +1382,6 @@ const TUTORIAL_STEPS = [
     setup: null,
   },
   {
-    id: 'study-mode',
-    title: 'Study Mode',
-    description:
-      'Study Mode recalculates progress counting only items tagged "Studied" — useful during revision week. Toggle it on and off any time.',
-    targetSelector: '#study-mode-btn',
-    setup: null,
-  },
-  {
     id: 'new-semester',
     title: 'Create your own semester',
     description:
@@ -1674,7 +1635,6 @@ async function init() {
 
   setupViewToggle();
   setupSort();
-  setupStudyMode();
   setupTheme();
   setupModal();
   setupNewBtn();
@@ -1903,29 +1863,6 @@ function setupSort() {
   sel.addEventListener('change', () => {
     state.sortOrder = sel.value;
     writePref('lastSortOrder', state.sortOrder);
-    if (state.semester) {
-      renderDashboard();
-      renderPlanner();
-    }
-  });
-}
-
-// Study Mode toggle: a pure display/calculation overlay (no data changes),
-// persisted to localStorage so it survives restarts.
-function setupStudyMode() {
-  const btn = document.getElementById('study-mode-btn');
-
-  function updateBtn() {
-    btn.textContent = 'Study Mode: ' + (state.studyMode ? 'On' : 'Off');
-    btn.classList.toggle('study-mode-on', state.studyMode);
-  }
-
-  updateBtn();
-
-  btn.addEventListener('click', () => {
-    state.studyMode = !state.studyMode;
-    writePref('studyMode', String(state.studyMode));
-    updateBtn();
     if (state.semester) {
       renderDashboard();
       renderPlanner();

@@ -34,12 +34,6 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       'Tap any reading or task to open its tag picker and choose a tag. Tags in the "done" group count toward progress. You can add, rename, recolor, and reorder your own tags from the "+" sheet.',
   },
   {
-    id: 'study-mode',
-    title: 'Study Mode',
-    description:
-      'The cap button on the courses screen toggles Study Mode, which recalculates progress counting only items tagged "Studied" — handy during revision week.',
-  },
-  {
     id: 'sort',
     title: 'Sort courses',
     description:
