@@ -46,6 +46,12 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       'Turn on Breakdown in the courses header to split each course into separate Readings and Tasks mini-bars, so you can see where the work is.',
   },
   {
+    id: 'pomodoro',
+    title: 'Study timer',
+    description:
+      'The clock button starts a Pomodoro timer for a course: set your focus and break lengths, and Lectio tracks how long you have studied. It becomes a live countdown — tap to pause, long-press to skip ahead.',
+  },
+  {
     id: 'settings',
     title: 'Settings',
     description:
