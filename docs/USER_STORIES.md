@@ -332,9 +332,9 @@ Test references use the form `file › test name`.
 - Acceptance criteria:
   - [ ] Each semester stores `readingTags` and `taskTags` arrays; new semesters receive the default tag sets.
   - [ ] Tags have `id`, `name`, `color`, and `section` (`pending`/`done`); done-section tags count toward progress.
-  - [ ] Protected tag ids (`r-pending`, `r-studied`, `t-pending`, `t-studied`) cannot be renamed or deleted.
+  - [ ] Protected tag ids (`r-pending`, `t-pending`) cannot be renamed or deleted; every other tag, including `studied`, is fully editable.
   - [ ] Legacy semesters are migrated on load: default tags added and status strings rewritten to tag ids.
-- Linked tests: `tests/unit/semester-manager.test.js › get-semester returns parsed JSON with default tags migrated in`; `tests/unit/semester-manager.test.js › migrateStatusToTagId rewrites legacy status strings to tag ids`; `tests/integration/ipc.test.js › get-semester migrates legacy reading/task statuses to tag ids`; `tests/unit/progress.test.js › counts readings whose tag is in the done section`; `tests/unit/status.test.js › isProtectedTag protects the pending and studied tags of each kind`
+- Linked tests: `tests/unit/semester-manager.test.js › get-semester returns parsed JSON with default tags migrated in`; `tests/unit/semester-manager.test.js › migrateStatusToTagId rewrites legacy status strings to tag ids`; `tests/integration/ipc.test.js › get-semester migrates legacy reading/task statuses to tag ids`; `tests/unit/progress.test.js › counts readings whose tag is in the done section`; `tests/unit/status.test.js › isProtectedTag protects the pending tag of each kind`
 
 **US-037 — Tag management UI**
 - As a student, I want to add, rename, recolor, and reorder tags from the semester editor so that I can keep my tag set up to date.

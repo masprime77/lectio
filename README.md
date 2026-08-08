@@ -72,10 +72,11 @@ item tags) — see [Mobile app](#mobile-app) and
   buttons in the header act on whichever layout is active.
 - **Custom tag system** — each semester defines its own reading tags and task
   tags grouped into *Pending* and *Done* sections. Clicking a status badge opens
-  a dropdown to pick any tag. Done-section tags count toward progress. Protected
-  tags ("pending" / "studied") cannot be renamed or deleted but can be recolored.
-  Custom tags can be added, renamed, recolored, and dragged to reorder in the
-  Tags tab of the semester modal.
+  a dropdown to pick any tag. Done-section tags count toward progress. The
+  "pending" tag of each kind is protected (cannot be renamed or deleted, but can
+  be recolored); every other tag, including "studied", can be renamed, recolored,
+  deleted, and reordered. Custom tags can be added, renamed, recolored, and
+  dragged to reorder in the Tags tab of the semester modal.
 - **Sort control** — order courses by progress (↓/↑), alphabetically (A → Z /
   Z → A), or by week (↑/↓). Persists in `localStorage`; never rewrites the JSON
   file. Progress and alphabetical sorts apply to the dashboard and All Courses

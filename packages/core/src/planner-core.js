@@ -22,9 +22,11 @@
     { id: 't-studied', name: 'studied', color: '#22c55e', section: 'done' },
   ];
 
-  // The "pending" and "studied" tags of each kind cannot be deleted or renamed
-  // (they can still be recolored). They anchor the workflow and Study Mode.
-  const PROTECTED_TAG_IDS = new Set(['r-pending', 'r-studied', 't-pending', 't-studied']);
+  // The "pending" tag of each kind cannot be deleted or renamed (it can still
+  // be recolored): migrateStatusToTagId falls back to these ids for legacy or
+  // unrecognised statuses, so they must always exist. Every other tag —
+  // including "studied" — is fully editable.
+  const PROTECTED_TAG_IDS = new Set(['r-pending', 't-pending']);
 
   function isProtectedTag(id) {
     return PROTECTED_TAG_IDS.has(id);
