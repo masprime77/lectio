@@ -3,7 +3,17 @@ import { Stack, useRouter, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import {
+  ActivityIndicator,
+  AppState,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  useColorScheme,
+} from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { AuthProvider, useAuth } from '../src/auth/AuthProvider';
 import { TutorialProvider, useTutorial } from '../src/tutorial/TutorialProvider';
 import { TutorialOverlay } from '../src/tutorial/TutorialOverlay';
@@ -12,6 +22,31 @@ import { PomodoroProvider } from '../src/pomodoro/PomodoroProvider';
 import { ConflictDialog } from '../src/sync/ConflictDialog';
 import { prefs } from '../src/lib/prefs';
 import { useTheme } from '../src/theme';
+
+// Foreground behavior: while the app is open, PomodoroProvider already shows
+// an in-app Alert on phase completion, so the OS banner/list entry would be
+// redundant — suppress those two but keep the sound. Backgrounded, there is no
+// in-app alert to duplicate, so show everything normally.
+Notifications.setNotificationHandler({
+  handleNotification: async () => {
+    const foreground = AppState.currentState === 'active';
+    return {
+      shouldShowBanner: !foreground,
+      shouldShowList: !foreground,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    };
+  },
+});
+
+// Android 8+ requires every notification to belong to a channel, or it is
+// silently dropped — no error, nothing in the logs. One-time setup.
+if (Platform.OS === 'android') {
+  Notifications.setNotificationChannelAsync('pomodoro', {
+    name: 'Study timer',
+    importance: Notifications.AndroidImportance.DEFAULT,
+  }).catch(() => {});
+}
 
 function AppShell() {
   const theme = useTheme();
