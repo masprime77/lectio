@@ -10,6 +10,15 @@
   `notarize()`, so a failed certificate import (wrong cert type or mismatched
   `.p12` password) fails with a specific, actionable error instead of crashing
   inside `@electron/notarize`'s codesign check.
+- Fixed: the macOS release job never actually signed the app when the Developer
+  ID secrets were configured. `.github/workflows/release.yml` pinned
+  `CSC_IDENTITY_AUTO_DISCOVERY=false`, which disables electron-builder's macOS
+  signing outright (not just its keychain search) and wins over `CSC_LINK`,
+  while `afterPack.js` skips signing whenever `CSC_LINK`/`APPLE_TEAM_ID` are
+  set — so neither path signed and an ad-hoc bundle reached `afterSign`. The
+  flag is now set to `false` only on the free/self-signed path, and the
+  self-signed certificate import is skipped when `CSC_LINK` is configured (its
+  keychain became the default and could shadow the Developer ID identity).
 - Fixed: `packages/desktop/scripts/bundle-deps.js` now invokes `npm ls` through
   a shell (`execSync` with a fixed command string) instead of spawning the
   binary directly, fixing two consecutive `prebuild:win` failures on Windows —
