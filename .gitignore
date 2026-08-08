@@ -17,6 +17,7 @@ supabase/.env
 
 # Vendored copies of @lectio/core for the renderer (see scripts/sync-core.js)
 packages/desktop/planner-core.js
+packages/desktop/pomodoro-core.js
 packages/desktop/migrate.js
 packages/desktop/conflict.js
 packages/desktop/moodle.js

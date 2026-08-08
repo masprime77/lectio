@@ -9,6 +9,9 @@
       "@lectio/core/planner-core": [
         "./types/lectio-core.d.ts"
       ],
+      "@lectio/core/pomodoro-core": [
+        "./types/lectio-core.d.ts"
+      ],
       "@lectio/core/storage/migrate": [
         "./types/lectio-core.d.ts"
       ],
