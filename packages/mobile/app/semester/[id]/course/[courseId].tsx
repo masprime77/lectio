@@ -9,6 +9,11 @@ import {
   getTaskTags,
   setItemStatus,
 } from '@lectio/core/planner-core';
+import {
+  formatHoursMinutes,
+  getCourseStudySeconds,
+  setStudyTime,
+} from '@lectio/core/pomodoro-core';
 import { storage } from '../../../../src/storage';
 import { saveWithConflict } from '../../../../src/sync/saveWithConflict';
 import { useSortOrder } from '../../../../src/lib/use-sort-order';
@@ -16,6 +21,7 @@ import { useTheme } from '../../../../src/theme';
 import { ExportIcon } from '../../../../src/components/ExportIcon';
 import { Fab } from '../../../../src/components/Fab';
 import { PomodoroFab } from '../../../../src/pomodoro/PomodoroFab';
+import { StudyTimeEditor } from '../../../../src/pomodoro/StudyTimeEditor';
 import { ProgressBar } from '../../../../src/components/ProgressBar';
 import { SortButton, SortMenu } from '../../../../src/components/SortMenu';
 import { SwipeableRow } from '../../../../src/components/SwipeableRow';
@@ -70,6 +76,19 @@ export default function CourseDetailScreen() {
     },
     [id]
   );
+
+  // Hand-corrected studied time (the timer is not the only way to study).
+  const [timeEditorOpen, setTimeEditorOpen] = useState(false);
+
+  function handleSaveStudyTime(seconds: number) {
+    if (!semester) return;
+    const next: Semester = JSON.parse(JSON.stringify(semester));
+    const c = getCourses(next).find((x) => x.id === courseId);
+    if (!c) return;
+    setStudyTime(c, seconds);
+    persist(next);
+    setTimeEditorOpen(false);
+  }
 
   // Set an item's tag to the one picked in the sheet, persist, and re-render.
   // Writes the same item.status id the desktop's tag menu writes.
@@ -305,6 +324,16 @@ export default function CourseDetailScreen() {
               ? 'Tap items to select them, then delete.'
               : 'Tap an item to set its tag. Long-press to edit or delete.'}
           </Text>
+          <Pressable
+            onPress={() => setTimeEditorOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Edit studied time"
+            style={({ pressed }) => pressed && { opacity: 0.6 }}
+          >
+            <Text style={[styles.studyTime, { color: theme.muted }]}>
+              {formatHoursMinutes(getCourseStudySeconds(course))} studied · Edit
+            </Text>
+          </Pressable>
         </View>
 
         <View style={styles.sectionHeader}>
@@ -337,6 +366,13 @@ export default function CourseDetailScreen() {
           sortedItems(course.tasks, sortOrder).map((t) => renderItem('task', t, taskTags))
         )}
       </ScrollView>
+      <StudyTimeEditor
+        visible={timeEditorOpen}
+        courseName={course.name}
+        currentSeconds={getCourseStudySeconds(course)}
+        onSave={handleSaveStudyTime}
+        onClose={() => setTimeEditorOpen(false)}
+      />
       <PomodoroFab semester={semester} defaultCourseId={courseId} />
       {/* The "+" opens the add-sheet on the Tags tab; readings/tasks are added
           from the per-section "+ Add" controls next to the Readings/Tasks headers. */}
@@ -362,6 +398,7 @@ export default function CourseDetailScreen() {
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 16, paddingBottom: 180 },
+  studyTime: { fontSize: 13 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 14, marginRight: 4 },
   summary: {
     padding: 16,
