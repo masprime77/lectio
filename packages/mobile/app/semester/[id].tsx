@@ -8,6 +8,11 @@ import {
   reorderCourses,
   sortedCourses,
 } from '@lectio/core/planner-core';
+import {
+  formatHoursMinutes,
+  getCourseStudySeconds,
+  setStudyTime,
+} from '@lectio/core/pomodoro-core';
 import { storage } from '../../src/storage';
 import { saveWithConflict } from '../../src/sync/saveWithConflict';
 import { prefs } from '../../src/lib/prefs';
@@ -17,6 +22,7 @@ import { CourseBreakdown } from '../../src/components/CourseBreakdown';
 import { ExportIcon } from '../../src/components/ExportIcon';
 import { Fab } from '../../src/components/Fab';
 import { PomodoroFab } from '../../src/pomodoro/PomodoroFab';
+import { StudyTimeEditor } from '../../src/pomodoro/StudyTimeEditor';
 import { ProgressBar } from '../../src/components/ProgressBar';
 import { SortButton, SortMenu } from '../../src/components/SortMenu';
 import { SwipeableRow } from '../../src/components/SwipeableRow';
@@ -108,6 +114,20 @@ export default function CoursesScreen() {
     persist(next);
   }
 
+  // Course whose studied time is being corrected by hand (null = editor closed).
+  const [timeEditCourse, setTimeEditCourse] = useState<Course | null>(null);
+
+  function saveStudyTime(courseId: string, seconds: number) {
+    if (!semester) return;
+    const next: Semester = JSON.parse(JSON.stringify(semester));
+    const c = getCourses(next).find((x) => x.id === courseId);
+    if (!c) return;
+    setStudyTime(c, seconds);
+    setSemester(next);
+    saveWithConflict(id, next, setSemester).catch((err) => console.warn('save failed', err));
+    setTimeEditCourse(null);
+  }
+
   function showCourseActions(course: Course) {
     Alert.alert(course.name, undefined, [
       {
@@ -121,6 +141,7 @@ export default function CoursesScreen() {
           router.push(`/moodle-import?semesterId=${id}&courseId=${course.id}`);
         },
       },
+      { text: 'Edit studied time', onPress: () => setTimeEditCourse(course) },
       { text: 'Move up', onPress: () => moveCourse(course.id, -1) },
       { text: 'Move down', onPress: () => moveCourse(course.id, +1) },
       { text: 'Delete', style: 'destructive', onPress: () => confirmDeleteCourse(course) },
@@ -297,6 +318,9 @@ export default function CoursesScreen() {
                 <ProgressBar value={progress} color={item.color} />
                 <Text style={[styles.meta, { color: theme.muted }]}>
                   {progress}% · {item.readings.length} readings · {item.tasks.length} tasks
+                  {getCourseStudySeconds(item) > 0
+                    ? ` · ${formatHoursMinutes(getCourseStudySeconds(item))} studied`
+                    : ''}
                 </Text>
                 {breakdownOpen && (
                   <CourseBreakdown course={item} semester={semester!} />
@@ -311,6 +335,13 @@ export default function CoursesScreen() {
         current={sortOrder}
         onPick={pickSortOrder}
         onClose={() => setSortMenuOpen(false)}
+      />
+      <StudyTimeEditor
+        visible={timeEditCourse !== null}
+        courseName={timeEditCourse ? timeEditCourse.name : ''}
+        currentSeconds={timeEditCourse ? getCourseStudySeconds(timeEditCourse) : 0}
+        onSave={(seconds) => timeEditCourse && saveStudyTime(timeEditCourse.id, seconds)}
+        onClose={() => setTimeEditCourse(null)}
       />
       <PomodoroFab semester={semester} />
       <Fab onPress={() => router.push(`/add?context=course&id=${id}`)} />
