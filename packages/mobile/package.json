@@ -12,7 +12,10 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build:ios:dev": "eas build --platform ios --profile development",
+    "build:ios:preview": "eas build --platform ios --profile preview",
+    "build:ios:production": "eas build --platform ios --profile production"
   },
   "dependencies": {
     "@expo/ui": "~56.0.16",
@@ -32,6 +35,7 @@
     "expo-secure-store": "~56.0.4",
     "expo-sharing": "~56.0.17",
     "expo-status-bar": "~56.0.4",
+    "expo-updates": "~56.0.24",
     "expo-web-browser": "~56.0.5",
     "react": "19.2.3",
     "react-native": "0.85.3",
