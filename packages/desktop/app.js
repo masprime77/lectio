@@ -1429,6 +1429,14 @@ const TUTORIAL_STEPS = [
     setup: null,
   },
   {
+    id: 'pomodoro',
+    title: 'Study timer',
+    description:
+      'Start a Pomodoro timer for any course: set your focus and break lengths, and Lectio tracks how long you have studied each course. The button becomes a live countdown — click it to pause, skip ahead, or stop.',
+    targetSelector: '#pomodoro-control',
+    setup: null,
+  },
+  {
     id: 'new-semester',
     title: 'Create your own semester',
     description:
