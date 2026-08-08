@@ -1,5 +1,7 @@
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Crypto from 'expo-crypto';
 import { supabase } from '../supabase/client';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -44,4 +46,69 @@ export async function signInWithProvider(provider: 'google' | 'apple'): Promise<
   }
 
   throw new Error('Sign-in did not return a session.');
+}
+
+// Native Sign in with Apple: Apple's on-device Authentication Services via
+// expo-apple-authentication, then exchange the identity token with
+// Supabase's signInWithIdToken. No browser round-trip, and — unlike the
+// signInWithProvider() OAuth path above — no Services ID / secret-key
+// rotation required on the Apple/Supabase side, just the app's Bundle ID
+// registered as a Client ID in the Supabase dashboard.
+export async function signInWithAppleNative(): Promise<void> {
+  // Apple requires the *hashed* nonce; Supabase verifies against the *raw*
+  // nonce, which must be sent separately to signInWithIdToken below.
+  const rawNonce = Crypto.randomUUID();
+  const hashedNonce = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    rawNonce
+  );
+
+  let credential: AppleAuthentication.AppleAuthenticationCredential;
+  try {
+    credential = await AppleAuthentication.signInAsync({
+      requestedScopes: [
+        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+        AppleAuthentication.AppleAuthenticationScope.EMAIL,
+      ],
+      nonce: hashedNonce,
+    });
+  } catch (e) {
+    if ((e as { code?: string })?.code === 'ERR_REQUEST_CANCELED') {
+      throw new Error('Sign-in was cancelled.');
+    }
+    throw e;
+  }
+
+  if (!credential.identityToken) {
+    throw new Error('Apple did not return an identity token.');
+  }
+
+  const { error } = await supabase.auth.signInWithIdToken({
+    provider: 'apple',
+    token: credential.identityToken,
+    nonce: rawNonce,
+  });
+  if (error) throw error;
+
+  // Apple only sends the full name on the FIRST authorization for this
+  // app; every later sign-in returns null here, so capture it now or
+  // it's gone (Supabase can't recover it from the identity token itself).
+  if (credential.fullName?.givenName || credential.fullName?.familyName) {
+    const fullName = [credential.fullName.givenName, credential.fullName.familyName]
+      .filter(Boolean)
+      .join(' ');
+    await supabase.auth
+      .updateUser({
+        data: {
+          full_name: fullName,
+          given_name: credential.fullName.givenName ?? undefined,
+          family_name: credential.fullName.familyName ?? undefined,
+        },
+      })
+      .catch(() => {
+        // Non-fatal: the session is already established; losing the
+        // display name on this one sign-in isn't worth failing the
+        // whole flow over.
+      });
+  }
 }

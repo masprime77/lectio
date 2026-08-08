@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { createURL } from 'expo-linking';
 import { supabase } from '../supabase/client';
 import { isExpoGo } from './env';
-import { signInWithProvider } from './oauth';
+import { signInWithProvider, signInWithAppleNative } from './oauth';
 import { isConnectivityError } from './auth-errors';
 import { deleteAccount } from './account';
 
@@ -106,7 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signInWithApple() {
     if (isExpoGo) throw new Error('Apple sign-in needs the installed app (not Expo Go).');
-    await signInWithProvider('apple');
+    await signInWithAppleNative();
   }
 
   async function updateEmail(newEmail: string) {
