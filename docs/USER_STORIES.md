@@ -346,6 +346,20 @@ Test references use the form `file › test name`.
 
 ---
 
+## Study Timer
+
+**US-038 — Pomodoro study timer**
+- As a student, I want to run a Pomodoro-style study timer against a course so that my study time is tracked automatically on whichever device I am using.
+- Acceptance criteria:
+  - [ ] A timer control on each app opens a setup sheet to pick a course (or "Free study") and set focus, short-break and long-break lengths plus how many focus blocks precede a long break; the durations persist as defaults.
+  - [ ] Starting the timer morphs the control into a live countdown; tapping/clicking pauses and resumes, with separate skip and stop controls.
+  - [ ] Remaining time is derived from the session deadline, so a backgrounded, suspended or restarted app resumes showing the correct time.
+  - [ ] A completed focus block adds its full length to the course's studied time; a stopped or skipped block adds the elapsed time when it exceeds 30 seconds; free-study sessions are not tracked.
+  - [ ] Total studied time per course is shown on both apps and can be corrected by hand, with the difference recorded as an adjustment.
+- Linked tests: `packages/core/tests/unit/pomodoro-core.test.js` (settings clamping, phase transitions and long-break cadence, pause/resume, deadline arithmetic, session rehydration, study-time accumulation and adjustment, formatting and parsing). The timer UI on both platforms is verified manually.
+
+---
+
 ## Sort
 
 **US-039 — Sort control**
@@ -489,6 +503,7 @@ Test references use the form `file › test name`.
 | US-035 | Session restore     | — (Electron smoke)                           | not covered   |
 | US-036 | Tags                | semester-manager.test.js, ipc.test.js, progress.test.js, status.test.js | covered |
 | US-037 | Tags                | status.test.js                               | partial       |
+| US-038 | Study Timer         | pomodoro-core.test.js                        | partial       |
 | US-039 | Sort                | —                                            | not covered   |
 | US-040 | Focus mode          | —                                            | not covered   |
 | US-041 | Views               | —                                            | not covered   |
@@ -498,7 +513,7 @@ Test references use the form `file › test name`.
 | US-045 | Feedback            | —                                            | not covered   |
 | US-046 | Distribution        | — (gated by CI)                              | not covered   |
 
-**Coverage summary:** 12 covered, 5 partial, 28 not covered (45 stories). The
+**Coverage summary:** 12 covered, 6 partial, 28 not covered (46 stories). The
 Vitest suite focuses on the pure logic and filesystem/IPC layers in `lib/`
 (100% lines and functions; threshold 70%). UI, Electron-process, and packaging
 behaviours are validated manually or with hidden-window Electron smoke tests.
