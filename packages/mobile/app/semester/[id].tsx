@@ -16,6 +16,7 @@ import { useTheme } from '../../src/theme';
 import { CourseBreakdown } from '../../src/components/CourseBreakdown';
 import { ExportIcon } from '../../src/components/ExportIcon';
 import { Fab } from '../../src/components/Fab';
+import { PomodoroFab } from '../../src/pomodoro/PomodoroFab';
 import { ProgressBar } from '../../src/components/ProgressBar';
 import { SortButton, SortMenu } from '../../src/components/SortMenu';
 import { SwipeableRow } from '../../src/components/SwipeableRow';
@@ -311,13 +312,14 @@ export default function CoursesScreen() {
         onPick={pickSortOrder}
         onClose={() => setSortMenuOpen(false)}
       />
+      <PomodoroFab semester={semester} />
       <Fab onPress={() => router.push(`/add?context=course&id=${id}`)} />
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  list: { padding: 16, gap: 12, paddingBottom: 112 },
+  list: { padding: 16, gap: 12, paddingBottom: 180 },
   emptyWrap: { alignItems: 'center', gap: 12, marginTop: 32 },
   emptyBtn: {
     height: 48,
