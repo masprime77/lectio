@@ -10,10 +10,12 @@
   `notarize()`, so a failed certificate import (wrong cert type or mismatched
   `.p12` password) fails with a specific, actionable error instead of crashing
   inside `@electron/notarize`'s codesign check.
-- Fixed: `packages/desktop/scripts/bundle-deps.js` now resolves `npm.cmd` on
-  Windows before spawning it, fixing a `spawnSync npm ENOENT` failure during
-  `prebuild:win` (Windows can't execute the `npm.cmd` shell shim via
-  `execFileSync` without `shell: true`).
+- Fixed: `packages/desktop/scripts/bundle-deps.js` now invokes `npm ls` through
+  a shell (`execSync` with a fixed command string) instead of spawning the
+  binary directly, fixing two consecutive `prebuild:win` failures on Windows —
+  `spawnSync npm ENOENT` (npm on PATH is the `npm.cmd` shim) and then
+  `spawnSync npm.cmd EINVAL` (since Node's CVE-2024-27980 hardening, spawning a
+  `.cmd`/`.bat` without a shell is refused outright).
 
 ## v1.0.0
 
