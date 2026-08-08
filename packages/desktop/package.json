@@ -100,6 +100,7 @@
       "supabase-config.js",
       "style.css",
       "planner-core.js",
+      "pomodoro-core.js",
       "migrate.js",
       "semesters/",
       "assets/icon.png"

@@ -5,8 +5,8 @@
 // file is a normal declaration *module*, and tsconfig.json maps the core import
 // specifiers to it via `paths` (see "@lectio/core*"). One file backs every
 // subpath the app imports — `@lectio/core`, `@lectio/core/planner-core`,
-// `@lectio/core/storage/migrate`, `@lectio/core/storage/contract`,
-// `@lectio/core/integrations/lectio-file`. It deliberately omits the Node-only
+// `@lectio/core/pomodoro-core`, `@lectio/core/storage/migrate`,
+// `@lectio/core/storage/contract`, `@lectio/core/integrations/lectio-file`. It deliberately omits the Node-only
 // subpaths (`semester-store`, `ipc-handlers`, `storage/fs`) so they stay
 // unimportable from the RN bundle.
 
@@ -43,6 +43,8 @@ export interface Course {
   color?: string;
   readings: ReadingItem[];
   tasks: TaskItem[];
+  /** Present only once time has been logged; see @lectio/core/pomodoro-core. */
+  studyTime?: StudyTime;
 }
 
 export interface Semester {
@@ -325,3 +327,88 @@ declare const core: {
   uid(prefix: string): string;
 };
 export default core;
+
+// ---------------------------------------------------------------------------
+// Pomodoro timer + study time (@lectio/core/pomodoro-core)
+// ---------------------------------------------------------------------------
+
+export interface PomodoroSettings {
+  workMinutes: number;
+  shortBreakMinutes: number;
+  longBreakMinutes: number;
+  pomodorosUntilLongBreak: number;
+}
+
+export type PomodoroPhase = 'idle' | 'work' | 'shortBreak' | 'longBreak';
+
+/** Deadline-based session state; JSON-safe, so it persists as-is. */
+export interface PomodoroSession {
+  phase: PomodoroPhase;
+  endsAt: number;
+  pausedAt: number | null;
+  completedPomodoros: number;
+  courseId: string | null;
+  semesterId: string | null;
+}
+
+export interface StudySession {
+  id: string;
+  seconds: number;
+  source: 'pomodoro' | 'manual' | 'adjustment';
+  date: string;
+  createdAt: string;
+}
+
+export interface StudyTime {
+  totalSeconds: number;
+  sessions: StudySession[];
+}
+
+export const DEFAULT_POMODORO_SETTINGS: PomodoroSettings;
+export const MAX_SESSIONS: number;
+export function clampPomodoroSettings(
+  settings: Partial<PomodoroSettings> | null | undefined
+): PomodoroSettings;
+
+export function createIdleSession(): PomodoroSession;
+export function phaseDurationSeconds(phase: PomodoroPhase, settings: PomodoroSettings): number;
+export function startSession(
+  settings: PomodoroSettings,
+  opts: { courseId?: string | null; semesterId?: string | null },
+  nowMs?: number
+): PomodoroSession;
+export function remainingSeconds(session: PomodoroSession, nowMs?: number): number;
+export function isRunning(session: PomodoroSession): boolean;
+export function isPaused(session: PomodoroSession): boolean;
+export function isPhaseComplete(session: PomodoroSession, nowMs?: number): boolean;
+export function pauseSession(session: PomodoroSession, nowMs?: number): PomodoroSession;
+export function resumeSession(session: PomodoroSession, nowMs?: number): PomodoroSession;
+export function elapsedWorkSeconds(
+  session: PomodoroSession,
+  settings: PomodoroSettings,
+  nowMs?: number
+): number;
+export function advanceSession(
+  session: PomodoroSession,
+  settings: PomodoroSettings,
+  nowMs?: number
+): PomodoroSession;
+export function skipPhase(
+  session: PomodoroSession,
+  settings: PomodoroSettings,
+  nowMs?: number
+): PomodoroSession;
+export function phaseLabel(phase: PomodoroPhase): string;
+export function rehydrateSession(raw: unknown, nowMs?: number): PomodoroSession;
+
+export function ensureStudyTime(course: Course): StudyTime;
+export function getCourseStudySeconds(course: Course): number;
+export function addStudyTime(
+  course: Course,
+  seconds: number,
+  opts?: { source?: StudySession['source']; date?: string }
+): Course;
+export function setStudyTime(course: Course, newTotalSeconds: number): Course;
+export function formatClock(totalSeconds: number): string;
+export function formatHoursMinutes(totalSeconds: number): string;
+export function parseHoursMinutesInput(text: string): number | null;

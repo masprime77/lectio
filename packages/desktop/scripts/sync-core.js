@@ -11,7 +11,8 @@
 // `npm run dev` and in the packaged app.
 //
 // All files are dual-mode (window globals in the browser, module.exports in
-// Node): planner-core → window.PlannerCore, migrate → window.PlannerMigrate
+// Node): planner-core → window.PlannerCore, pomodoro-core → window.PomodoroCore
+// (the Pomodoro timer and study-time logic), migrate → window.PlannerMigrate
 // (used by supabase-storage.js's get() to apply the same migration as fs/mobile),
 // conflict → window.PlannerConflict (used by supabase-storage.js's save() to
 // detect cloud write conflicts, the same logic the mobile adapter uses),
@@ -24,6 +25,7 @@ const path = require('path');
 
 const files = [
   ['@lectio/core/planner-core', 'planner-core.js'],
+  ['@lectio/core/pomodoro-core', 'pomodoro-core.js'],
   ['@lectio/core/storage/migrate', 'migrate.js'],
   ['@lectio/core/storage/conflict', 'conflict.js'],
   ['@lectio/core/integrations/moodle', 'moodle.js'],
