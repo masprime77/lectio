@@ -125,15 +125,38 @@ That's it. The next tagged release builds a signed macOS app automatically.
 
 `.github/workflows/release.yml` (macOS `build` job):
 
-1. If `MAC_CSC_P12_BASE64` is set, the **Import self-signed signing
-   certificate** step creates a temporary keychain, imports the `.p12`, adds it
-   to the search list, and exports the identity's SHA-1 as `MAC_SIGN_IDENTITY`.
-   (The cert is untrusted, so it's listed without `find-identity -v`.)
-2. The build runs with `CSC_IDENTITY_AUTO_DISCOVERY=false`, so electron-builder
-   does not try to sign. Instead `packages/desktop/build/afterPack.js` signs the
-   bundle with `MAC_SIGN_IDENTITY` and logs the resulting designated requirement.
+1. If `MAC_CSC_P12_BASE64` is set **and `CSC_LINK` is not**, the **Import
+   self-signed signing certificate** step creates a temporary keychain, imports
+   the `.p12`, adds it to the search list, and exports the identity's SHA-1 as
+   `MAC_SIGN_IDENTITY`. (The cert is untrusted, so it's listed without
+   `find-identity -v`.) It is skipped on the real Developer ID path, where
+   `afterPack` no-ops anyway and this step's keychain — which it makes the
+   *default* — could shadow the identity electron-builder imports.
+2. On this free path the build runs with `CSC_IDENTITY_AUTO_DISCOVERY=false`, so
+   electron-builder does not try to sign. Instead
+   `packages/desktop/build/afterPack.js` signs the bundle with
+   `MAC_SIGN_IDENTITY` and logs the resulting designated requirement.
 3. If the secret is absent, the step is skipped and `afterPack` falls back to
    ad-hoc signing (auto-update won't work, but the app still runs).
+
+### Gotcha: `CSC_IDENTITY_AUTO_DISCOVERY` disables signing entirely
+
+That variable does **not** merely stop electron-builder searching the keychain —
+setting it to `false` turns macOS code signing off outright, and it takes
+precedence even when `CSC_LINK` is set. Pinning it to `false` unconditionally
+therefore breaks the *real* signing path: electron-builder skips signing, and
+`afterPack` also skips (it defers whenever `CSC_LINK`/`APPLE_TEAM_ID` are set),
+so nothing signs the app and an ad-hoc bundle reaches `afterSign`. The
+signature check there catches it, but the failure reads like a bad certificate.
+The workflow now sets the flag to `false` only when `CSC_LINK` is empty. The
+symptom to recognise in a build log is:
+
+```
+• skipped macOS application code signing  reason=, ... CSC_IDENTITY_AUTO_DISCOVERY=false
+```
+
+An empty `reason=` alongside configured signing secrets means the flag suppressed
+signing — not that the certificate failed to import.
 
 You can confirm a signed build in the release job log: look for
 `afterPack: self-signed (...) signed` followed by
