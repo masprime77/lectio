@@ -27,6 +27,19 @@
     ],
     "experiments": {
       "typedRoutes": false
-    }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/68cf77ab-e519-4e77-b02d-5159ccd1f9c3"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "68cf77ab-e519-4e77-b02d-5159ccd1f9c3"
+      }
+    },
+    "owner": "masprime77"
   }
 }
