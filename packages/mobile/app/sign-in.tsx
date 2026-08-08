@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -8,14 +9,20 @@ import {
   Text,
   TextInput,
   View,
+  useColorScheme,
 } from 'react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/auth/AuthProvider';
 import { friendlyAuthError, isConnectivityError } from '../src/auth/auth-errors';
 import { useTheme } from '../src/theme';
 
+const googleSignInLight = require('../assets/google-signin-light.png');
+const googleSignInDark = require('../assets/google-signin-dark.png');
+
 export default function SignInScreen() {
   const theme = useTheme();
+  const scheme = useColorScheme();
   const router = useRouter();
   const {
     signIn,
@@ -174,18 +181,29 @@ export default function SignInScreen() {
             </View>
 
             <Pressable
-              style={[styles.btnProvider, { backgroundColor: theme.surface, borderColor: theme.border }]}
               onPress={() => handleProvider('google')}
+              accessibilityRole="button"
+              accessibilityLabel="Continue with Google"
+              style={({ pressed }) => [styles.googleBtn, pressed && { opacity: 0.8 }]}
             >
-              <Text style={[styles.btnProviderText, { color: theme.text }]}>Continue with Google</Text>
+              <Image
+                source={scheme === 'dark' ? googleSignInDark : googleSignInLight}
+                style={styles.googleBtnImage}
+                resizeMode="contain"
+              />
             </Pressable>
             {Platform.OS === 'ios' ? (
-              <Pressable
-                style={[styles.btnProvider, { backgroundColor: theme.surface, borderColor: theme.border }]}
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                buttonStyle={
+                  scheme === 'dark'
+                    ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                    : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                }
+                cornerRadius={10}
+                style={styles.appleBtn}
                 onPress={() => handleProvider('apple')}
-              >
-                <Text style={[styles.btnProviderText, { color: theme.text }]}>Continue with Apple</Text>
-              </Pressable>
+              />
             ) : null}
           </>
         )}
@@ -236,12 +254,18 @@ const styles = StyleSheet.create({
   divider: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 4 },
   dividerLine: { flex: 1, height: StyleSheet.hairlineWidth },
   dividerText: { fontSize: 13 },
-  btnProvider: {
+  googleBtn: {
     height: 48,
-    borderRadius: 10,
-    borderWidth: 1,
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  btnProviderText: { fontWeight: '600', fontSize: 16 },
+  googleBtnImage: {
+    height: 44,
+    width: '100%',
+  },
+  appleBtn: {
+    height: 48,
+    width: '100%',
+  },
 });
