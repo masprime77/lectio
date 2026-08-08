@@ -72,3 +72,15 @@ contextBridge.exposeInMainWorld('moodleAuth', {
   removeAccount: (baseUrl) => ipcRenderer.invoke('moodle-remove-account', baseUrl),
   captureToken: (baseUrl) => ipcRenderer.invoke('moodle-capture-token', baseUrl),
 });
+
+// Pomodoro menu bar bridge: the renderer reports its current display state
+// one-way (main has no timer logic of its own — see main.js), and receives
+// back the three actions the header button already performs, relayed from
+// clicks on the Tray menu.
+contextBridge.exposeInMainWorld('pomodoroTray', {
+  report: (state) => ipcRenderer.send('pomodoro-tray-report', state),
+  onToggle: (callback) => ipcRenderer.on('tray-pomodoro-toggle', () => callback()),
+  onSkip: (callback) => ipcRenderer.on('tray-pomodoro-skip', () => callback()),
+  onStop: (callback) => ipcRenderer.on('tray-pomodoro-stop', () => callback()),
+  onOpenModal: (callback) => ipcRenderer.on('tray-open-pomodoro-modal', () => callback()),
+});
