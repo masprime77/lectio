@@ -1,5 +1,11 @@
 ## Unreleased
 
+- Fixed: `packages/desktop/build/afterSign.js` now fails loudly with an
+  actionable error when only some of the five macOS signing secrets
+  (`CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_TEAM_ID`, `APPLE_ID`,
+  `APPLE_ID_PASSWORD`) are configured, instead of silently attempting to
+  notarize an unsigned app and crashing with a cryptic codesign error.
+
 ## v1.0.0
 
 _Released: 2026-08-08_
