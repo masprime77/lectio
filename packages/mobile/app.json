@@ -3,7 +3,7 @@
     "name": "Lectio",
     "slug": "lectio",
     "version": "1.8.8",
-    "orientation": "portrait",
+    "orientation": "default",
     "scheme": "lectio",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -26,7 +26,8 @@
       "expo-apple-authentication",
       "expo-secure-store",
       "expo-asset",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-screen-orientation"
     ],
     "experiments": {
       "typedRoutes": false
