@@ -77,6 +77,13 @@ item tags) — see [Mobile app](#mobile-app) and
   be recolored); every other tag, including "studied", can be renamed, recolored,
   deleted, and reordered. Custom tags can be added, renamed, recolored, and
   dragged to reorder in the Tags tab of the semester modal.
+- **Pomodoro study timer** — start a focus timer for any course from either
+  app: set your focus and break lengths and how many blocks precede a long
+  break, and Lectio adds the time to that course as you go. The control becomes
+  a live countdown you can pause, skip, or stop; the remaining time is derived
+  from the session deadline, so backgrounding, sleeping, or restarting the app
+  never loses time. Each course's total is shown on the dashboard and course
+  views, and can be corrected by hand.
 - **Sort control** — order courses by progress (↓/↑), alphabetically (A → Z /
   Z → A), or by week (↑/↓). Persists in `localStorage`; never rewrites the JSON
   file. Progress and alphabetical sorts apply to the dashboard and All Courses
