@@ -88,6 +88,188 @@
     return createIdleState();
   }
 
+  // ---- Deadline-based timer state -----------------------------------------
+  // The tick-based helpers above decrement a counter and assume a reliable
+  // 1 Hz caller. These derive everything from wall-clock instead, which is
+  // what both UIs actually use: an interval only triggers a repaint, so a
+  // throttled or suspended timer (backgrounded app, sleeping laptop) resumes
+  // showing the correct remaining time with no catch-up logic.
+  //
+  // Session shape:
+  //   { phase, endsAt, pausedAt, completedPomodoros, courseId, semesterId }
+  //   phase              'idle' | 'work' | 'shortBreak' | 'longBreak'
+  //   endsAt             epoch ms when the current phase ends (0 when idle)
+  //   pausedAt           epoch ms when paused, or null when running
+  //   completedPomodoros work phases finished so far this session
+  //   courseId           course to credit, or null for a free-study session
+  //   semesterId         semester the session was started against
+  // It is a plain JSON-safe object so it can be persisted as-is.
+
+  function createIdleSession() {
+    return {
+      phase: 'idle',
+      endsAt: 0,
+      pausedAt: null,
+      completedPomodoros: 0,
+      courseId: null,
+      semesterId: null,
+    };
+  }
+
+  function phaseDurationSeconds(phase, settings) {
+    const s = clampPomodoroSettings(settings);
+    if (phase === 'work') return s.workMinutes * 60;
+    if (phase === 'shortBreak') return s.shortBreakMinutes * 60;
+    if (phase === 'longBreak') return s.longBreakMinutes * 60;
+    return 0;
+  }
+
+  // Begin a work phase now. `opts` = { courseId, semesterId }.
+  function startSession(settings, opts, nowMs) {
+    const now = typeof nowMs === 'number' ? nowMs : Date.now();
+    const o = opts || {};
+    return {
+      phase: 'work',
+      endsAt: now + phaseDurationSeconds('work', settings) * 1000,
+      pausedAt: null,
+      completedPomodoros: 0,
+      courseId: o.courseId || null,
+      semesterId: o.semesterId || null,
+    };
+  }
+
+  // Whole seconds left in the current phase, never negative. A paused session
+  // freezes at the remaining time it had when it was paused.
+  function remainingSeconds(session, nowMs) {
+    if (!session || session.phase === 'idle') return 0;
+    const now = typeof nowMs === 'number' ? nowMs : Date.now();
+    const ref = session.pausedAt != null ? session.pausedAt : now;
+    return Math.max(0, Math.ceil((session.endsAt - ref) / 1000));
+  }
+
+  function isRunning(session) {
+    return !!session && session.phase !== 'idle' && session.pausedAt == null;
+  }
+
+  function isPaused(session) {
+    return !!session && session.phase !== 'idle' && session.pausedAt != null;
+  }
+
+  // True once a running phase has reached its deadline.
+  function isPhaseComplete(session, nowMs) {
+    if (!isRunning(session)) return false;
+    const now = typeof nowMs === 'number' ? nowMs : Date.now();
+    return now >= session.endsAt;
+  }
+
+  function pauseSession(session, nowMs) {
+    if (!isRunning(session)) return session;
+    const now = typeof nowMs === 'number' ? nowMs : Date.now();
+    return { ...session, pausedAt: now };
+  }
+
+  // Resume by pushing the deadline out by however long the pause lasted, so
+  // the remaining time is preserved exactly.
+  function resumeSession(session, nowMs) {
+    if (!isPaused(session)) return session;
+    const now = typeof nowMs === 'number' ? nowMs : Date.now();
+    const pausedFor = now - session.pausedAt;
+    return { ...session, endsAt: session.endsAt + pausedFor, pausedAt: null };
+  }
+
+  // Seconds of work actually elapsed in the current phase. Returns 0 unless
+  // the session is in a work phase. Used to credit partial time when a session
+  // is stopped early, and clamped to the phase length so a long pause or a
+  // clock change can never credit more than one full pomodoro.
+  function elapsedWorkSeconds(session, settings, nowMs) {
+    if (!session || session.phase !== 'work') return 0;
+    const full = phaseDurationSeconds('work', settings);
+    const left = remainingSeconds(session, nowMs);
+    return Math.max(0, Math.min(full, full - left));
+  }
+
+  // Advance to the next phase, keeping the same course/semester. Mirrors
+  // advancePhase(): work -> shortBreak, or longBreak every nth pomodoro;
+  // shortBreak -> work; longBreak -> idle (one full cycle done).
+  function advanceSession(session, settings, nowMs) {
+    const s = clampPomodoroSettings(settings);
+    const now = typeof nowMs === 'number' ? nowMs : Date.now();
+    if (!session || session.phase === 'idle') return createIdleSession();
+
+    const carry = { courseId: session.courseId, semesterId: session.semesterId };
+
+    if (session.phase === 'work') {
+      const completed = session.completedPomodoros + 1;
+      const nextPhase = completed % s.pomodorosUntilLongBreak === 0 ? 'longBreak' : 'shortBreak';
+      return {
+        phase: nextPhase,
+        endsAt: now + phaseDurationSeconds(nextPhase, s) * 1000,
+        pausedAt: null,
+        completedPomodoros: completed,
+        ...carry,
+      };
+    }
+
+    if (session.phase === 'shortBreak') {
+      return {
+        phase: 'work',
+        endsAt: now + phaseDurationSeconds('work', s) * 1000,
+        pausedAt: null,
+        completedPomodoros: session.completedPomodoros,
+        ...carry,
+      };
+    }
+
+    // longBreak finished — the configured cycle is complete.
+    return createIdleSession();
+  }
+
+  // Skip straight to the next phase before its deadline (the "Skip" control).
+  // Identical to advanceSession; named separately so call sites read clearly.
+  function skipPhase(session, settings, nowMs) {
+    return advanceSession(session, settings, nowMs);
+  }
+
+  // Human label for the current phase, for the timer face.
+  function phaseLabel(phase) {
+    if (phase === 'work') return 'Focus';
+    if (phase === 'shortBreak') return 'Short break';
+    if (phase === 'longBreak') return 'Long break';
+    return 'Idle';
+  }
+
+  // Restores a session read back from storage. Anything malformed, or a
+  // session whose break already ended while the app was closed, collapses to
+  // idle. A *work* phase that ended while away is returned as-is so the caller
+  // can still credit its time before advancing — see the UI parts.
+  function rehydrateSession(raw, nowMs) {
+    const now = typeof nowMs === 'number' ? nowMs : Date.now();
+    if (!raw || typeof raw !== 'object') return createIdleSession();
+    const phases = ['idle', 'work', 'shortBreak', 'longBreak'];
+    if (!phases.includes(raw.phase)) return createIdleSession();
+    if (raw.phase === 'idle') return createIdleSession();
+    if (typeof raw.endsAt !== 'number' || !Number.isFinite(raw.endsAt)) {
+      return createIdleSession();
+    }
+    const session = {
+      phase: raw.phase,
+      endsAt: raw.endsAt,
+      pausedAt: typeof raw.pausedAt === 'number' ? raw.pausedAt : null,
+      completedPomodoros:
+        typeof raw.completedPomodoros === 'number' && raw.completedPomodoros >= 0
+          ? Math.floor(raw.completedPomodoros)
+          : 0,
+      courseId: typeof raw.courseId === 'string' ? raw.courseId : null,
+      semesterId: typeof raw.semesterId === 'string' ? raw.semesterId : null,
+    };
+    // A break that expired while the app was closed is simply over — there is
+    // nothing to credit and no value in resuming it.
+    if (session.phase !== 'work' && session.pausedAt == null && now >= session.endsAt) {
+      return createIdleSession();
+    }
+    return session;
+  }
+
   // Lazily initializes course.studyTime in place and returns it.
   function ensureStudyTime(course) {
     if (!course.studyTime || typeof course.studyTime !== 'object') {
@@ -192,10 +374,27 @@
     DEFAULT_POMODORO_SETTINGS,
     MAX_SESSIONS,
     clampPomodoroSettings,
+    // tick-based state machine (retained)
     createIdleState,
     startWork,
     tick,
     advancePhase,
+    // deadline-based session state
+    createIdleSession,
+    phaseDurationSeconds,
+    startSession,
+    remainingSeconds,
+    isRunning,
+    isPaused,
+    isPhaseComplete,
+    pauseSession,
+    resumeSession,
+    elapsedWorkSeconds,
+    advanceSession,
+    skipPhase,
+    phaseLabel,
+    rehydrateSession,
+    // study time
     ensureStudyTime,
     getCourseStudySeconds,
     addStudyTime,
