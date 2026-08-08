@@ -27,6 +27,13 @@
     ],
     "experiments": {
       "typedRoutes": false
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "68cf77ab-e519-4e77-b02d-5159ccd1f9c3"
+      }
+    },
+    "owner": "masprime77"
   }
 }
