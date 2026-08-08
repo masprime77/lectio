@@ -1980,6 +1980,13 @@ async function setupPomodoro() {
   document.getElementById('pomodoro-skip-btn')
     .addEventListener('click', onPomodoroSkip);
 
+  if (window.pomodoroTray) {
+    window.pomodoroTray.onToggle(onPomodoroPrimaryClick);
+    window.pomodoroTray.onSkip(onPomodoroSkip);
+    window.pomodoroTray.onStop(() => stopPomodoro(true));
+    window.pomodoroTray.onOpenModal(openPomodoroModal);
+  }
+
   const overlay = document.getElementById('pomodoro-overlay');
   const closeBtn = document.getElementById('pomodoro-close');
   closeBtn.innerHTML = icon('x');
@@ -2185,6 +2192,7 @@ function renderPomodoroControl() {
   if (idle) {
     btn.innerHTML = `${icon('clock')}<span>Study timer</span>`;
     btn.title = 'Start a study timer';
+    reportPomodoroToTray();
     return;
   }
 
@@ -2201,6 +2209,31 @@ function renderPomodoroControl() {
     `<span class="pomodoro-clock">${formatClock(remainingSeconds(s))}</span>` +
     `<span class="pomodoro-label">${escapeHtml(label)}</span>`;
   btn.title = paused ? 'Resume' : 'Pause';
+  reportPomodoroToTray();
+}
+
+// Push the header control's current display state to the Tray (main has no
+// timer logic of its own — see main.js's pomodoro-tray-report handler).
+// No-ops if the bridge isn't present, i.e. any context where main.js hasn't
+// wired preload.js's window.pomodoroTray (there isn't one in this app, but
+// this keeps the renderer resilient to a stripped-down preload during tests).
+function reportPomodoroToTray() {
+  if (!window.pomodoroTray) return;
+  const s = state.pomodoro.session;
+  const idle = s.phase === 'idle';
+  if (idle) {
+    window.pomodoroTray.report({ phase: 'idle', clock: '', label: '', paused: false });
+    return;
+  }
+  const course =
+    s.courseId && state.semester ? state.semester.courses.find((c) => c.id === s.courseId) : null;
+  const label = s.phase === 'work' ? (course ? course.name : 'Free study') : phaseLabel(s.phase);
+  window.pomodoroTray.report({
+    phase: s.phase,
+    clock: formatClock(remainingSeconds(s)),
+    label,
+    paused: pomodoroIsPaused(s),
+  });
 }
 
 // Swap a studied-time label for an inline text input. Mirrors

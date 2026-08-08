@@ -103,7 +103,9 @@
       "pomodoro-core.js",
       "migrate.js",
       "semesters/",
-      "assets/icon.png"
+      "assets/icon.png",
+      "assets/pomodoro-tray-icon.png",
+      "assets/pomodoro-tray-icon@2x.png"
     ],
     "extraResources": [
       {
