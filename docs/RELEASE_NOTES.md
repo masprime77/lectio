@@ -17,6 +17,9 @@
   the Breakdown panel, focus mode, and in-app feedback; its example-semester
   step now loads the bundled example itself if none exists yet, instead of
   silently skipping.
+- Chore: untracked `spikes/moodle-poc/inspect-result.json` (a personal-data
+  spike output that predated its `.gitignore` rule) from the repo, and
+  removed a developer name from an HTML comment on the public landing page.
 
 ## 1.0.1 — 2026-08-09
 
