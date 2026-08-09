@@ -5,6 +5,10 @@
   independent version was left untouched, as was `expo.ios.buildNumber`
   (unset — EAS manages it remotely via `appVersionSource: "remote"` +
   `autoIncrement` on the production build profile).
+- Fixed: the desktop app no longer auto-seeds new installs with the old
+  "Dev Test Semester" fixture. The bundled example was replaced with a
+  minimal "Example Semester" (`ss2025`), and it's now loaded only when the
+  user explicitly clicks "Load example semester" from the empty state.
 
 ## 1.0.1 — 2026-08-09
 
