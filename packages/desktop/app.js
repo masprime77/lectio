@@ -2289,9 +2289,28 @@ function renderEmptyState() {
   state.semesterId = null;
   state.semester = null;
   document.getElementById('dashboard').innerHTML =
-    '<h2>No semesters yet</h2><div class="current-week">Create one with the “New Semester” button.</div>';
+    '<h2>No semesters yet</h2>' +
+    '<div class="current-week">Create one with the “New” button, or start from a small example.</div>' +
+    '<button type="button" id="load-example-btn" class="btn">Load example semester</button>';
   document.getElementById('planner').innerHTML = '';
   setSemesterActionsEnabled(false);
+  const loadBtn = document.getElementById('load-example-btn');
+  if (loadBtn) loadBtn.addEventListener('click', () => loadExampleSemesterFlow(loadBtn));
+}
+
+// Loads the bundled example semester on explicit user request (desktop no
+// longer auto-seeds userData on first launch — see main.js's
+// ensureSemestersDir).
+async function loadExampleSemesterFlow(btn) {
+  await withBusy(btn, 'Loading…', async () => {
+    try {
+      const id = await window.planner.loadExampleSemester();
+      await populateSelector();
+      await loadSemester(id);
+    } catch (err) {
+      alert('Could not load the example semester: ' + (err.message || err));
+    }
+  });
 }
 
 function setSemesterActionsEnabled(enabled) {

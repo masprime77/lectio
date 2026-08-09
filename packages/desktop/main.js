@@ -4,6 +4,7 @@ const log = require('electron-log/main');
 const fs = require('fs');
 const path = require('path');
 const { registerIpcHandlers } = require('@lectio/core/ipc-handlers');
+const { getSemester, saveSemester } = require('@lectio/core/semester-store');
 const { buildLaunchUrl, parseMoodleMobileRedirect } = require('@lectio/core/integrations/moodle-sso');
 const { parseOAuthRedirect } = require('@lectio/core/integrations/oauth-redirect');
 
@@ -341,6 +342,25 @@ function setupAutoUpdater(enabled) {
 // IPC: filesystem handlers (replace the old Express endpoints). The actual
 // logic lives in @lectio/core (semester-store) so it can be tested without Electron.
 registerIpcHandlers(ipcMain, () => SEMESTERS_DIR);
+
+// Explicit, user-initiated load of the bundled example semester (see the
+// empty-state "Load example semester" button in app.js). Lives here rather
+// than in @lectio/core/ipc-handlers because it needs app.isPackaged /
+// process.resourcesPath, which are Electron-specific.
+ipcMain.handle('load-example-semester', () => {
+  const bundledExample = app.isPackaged
+    ? path.join(process.resourcesPath, 'semesters', 'example.json')
+    : path.join(__dirname, 'semesters', 'example.json');
+  const data = JSON.parse(fs.readFileSync(bundledExample, 'utf8'));
+  try {
+    getSemester(SEMESTERS_DIR, data.id);
+    return data.id; // already present (e.g. loaded before) — don't overwrite edits
+  } catch (e) {
+    // not found — fall through and create it
+  }
+  saveSemester(SEMESTERS_DIR, data.id, data);
+  return data.id;
+});
 
 // ---------------------------------------------------------------------------
 // Unsaved-changes tracking + close prompt
