@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { createURL } from 'expo-linking';
-import { supabase } from '../supabase/client';
+import { supabase, isSupabaseConfigured } from '../supabase/client';
 import { isExpoGo } from './env';
 import { signInWithProvider, signInWithAppleNative } from './oauth';
 import { isConnectivityError } from './auth-errors';
@@ -42,6 +42,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function loadSession() {
     setConnectionError(false);
     setLoading(true);
+    if (!isSupabaseConfigured) {
+      setConnectionError(true);
+      setLoading(false);
+      return;
+    }
     try {
       const { data } = await supabase.auth.getSession();
       setSession(data.session);
