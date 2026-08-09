@@ -1061,6 +1061,31 @@ body.electron-app .header-inner { padding-left: 80px; }
 .legal-notice a { color: var(--primary); text-decoration: none; }
 .legal-notice a:hover { text-decoration: underline; }
 
+.oauth-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 1rem 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.oauth-divider::before,
+.oauth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.oauth-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.btn-oauth {
+  width: 100%;
+  text-align: center;
+}
+
 /* Modal tabs */
 .modal-tabs {
   display: flex;
