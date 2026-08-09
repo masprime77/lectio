@@ -83,6 +83,19 @@ Application** certificate (a Development or Mac App Distribution cert won't
 do) and `CSC_KEY_PASSWORD` not matching the `.p12` export password; the error
 includes the raw `codesign` output so the actual state is visible in the CI log.
 
+### Two notarization paths — only one is enabled
+
+electron-builder has **built-in** notarization of its own, in addition to the
+`afterSign.js` hook. It activates as soon as `APPLE_ID` is set and then requires
+the app-specific password in **`APPLE_APP_SPECIFIC_PASSWORD`** — a different
+variable from the `APPLE_ID_PASSWORD` this repo's hook uses — so it aborts the
+build with `APPLE_APP_SPECIFIC_PASSWORD env var needs to be set`. It is
+therefore disabled with `"notarize": false` in the desktop `package.json`'s
+`build.mac` block, leaving `afterSign.js` as the single notarizer. Enabling both
+would notarize every build twice. If you ever prefer the built-in path, set
+`APPLE_APP_SPECIFIC_PASSWORD` in the workflow and drop the `notarize()` call
+from `afterSign.js`.
+
 Notarization only succeeds because **Hardened Runtime** is enabled with the
 entitlements Electron's JIT needs
 (`packages/desktop/build/entitlements.mac.plist`) — Apple rejects a build
