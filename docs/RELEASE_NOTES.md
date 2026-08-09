@@ -5,6 +5,9 @@
   independent version was left untouched, as was `expo.ios.buildNumber`
   (unset — EAS manages it remotely via `appVersionSource: "remote"` +
   `autoIncrement` on the production build profile).
+- Fixed: the Google and Apple sign-in icons were missing on downloaded/
+  packaged builds (they only ever showed in dev mode) — their SVG assets
+  were never added to electron-builder's packaging whitelist.
 - Fixed: the desktop app no longer auto-seeds new installs with the old
   "Dev Test Semester" fixture. The bundled example was replaced with a
   minimal "Example Semester" (`ss2025`), and it's now loaded only when the
