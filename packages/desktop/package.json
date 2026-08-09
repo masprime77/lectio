@@ -106,7 +106,9 @@
       "semesters/",
       "assets/icon.png",
       "assets/pomodoro-tray-icon.png",
-      "assets/pomodoro-tray-icon@2x.png"
+      "assets/pomodoro-tray-icon@2x.png",
+      "assets/google-logo.svg",
+      "assets/apple-logo.svg"
     ],
     "extraResources": [
       {
