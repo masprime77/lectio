@@ -4545,6 +4545,27 @@ function setupSignIn() {
   });
   createBtn.addEventListener('click', () => run(lectioAuth.signUp));
 
+  const googleBtn = document.getElementById('signin-google');
+  const appleBtn = document.getElementById('signin-apple');
+
+  async function runProvider(provider, btn) {
+    errEl.classList.add('hidden');
+    setBusy(true);
+    btn.disabled = true;
+    try {
+      await lectioAuth.signInWithProvider(provider);
+      // On success, onAuthChange -> handleSession() hides the overlay.
+    } catch (e) {
+      showError(lectioAuth.friendlyAuthError(e));
+    } finally {
+      setBusy(false);
+      btn.disabled = false;
+    }
+  }
+
+  googleBtn.addEventListener('click', () => runProvider('google', googleBtn));
+  appleBtn.addEventListener('click', () => runProvider('apple', appleBtn));
+
   document.getElementById('signin-privacy-link').addEventListener('click', (e) => {
     e.preventDefault();
     window.legalDocs.open('privacy');

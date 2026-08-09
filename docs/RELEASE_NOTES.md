@@ -1,7 +1,7 @@
 ## Unreleased
 
-- Added: groundwork for desktop "Sign in with Google" / "Sign in with Apple"
-  (renderer UI lands in a follow-up). `packages/core/src/integrations/oauth-redirect.js`
+- Added: groundwork for desktop "Sign in with Google" / "Sign in with Apple".
+  `packages/core/src/integrations/oauth-redirect.js`
   parses a captured `lectio://auth-callback` redirect from a Supabase
   `signInWithOAuth()` flow (both the PKCE `?code=` shape and the older
   implicit `#access_token=`/`refresh_token=` shape, plus provider error
@@ -14,6 +14,17 @@
   Services bridge in Electron); Supabase resolves the same account by `sub`
   claim regardless of which flow supplied the identity token, so accounts stay
   shared with the mobile app.
+- Added: "Continue with Google" / "Continue with Apple" buttons to the desktop
+  sign-in screen, below the existing email/password form. `auth.js`'s new
+  `signInWithProvider()` calls Supabase's `signInWithOAuth()` with
+  `skipBrowserRedirect`, hands the resulting authorize URL to
+  `window.providerAuth.captureRedirect()`, and completes the session via
+  `exchangeCodeForSession()` (PKCE) or `setSession()` (implicit) once the
+  redirect comes back — mirroring `packages/mobile/src/auth/oauth.ts`'s
+  `signInWithProvider()`. A closed popup or provider error surfaces through
+  the existing `friendlyAuthError()` path, same as password sign-in.
+  Requires a one-time Google/Apple OAuth provider setup in the Supabase
+  dashboard before it works end-to-end (see PR description).
 - Fixed: the mobile app crashed instantly on launch whenever
   `EXPO_PUBLIC_SUPABASE_URL`/`EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` were
   missing (as in TestFlight build 1.0.0 #3, whose EAS build had neither var
