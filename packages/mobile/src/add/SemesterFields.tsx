@@ -17,6 +17,7 @@ import { saveWithConflict } from '../sync/saveWithConflict';
 import { uniqueSemesterId } from '../lib/semester-id';
 import { useTheme } from '../theme';
 import { DateField } from '../components/DateField';
+import { NumericKeyboardDoneBar, NUMERIC_KEYBOARD_ACCESSORY_ID } from '../components/NumericKeyboardDoneBar';
 import type { Semester } from '../../types/lectio-core';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -143,10 +144,12 @@ export function SemesterFields({
         placeholder="15"
         placeholderTextColor={theme.muted}
         keyboardType="number-pad"
+        inputAccessoryViewID={NUMERIC_KEYBOARD_ACCESSORY_ID}
         value={weeks}
         onChangeText={setWeeks}
         editable={!busy}
       />
+      <NumericKeyboardDoneBar />
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 

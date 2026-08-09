@@ -1,10 +1,43 @@
 ## Unreleased
 
+## 1.0.2 — 2026-08-09
+
 - Chore: bumped version to 1.0.1 across the root, desktop, and mobile
   packages, and `packages/mobile/app.json`'s `expo.version`; `@lectio/core`'s
   independent version was left untouched, as was `expo.ios.buildNumber`
   (unset — EAS manages it remotely via `appVersionSource: "remote"` +
   `autoIncrement` on the production build profile).
+- Fixed: the Google and Apple sign-in icons were missing on downloaded/
+  packaged builds (they only ever showed in dev mode) — their SVG assets
+  were never added to electron-builder's packaging whitelist.
+- Fixed: the desktop app no longer auto-seeds new installs with the old
+  "Dev Test Semester" fixture. The bundled example was replaced with a
+  minimal "Example Semester" (`ss2025`), and it's now loaded only when the
+  user explicitly clicks "Load example semester" from the empty state.
+- Fixed: creating or saving a semester could fail silently (an unhandled
+  promise rejection left the "New" modal stuck open with no feedback).
+  Errors now surface as a visible alert and the modal stays open with your
+  input intact.
+- Changed: the onboarding tour grew from 9 to 12 steps, adding coverage for
+  the Breakdown panel, focus mode, and in-app feedback; its example-semester
+  step now loads the bundled example itself if none exists yet, instead of
+  silently skipping.
+- Chore: untracked `spikes/moodle-poc/inspect-result.json` (a personal-data
+  spike output that predated its `.gitignore` rule) from the repo, and
+  removed a developer name from an HTML comment on the public landing page.
+- Docs: updated `README.md`, `CLAUDE.md`, and `.github/workflows/ci.yml` to
+  reflect the example-semester/tutorial changes above and to drop the
+  stale `mobile-prep` branch reference (the active integration branch is
+  `dev`).
+- Fixed (mobile): on iOS, `number-pad` fields had no way to dismiss the
+  keyboard (that keyboard type has no Return/Done key), leaving the Study
+  timer sheet, semester/item forms, and the Moodle import triage screen
+  stuck open under the keyboard. A shared "Done" accessory bar now closes
+  the keyboard from any of these fields; Android is unaffected.
+- Fixed (mobile): the "Study timer" and "Studied time" bottom sheets could
+  hide their text field behind the keyboard on iOS. Both now use the same
+  `KeyboardAvoidingView` pattern already used by the app's full-screen
+  forms, keeping the focused field visible.
 
 ## 1.0.1 — 2026-08-09
 
