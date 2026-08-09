@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { registerIpcHandlers } = require('@lectio/core/ipc-handlers');
 const { buildLaunchUrl, parseMoodleMobileRedirect } = require('@lectio/core/integrations/moodle-sso');
+const { parseOAuthRedirect } = require('@lectio/core/integrations/oauth-redirect');
 
 let mainWindow = null;
 
@@ -558,11 +559,56 @@ function captureMoodleToken(baseUrl) {
   });
 }
 
+// Opens `oauthUrl` (a Supabase signInWithOAuth() authorize URL, built in
+// the renderer where the PKCE code_verifier is already stored) in its own
+// window and intercepts the lectio://auth-callback redirect before
+// Electron tries to navigate to it — mirrors captureMoodleToken() above.
+// Resolves with the parsed redirect payload, or rejects if the user
+// closes the window first or the provider returned an error.
+function captureOAuthRedirect(oauthUrl) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+
+    const authWindow = new BrowserWindow({
+      width: 480,
+      height: 720,
+      title: 'Sign in',
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
+    });
+
+    function handleRedirect(event, url) {
+      const parsed = parseOAuthRedirect(url);
+      if (settled || !parsed) return;
+      event.preventDefault();
+      settled = true;
+      authWindow.destroy();
+      if (parsed.type === 'error') {
+        reject(new Error(parsed.errorDescription || parsed.error));
+        return;
+      }
+      resolve(parsed);
+    }
+
+    authWindow.webContents.on('will-redirect', handleRedirect);
+    authWindow.webContents.on('will-navigate', handleRedirect);
+
+    authWindow.on('closed', () => {
+      if (!settled) reject(new Error('Sign-in was cancelled.'));
+    });
+
+    authWindow.loadURL(oauthUrl);
+  });
+}
+
 ipcMain.handle('moodle-list-accounts', () => listMoodleAccounts());
 ipcMain.handle('moodle-get-account-token', (event, baseUrl) => getMoodleAccountToken(baseUrl));
 ipcMain.handle('moodle-add-account', (event, { baseUrl, wstoken, label }) => addMoodleAccount({ baseUrl, wstoken, label }));
 ipcMain.handle('moodle-remove-account', (event, baseUrl) => removeMoodleAccount(baseUrl));
 ipcMain.handle('moodle-capture-token', (event, baseUrl) => captureMoodleToken(baseUrl));
+ipcMain.handle('oauth-capture-redirect', (event, oauthUrl) => captureOAuthRedirect(oauthUrl));
 
 // ---------------------------------------------------------------------------
 // App lifecycle
