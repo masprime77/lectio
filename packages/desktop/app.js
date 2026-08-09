@@ -2624,9 +2624,9 @@ function setupModal() {
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) closeModal();
   });
-  document.getElementById('new-semester-form').addEventListener('submit', (e) => {
+  document.getElementById('new-semester-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    submitModal();
+    await submitModal();
   });
 
   // Tab switching between Semester / Courses / Tags / Reading-Task panels.
@@ -2889,6 +2889,17 @@ async function submitModal() {
     return;
   }
 
+  try {
+    await submitSemesterFromModal();
+  } catch (err) {
+    alert('Could not save the semester: ' + (err.message || err));
+  }
+}
+
+// Create or update the semester described by the Semester/Courses tabs.
+// Split out from submitModal so errors thrown anywhere in here (including
+// storage failures) are caught in one place instead of failing silently.
+async function submitSemesterFromModal() {
   const name = document.getElementById('ns-name').value.trim();
   const startDate = document.getElementById('ns-start').value;
   const weeks = parseInt(document.getElementById('ns-weeks').value, 10) || 15;
