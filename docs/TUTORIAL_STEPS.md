@@ -4,7 +4,7 @@ This describes the **desktop app** (`@lectio/desktop`). The mobile app has no
 onboarding tour yet — that gap is tracked in
 [`PENDING_FEATURES.md`](PENDING_FEATURES.md).
 
-The desktop app shows an interactive tour on first launch, and whenever the user triggers it from **Settings → Start tour**.
+The desktop app shows an interactive tour on first launch, and whenever the user triggers it from **Settings → Start tour**. It currently has 12 steps, including `breakdown` (the Breakdown progress panel), `focus-mode` (clicking a course name to focus on it), and `feedback` (the feedback button) between the sort and study-timer steps.
 
 ## How steps work
 

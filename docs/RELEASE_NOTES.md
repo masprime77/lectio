@@ -13,6 +13,10 @@
   promise rejection left the "New" modal stuck open with no feedback).
   Errors now surface as a visible alert and the modal stays open with your
   input intact.
+- Changed: the onboarding tour grew from 9 to 12 steps, adding coverage for
+  the Breakdown panel, focus mode, and in-app feedback; its example-semester
+  step now loads the bundled example itself if none exists yet, instead of
+  silently skipping.
 
 ## 1.0.1 — 2026-08-09
 

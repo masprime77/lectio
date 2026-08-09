@@ -1454,6 +1454,30 @@ const TUTORIAL_STEPS = [
     setup: null,
   },
   {
+    id: 'breakdown',
+    title: 'Readings vs. tasks',
+    description:
+      'The Breakdown button splits each course\'s progress into separate readings and tasks bars, plus a total for the whole semester.',
+    targetSelector: '#breakdown-btn',
+    setup: null,
+  },
+  {
+    id: 'focus-mode',
+    title: 'Focus on one course',
+    description:
+      'Click a course name on the dashboard to focus on it — the other courses collapse out of the way so you can concentrate on one at a time. Click it again to unfocus.',
+    targetSelector: '.progress-course-name',
+    setup: null,
+  },
+  {
+    id: 'feedback',
+    title: 'Send feedback',
+    description:
+      'Found a bug or have an idea? The feedback button lets you send a bug report or feature request straight from the app.',
+    targetSelector: '#feedback-btn',
+    setup: null,
+  },
+  {
     id: 'pomodoro',
     title: 'Study timer',
     description:
