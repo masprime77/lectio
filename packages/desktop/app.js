@@ -1407,11 +1407,16 @@ const TUTORIAL_STEPS = [
       'This is the semester selector. Lectio comes with an example semester so you can explore right away. You can create your own with the "New" button.',
     targetSelector: '#semester-select',
     setup: async () => {
-      // Ensure the example semester (id "ss2025") is loaded, if it exists.
-      // If the user already has a different semester active, do nothing.
+      // Ensure the example semester (id "ss2025") is loaded, loading the
+      // bundled example first if the user hasn't already (e.g. someone who
+      // starts the tour before ever hitting the empty-state button).
       const list = await api.list();
-      const example = list.find((s) => s.id === 'ss2025');
-      if (example && state.semesterId !== 'ss2025') {
+      let example = list.find((s) => s.id === 'ss2025');
+      if (!example) {
+        await window.planner.loadExampleSemester();
+        await populateSelector();
+      }
+      if (state.semesterId !== 'ss2025') {
         await loadSemester('ss2025');
       }
     },
