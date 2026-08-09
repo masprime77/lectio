@@ -10,6 +10,7 @@ jobs:
   # build below never runs — so a release is never built when tests fail.
   ci:
     uses: ./.github/workflows/ci.yml
+    secrets: inherit
 
   build:
     name: Build & publish macOS app
