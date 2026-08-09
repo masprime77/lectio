@@ -16,6 +16,7 @@ import { storage } from '../storage';
 import { saveWithConflict } from '../sync/saveWithConflict';
 import { useTheme } from '../theme';
 import { DateField } from '../components/DateField';
+import { NumericKeyboardDoneBar, NUMERIC_KEYBOARD_ACCESSORY_ID } from '../components/NumericKeyboardDoneBar';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 function isValidDate(s: string): boolean {
@@ -149,10 +150,12 @@ export function ItemFields({
         placeholder="1"
         placeholderTextColor={theme.muted}
         keyboardType="number-pad"
+        inputAccessoryViewID={NUMERIC_KEYBOARD_ACCESSORY_ID}
         value={week}
         onChangeText={setWeek}
         editable={!busy}
       />
+      <NumericKeyboardDoneBar />
 
       {kind === 'task' && (
         <>
