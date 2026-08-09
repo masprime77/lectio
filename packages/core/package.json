@@ -14,6 +14,7 @@
     "./integrations/moodle": "./src/integrations/moodle.js",
     "./integrations/moodle-client": "./src/integrations/moodle-client.js",
     "./integrations/moodle-sso": "./src/integrations/moodle-sso.js",
+    "./integrations/oauth-redirect": "./src/integrations/oauth-redirect.js",
     "./storage/migrate": "./src/storage/migrate.js",
     "./storage/contract": "./src/storage/contract.js",
     "./storage/conflict": "./src/storage/conflict.js",

@@ -73,6 +73,13 @@ contextBridge.exposeInMainWorld('moodleAuth', {
   captureToken: (baseUrl) => ipcRenderer.invoke('moodle-capture-token', baseUrl),
 });
 
+// Provider auth bridge: opens a captive window for a Supabase
+// signInWithOAuth() authorize URL and resolves with the parsed
+// lectio://auth-callback redirect. See main.js's captureOAuthRedirect.
+contextBridge.exposeInMainWorld('providerAuth', {
+  captureRedirect: (oauthUrl) => ipcRenderer.invoke('oauth-capture-redirect', oauthUrl),
+});
+
 // Pomodoro menu bar bridge: the renderer reports its current display state
 // one-way (main has no timer logic of its own — see main.js), and receives
 // back the three actions the header button already performs, relayed from

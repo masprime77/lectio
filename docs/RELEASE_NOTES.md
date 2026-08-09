@@ -1,5 +1,62 @@
 ## Unreleased
 
+- Chore: bumped version to 1.0.1 across the root, desktop, and mobile
+  packages, and `packages/mobile/app.json`'s `expo.version`; `@lectio/core`'s
+  independent version was left untouched, as was `expo.ios.buildNumber`
+  (unset — EAS manages it remotely via `appVersionSource: "remote"` +
+  `autoIncrement` on the production build profile).
+
+## 1.0.1 — 2026-08-09
+
+- Changed: restyled the desktop "Continue with Google" / "Continue with
+  Apple" buttons as full-width branded pills (14px corner radius, soft
+  shadow, circular icon badge) and moved them above the email/password
+  form, ahead of an "or continue with email" divider. Google's icon comes
+  from Google's official pre-approved brand icon download; Apple's uses
+  the logo-only artwork from Apple Design Resources, recolored via a CSS
+  mask so the same file works on the button's black (light theme) and
+  white (dark theme) variants. No behavior change — same
+  `#signin-google`/`#signin-apple` ids and click handlers from the OAuth
+  groundwork above.
+- Added: groundwork for desktop "Sign in with Google" / "Sign in with Apple".
+  `packages/core/src/integrations/oauth-redirect.js`
+  parses a captured `lectio://auth-callback` redirect from a Supabase
+  `signInWithOAuth()` flow (both the PKCE `?code=` shape and the older
+  implicit `#access_token=`/`refresh_token=` shape, plus provider error
+  redirects). `packages/desktop/main.js`'s new `captureOAuthRedirect()` opens
+  the provider's authorize URL in its own window and intercepts that redirect
+  before Electron tries (and fails) to navigate to it — the same technique
+  `captureMoodleToken()` already uses for Moodle's SSO flow — exposed to the
+  renderer as `window.providerAuth.captureRedirect()`. Desktop uses this same
+  browser-based flow for both Google and Apple (no native Apple Authentication
+  Services bridge in Electron); Supabase resolves the same account by `sub`
+  claim regardless of which flow supplied the identity token, so accounts stay
+  shared with the mobile app.
+- Added: "Continue with Google" / "Continue with Apple" buttons to the desktop
+  sign-in screen, below the existing email/password form. `auth.js`'s new
+  `signInWithProvider()` calls Supabase's `signInWithOAuth()` with
+  `skipBrowserRedirect`, hands the resulting authorize URL to
+  `window.providerAuth.captureRedirect()`, and completes the session via
+  `exchangeCodeForSession()` (PKCE) or `setSession()` (implicit) once the
+  redirect comes back — mirroring `packages/mobile/src/auth/oauth.ts`'s
+  `signInWithProvider()`. A closed popup or provider error surfaces through
+  the existing `friendlyAuthError()` path, same as password sign-in.
+  Requires a one-time Google/Apple OAuth provider setup in the Supabase
+  dashboard before it works end-to-end (see PR description).
+- Fixed: the mobile app crashed instantly on launch whenever
+  `EXPO_PUBLIC_SUPABASE_URL`/`EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` were
+  missing (as in TestFlight build 1.0.0 #3, whose EAS build had neither var
+  configured). `packages/mobile/src/supabase/client.ts` threw at module
+  scope on import — before `AuthProvider`, before `RootLayout`, before React
+  ever mounted, so no error boundary or retry screen could catch it. It now
+  exports `isSupabaseConfigured` instead of throwing, and
+  `AuthProvider.tsx`'s `loadSession()` short-circuits straight to the
+  existing "Can't reach Lectio's servers" retry screen when unconfigured.
+- Added: the mobile app now uses the desktop app's icon instead of Expo's
+  default. `packages/mobile/assets/icon.png` is generated from
+  `packages/desktop/assets/icon.png` with its (fully opaque) alpha channel
+  stripped, since iOS App Store binary validation rejects icons that carry
+  an alpha channel; `app.json`'s new `icon` field points at it.
 - Fixed: `packages/desktop/build/afterSign.js` now fails loudly with an
   actionable error when only some of the five macOS signing secrets
   (`CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_TEAM_ID`, `APPLE_ID`,
@@ -38,6 +95,24 @@
   `spawnSync npm ENOENT` (npm on PATH is the `npm.cmd` shim) and then
   `spawnSync npm.cmd EINVAL` (since Node's CVE-2024-27980 hardening, spawning a
   `.cmd`/`.bat` without a shell is refused outright).
+- Fixed: every packaged release shipped an empty Supabase config, so sign-in
+  always failed with "Cannot reach the server." `sync-supabase.js` resolves the
+  project URL/key from `EXPO_PUBLIC_SUPABASE_URL` /
+  `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (falling back to the git-ignored
+  `packages/mobile/.env`), but the release workflow set neither and CI has no
+  `.env` — so the build wrote `{ url: '', anonKey: '' }`, `supabase-client.js`
+  set `window.lectioSupabase = null`, and `auth.js` rejected every sign-in.
+  Local `npm start` worked only because a developer's own `.env` filled it in.
+- Changed: `sync-supabase.js` now exits non-zero when `CI=true` and no Supabase
+  URL/key is found, instead of warning and writing an empty config — a release
+  that can never sign in now fails the build rather than being published.
+  Local (non-CI) runs are unchanged and still warn.
+- Changed: the macOS and Windows build steps in `release.yml`, and the
+  packaging-sanity build in `ci.yml`, now pass `EXPO_PUBLIC_SUPABASE_URL` and
+  `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from repo secrets. **These two
+  secrets must be added to the repository before the next release** — the
+  builds fail without them by design (documented in the README's Releasing
+  section).
 
 ## v1.0.0
 
