@@ -103,6 +103,13 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          # Supabase project URL + publishable key, baked into the renderer at
+          # build time by prebuild:mac's sync-supabase.js. Without these the
+          # packaged app ships an empty config and every sign-in fails with
+          # "Cannot reach the server" — sync-supabase.js now fails the build
+          # in CI rather than publishing that.
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
         run: npm run build:mac --workspace @lectio/desktop -- --publish always
 
       - name: Upload build artifacts
@@ -144,6 +151,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Unsigned build in CI, mirroring macOS.
           CSC_IDENTITY_AUTO_DISCOVERY: false
+          # Same Supabase config as the macOS job — baked in by prebuild:win's
+          # sync-supabase.js, which fails the build in CI when they're missing.
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
         run: npm run build:win --workspace @lectio/desktop -- --publish always
 
       - name: Upload build artifacts
