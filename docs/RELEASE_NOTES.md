@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 1.0.2 — 2026-08-09
+
 - Chore: bumped version to 1.0.1 across the root, desktop, and mobile
   packages, and `packages/mobile/app.json`'s `expo.version`; `@lectio/core`'s
   independent version was left untouched, as was `expo.ios.buildNumber`
