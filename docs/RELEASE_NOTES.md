@@ -1,5 +1,19 @@
 ## Unreleased
 
+- Added: groundwork for desktop "Sign in with Google" / "Sign in with Apple"
+  (renderer UI lands in a follow-up). `packages/core/src/integrations/oauth-redirect.js`
+  parses a captured `lectio://auth-callback` redirect from a Supabase
+  `signInWithOAuth()` flow (both the PKCE `?code=` shape and the older
+  implicit `#access_token=`/`refresh_token=` shape, plus provider error
+  redirects). `packages/desktop/main.js`'s new `captureOAuthRedirect()` opens
+  the provider's authorize URL in its own window and intercepts that redirect
+  before Electron tries (and fails) to navigate to it — the same technique
+  `captureMoodleToken()` already uses for Moodle's SSO flow — exposed to the
+  renderer as `window.providerAuth.captureRedirect()`. Desktop uses this same
+  browser-based flow for both Google and Apple (no native Apple Authentication
+  Services bridge in Electron); Supabase resolves the same account by `sub`
+  claim regardless of which flow supplied the identity token, so accounts stay
+  shared with the mobile app.
 - Fixed: the mobile app crashed instantly on launch whenever
   `EXPO_PUBLIC_SUPABASE_URL`/`EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` were
   missing (as in TestFlight build 1.0.0 #3, whose EAS build had neither var
