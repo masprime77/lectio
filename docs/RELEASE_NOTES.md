@@ -27,6 +27,15 @@
   reflect the example-semester/tutorial changes above and to drop the
   stale `mobile-prep` branch reference (the active integration branch is
   `dev`).
+- Fixed (mobile): on iOS, `number-pad` fields had no way to dismiss the
+  keyboard (that keyboard type has no Return/Done key), leaving the Study
+  timer sheet, semester/item forms, and the Moodle import triage screen
+  stuck open under the keyboard. A shared "Done" accessory bar now closes
+  the keyboard from any of these fields; Android is unaffected.
+- Fixed (mobile): the "Study timer" and "Studied time" bottom sheets could
+  hide their text field behind the keyboard on iOS. Both now use the same
+  `KeyboardAvoidingView` pattern already used by the app's full-screen
+  forms, keeping the focused field visible.
 
 ## 1.0.1 — 2026-08-09
 

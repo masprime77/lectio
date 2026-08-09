@@ -10,7 +10,9 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,6 +23,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { clampPomodoroSettings } from '@lectio/core/pomodoro-core';
 import { getCourses } from '@lectio/core/planner-core';
+import { NumericKeyboardDoneBar, NUMERIC_KEYBOARD_ACCESSORY_ID } from '../components/NumericKeyboardDoneBar';
 import { useTheme } from '../theme';
 import type { PomodoroSettings, Semester } from '../../types/lectio-core';
 
@@ -93,6 +96,7 @@ export function PomodoroSetupSheet({
         value={value}
         onChangeText={onChange}
         keyboardType="number-pad"
+        inputAccessoryViewID={NUMERIC_KEYBOARD_ACCESSORY_ID}
         style={[
           styles.input,
           { color: theme.text, borderColor: theme.border, backgroundColor: theme.surfaceAlt },
@@ -104,60 +108,63 @@ export function PomodoroSetupSheet({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <AnimatedPressable
-          style={[
-            styles.sheet,
-            { backgroundColor: theme.surface, paddingBottom: insets.bottom + 16 },
-            { transform: [{ translateY }] },
-          ]}
-          onPress={(e) => e.stopPropagation()}
-        >
-          <Text style={[styles.title, { color: theme.text }]}>Study timer</Text>
-
-          <ScrollView style={styles.courseList} keyboardShouldPersistTaps="handled">
-            <CourseRow
-              label="Free study (no course)"
-              selected={courseId === null}
-              onPress={() => setCourseId(null)}
-            />
-            {courses.map((c) => (
-              <CourseRow
-                key={c.id}
-                label={c.name}
-                color={c.color}
-                selected={courseId === c.id}
-                onPress={() => setCourseId(c.id)}
-              />
-            ))}
-          </ScrollView>
-
-          <View style={styles.grid}>
-            {field('Focus (min)', work, setWork)}
-            {field('Short break (min)', short, setShort)}
-            {field('Long break (min)', long, setLong)}
-            {field('Focus blocks before long break', count, setCount)}
-          </View>
-
-          <Text style={[styles.hint, { color: theme.muted }]}>
-            Time is added to the chosen course when a focus block finishes. Free study is not
-            tracked.
-          </Text>
-
-          <Pressable
-            onPress={handleStart}
-            accessibilityRole="button"
-            accessibilityLabel="Start study timer"
-            style={({ pressed }) => [
-              styles.startBtn,
-              { backgroundColor: theme.accent },
-              pressed && { opacity: 0.8 },
+      <KeyboardAvoidingView style={styles.avoider} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <Pressable style={styles.backdrop} onPress={onClose}>
+          <AnimatedPressable
+            style={[
+              styles.sheet,
+              { backgroundColor: theme.surface, paddingBottom: insets.bottom + 16 },
+              { transform: [{ translateY }] },
             ]}
+            onPress={(e) => e.stopPropagation()}
           >
-            <Text style={styles.startBtnText}>Start</Text>
-          </Pressable>
-        </AnimatedPressable>
-      </Pressable>
+            <Text style={[styles.title, { color: theme.text }]}>Study timer</Text>
+
+            <ScrollView style={styles.courseList} keyboardShouldPersistTaps="handled">
+              <CourseRow
+                label="Free study (no course)"
+                selected={courseId === null}
+                onPress={() => setCourseId(null)}
+              />
+              {courses.map((c) => (
+                <CourseRow
+                  key={c.id}
+                  label={c.name}
+                  color={c.color}
+                  selected={courseId === c.id}
+                  onPress={() => setCourseId(c.id)}
+                />
+              ))}
+            </ScrollView>
+
+            <View style={styles.grid}>
+              {field('Focus (min)', work, setWork)}
+              {field('Short break (min)', short, setShort)}
+              {field('Long break (min)', long, setLong)}
+              {field('Focus blocks before long break', count, setCount)}
+            </View>
+
+            <Text style={[styles.hint, { color: theme.muted }]}>
+              Time is added to the chosen course when a focus block finishes. Free study is not
+              tracked.
+            </Text>
+
+            <Pressable
+              onPress={handleStart}
+              accessibilityRole="button"
+              accessibilityLabel="Start study timer"
+              style={({ pressed }) => [
+                styles.startBtn,
+                { backgroundColor: theme.accent },
+                pressed && { opacity: 0.8 },
+              ]}
+            >
+              <Text style={styles.startBtnText}>Start</Text>
+            </Pressable>
+          </AnimatedPressable>
+        </Pressable>
+      </KeyboardAvoidingView>
+      <NumericKeyboardDoneBar />
     </Modal>
   );
 }
@@ -206,6 +213,7 @@ function CourseRow({
 }
 
 const styles = StyleSheet.create({
+  avoider: { flex: 1 },
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.4)' },
   sheet: {
     borderTopLeftRadius: 16,
