@@ -27,6 +27,10 @@
   --overlay: rgba(0, 0, 0, 0.45);
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 
+  /* OAuth buttons */
+  --oauth-apple-bg: #000000;
+  --oauth-apple-text: #ffffff;
+
   /* Status colors (shared across themes) */
   --st-pending: #9aa5b1;
   --st-seen: #f0ad4e;
@@ -63,6 +67,10 @@
   --danger-bg: #3a2522;
   --overlay: rgba(0, 0, 0, 0.6);
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+
+  /* OAuth buttons */
+  --oauth-apple-bg: #ffffff;
+  --oauth-apple-text: #000000;
 }
 
 /* Auto — follow the system preference when no explicit theme is chosen. */
@@ -87,6 +95,10 @@
     --danger-bg: #3a2522;
     --overlay: rgba(0, 0, 0, 0.6);
     --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+
+    /* OAuth buttons */
+    --oauth-apple-bg: #ffffff;
+    --oauth-apple-text: #000000;
   }
 }
 
@@ -1076,14 +1088,72 @@ body.electron-app .header-inner { padding-left: 80px; }
   height: 1px;
   background: var(--border);
 }
+/* OAuth sign-in buttons (signin-overlay) — stacked pill buttons with a
+   circular icon badge. Google's button is a "neutral" style (permitted
+   by Google's branding guidelines for a custom button) that reuses
+   --surface/--text/--border so it matches the app's theme automatically.
+   Apple's flips --oauth-apple-bg/-text per theme. The pill radius,
+   shadow, and badge are generic UI styling (not part of either brand's
+   required assets) chosen to match the reference mockup. */
 .oauth-buttons {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
 }
 .btn-oauth {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   width: 100%;
-  text-align: center;
+  height: 54px;
+  padding: 0 1.1rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: var(--font-base);
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s,
+    box-shadow 0.15s;
+}
+.btn-oauth:hover:not(:disabled) { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14); }
+.btn-oauth:disabled { opacity: 0.6; cursor: default; box-shadow: none; }
+.oauth-icon-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.oauth-icon-badge img { width: 18px; height: 18px; display: block; }
+.btn-oauth-google { background: var(--surface); color: var(--text); }
+.btn-oauth-google:hover:not(:disabled) { background: var(--hover); }
+.btn-oauth-google .oauth-icon-badge {
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.btn-oauth-apple {
+  background: var(--oauth-apple-bg);
+  color: var(--oauth-apple-text);
+  border-color: var(--oauth-apple-bg);
+}
+.btn-oauth-apple:hover:not(:disabled) { opacity: 0.9; }
+.btn-oauth-apple .oauth-icon-badge { background: transparent; }
+/* Apple's logo file is a single-color glyph, used as a CSS mask so it
+   recolors via --oauth-apple-text automatically (one file works on both
+   the black and white button styles). Per Apple's artwork rules: match
+   the logo's height to the button, don't crop, don't add padding. */
+.apple-icon {
+  width: 15px;
+  height: 18px;
+  flex-shrink: 0;
+  background-color: var(--oauth-apple-text);
+  -webkit-mask: url('assets/apple-logo.svg') no-repeat center / contain;
+  mask: url('assets/apple-logo.svg') no-repeat center / contain;
 }
 
 /* Modal tabs */
