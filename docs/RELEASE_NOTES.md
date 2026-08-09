@@ -26,6 +26,12 @@
   `afterSign.js` hook uses, failing the build; with signing previously being
   skipped, the release never got far enough to hit it. `afterSign.js` is now the
   single notarization path.
+- Fixed: `bundle-deps.js` now skips iCloud's conflict-duplicate directories
+  (`vitest 3`, `@vitest/spy 2`) when seeding the production closure. A checkout
+  under `~/Documents` accumulates these and npm lists them as extraneous, so a
+  **locally** built app bundled dev-only junk (36 modules instead of 18). CI
+  checkouts are clean and were never affected — published builds already
+  shipped the correct 18-module closure.
 - Fixed: `packages/desktop/scripts/bundle-deps.js` now invokes `npm ls` through
   a shell (`execSync` with a fixed command string) instead of spawning the
   binary directly, fixing two consecutive `prebuild:win` failures on Windows —

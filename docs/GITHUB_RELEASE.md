@@ -1,4 +1,3 @@
----
 ## What's new in v1.0.0
 
 ### Highlights
@@ -8,48 +7,38 @@
 - **Inline editing everywhere** — rename, delete, and add readings/tasks in place, including inline due-date editing.
 - **Autosave & manual save** — every change autosaves with a Saving/Saved indicator, plus ⌘S/Ctrl+S and a save-before-quit safeguard.
 - **Onboarding tour, theming, and auto-updates** — a guided first-run tour, Light/Dark/Auto theme, and background auto-updates via GitHub Releases.
+- **Signed and notarized on macOS** — builds are signed with an Apple Developer ID certificate and notarized by Apple, so they open normally with no Gatekeeper warning and no Terminal workaround.
 
 This is the official 1.0.0 public launch — prior v1.x tags were internal development and test builds (see `docs/CHANGELOG_PRE_LAUNCH.md`).
 
 ---
-**Full changelog:** [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md)
 
-**macOS:** download `Lectio-arm64.dmg` below → drag to Applications.
+### Install
+
+**macOS (Apple Silicon):** download `Lectio-arm64.dmg` below → drag to Applications.
 **Windows:** download `Lectio-Setup.exe` below → Next → Next → Install.
 **Homebrew:** `brew tap masprime77/tap && brew install --cask lectio`
 
-> First launch on macOS: right-click → Open (Gatekeeper), or run `xattr -cr /Applications/Lectio.app` in Terminal.
-> First launch on Windows: click **More info → Run anyway** (SmartScreen).
+> **Updating from an earlier build?** This is the first notarized release, so its signature doesn't match what older copies expect — existing installs can't auto-update into it. Install this one manually once; auto-updates work normally from here on.
 
----
+> **Windows first launch:** SmartScreen may warn you, since the Windows build isn't code-signed. Click **More info → Run anyway** — once only.
+
+> **Intel Macs:** not supported yet. The macOS build is Apple Silicon (arm64) only.
+
+**Full changelog:** [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md)
 
 <!--
-AFTER THE PR IS MERGED — what to run
+Publishing checklist
 
-After merging the PR into main:
+1. Paste everything above (down to the "Full changelog" line) into the
+   GitHub Release description for the v1.0.0 tag, then publish the draft to
+   make the download links live.
+2. Update the Homebrew cask:
 
-  git checkout main
-  git pull origin main
+     homebrew/sync-tap.sh
 
-NOTE (one-time only): v1.0.0 already exists as a tag from early dev
-history. Before tagging, delete the old tag first:
-  git push origin :refs/tags/v1.0.0
-  git tag -d v1.0.0
-Then proceed with the tag/push commands below as normal. This note only
-applies to this specific relaunch and should be removed from this file
-once the v1.0.0 release is published (i.e., do not carry it forward into
-future GITHUB_RELEASE.md rewrites).
-
-  git tag v1.0.0
-  git push origin v1.0.0
-
-The release.yml workflow will then run CI and, if it passes, build and
-publish the macOS (.dmg + .zip + latest-mac.yml) and Windows (.exe + .zip +
-latest.yml) assets to a new GitHub Release for the v1.0.0 tag. Once the
-draft release appears in GitHub, paste the content of docs/GITHUB_RELEASE.md
-into the description field and publish it to make the download links live.
-
-After publishing, update the Homebrew cask:
-
-  homebrew/sync-tap.sh
+Assets the release workflow attaches: Lectio-arm64.dmg (+ .blockmap),
+Lectio-1.0.0-arm64-mac.zip (+ .blockmap), latest-mac.yml, Lectio-Setup.exe
+(+ .blockmap), Lectio-1.0.0-win.zip, latest.yml. The two latest*.yml files
+drive electron-updater and must stay attached.
 -->

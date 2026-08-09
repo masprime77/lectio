@@ -56,6 +56,12 @@ for (const src of pkgPaths) {
   const rel = path.relative(rootModules, src);
   // Skip the repo root, the desktop app itself, and anything outside root node_modules.
   if (rel === '' || rel.startsWith('..') || rel === path.join('@lectio', 'desktop')) continue;
+  // Skip iCloud's conflict duplicates ("vitest 3", "@vitest/spy 2"). A checkout
+  // under ~/Documents accumulates these; npm lists them as extraneous, and
+  // copying them would bundle dev-only junk into a locally built app. A space
+  // can't occur in a real package name, and `rel` is relative to the root
+  // node_modules, so a repo path containing spaces is unaffected.
+  if (rel.includes(' ')) continue;
 
   const dest = path.join(destModules, rel);
   const nested = path.join(src, 'node_modules');
