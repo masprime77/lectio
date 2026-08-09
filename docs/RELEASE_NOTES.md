@@ -9,6 +9,10 @@
   "Dev Test Semester" fixture. The bundled example was replaced with a
   minimal "Example Semester" (`ss2025`), and it's now loaded only when the
   user explicitly clicks "Load example semester" from the empty state.
+- Fixed: creating or saving a semester could fail silently (an unhandled
+  promise rejection left the "New" modal stuck open with no feedback).
+  Errors now surface as a visible alert and the modal stays open with your
+  input intact.
 
 ## 1.0.1 — 2026-08-09
 
