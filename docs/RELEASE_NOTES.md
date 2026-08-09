@@ -38,6 +38,24 @@
   `spawnSync npm ENOENT` (npm on PATH is the `npm.cmd` shim) and then
   `spawnSync npm.cmd EINVAL` (since Node's CVE-2024-27980 hardening, spawning a
   `.cmd`/`.bat` without a shell is refused outright).
+- Fixed: every packaged release shipped an empty Supabase config, so sign-in
+  always failed with "Cannot reach the server." `sync-supabase.js` resolves the
+  project URL/key from `EXPO_PUBLIC_SUPABASE_URL` /
+  `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (falling back to the git-ignored
+  `packages/mobile/.env`), but the release workflow set neither and CI has no
+  `.env` — so the build wrote `{ url: '', anonKey: '' }`, `supabase-client.js`
+  set `window.lectioSupabase = null`, and `auth.js` rejected every sign-in.
+  Local `npm start` worked only because a developer's own `.env` filled it in.
+- Changed: `sync-supabase.js` now exits non-zero when `CI=true` and no Supabase
+  URL/key is found, instead of warning and writing an empty config — a release
+  that can never sign in now fails the build rather than being published.
+  Local (non-CI) runs are unchanged and still warn.
+- Changed: the macOS and Windows build steps in `release.yml`, and the
+  packaging-sanity build in `ci.yml`, now pass `EXPO_PUBLIC_SUPABASE_URL` and
+  `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from repo secrets. **These two
+  secrets must be added to the repository before the next release** — the
+  builds fail without them by design (documented in the README's Releasing
+  section).
 
 ## v1.0.0
 

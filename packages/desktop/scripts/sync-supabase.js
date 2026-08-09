@@ -47,10 +47,17 @@ const anonKey =
   '';
 
 if (!url || !anonKey) {
-  console.warn(
-    '[sync-supabase] No Supabase URL/key found (env or packages/mobile/.env). ' +
-      'Writing an empty config — sign-in will be unavailable until it is set.'
-  );
+  const msg =
+    '[sync-supabase] No Supabase URL/key found (checked EXPO_PUBLIC_SUPABASE_URL ' +
+    '/ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY env vars and packages/mobile/.env).';
+  if (process.env.CI === 'true') {
+    // In CI this would ship a build that can never sign in — fail the
+    // build instead of silently publishing a broken app (see README's
+    // Releasing section for the required repo secrets).
+    console.error(msg + ' Refusing to produce a build with a broken Supabase config in CI.');
+    process.exit(1);
+  }
+  console.warn(msg + ' Writing an empty config — sign-in will be unavailable until it is set.');
 }
 
 // 3) Write the git-ignored config the renderer reads.
