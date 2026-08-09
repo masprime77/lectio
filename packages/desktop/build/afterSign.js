@@ -19,6 +19,13 @@
 //     bundle and the same cryptic @electron/notarize crash. Verify the real
 //     signature up front and fail with a message naming the likely cause.
 //   - all five set and actually signed: notarize as before.
+//
+// This hook is the ONLY notarization path: electron-builder has its own
+// built-in notarization, which is switched off via "notarize": false in the
+// desktop package.json's build.mac block. Leaving it on would notarize twice —
+// and it reads the app-specific password from APPLE_APP_SPECIFIC_PASSWORD
+// rather than the APPLE_ID_PASSWORD used here, so it fails the build outright
+// when only the latter is set. Re-enabling it means retiring this hook.
 const { spawnSync } = require('child_process');
 
 const REQUIRED_SIGNING_VARS = [

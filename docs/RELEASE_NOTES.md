@@ -19,6 +19,13 @@
   flag is now set to `false` only on the free/self-signed path, and the
   self-signed certificate import is skipped when `CSC_LINK` is configured (its
   keychain became the default and could shadow the Developer ID identity).
+- Fixed: disabled electron-builder's built-in macOS notarization
+  (`"notarize": false` in the desktop `package.json`'s `build.mac` block). It
+  activates whenever `APPLE_ID` is set and demands the password in
+  `APPLE_APP_SPECIFIC_PASSWORD` rather than the `APPLE_ID_PASSWORD` the
+  `afterSign.js` hook uses, failing the build; with signing previously being
+  skipped, the release never got far enough to hit it. `afterSign.js` is now the
+  single notarization path.
 - Fixed: `packages/desktop/scripts/bundle-deps.js` now invokes `npm ls` through
   a shell (`execSync` with a fixed command string) instead of spawning the
   binary directly, fixing two consecutive `prebuild:win` failures on Windows —
