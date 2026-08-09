@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('planner', {
   exportCourse: (args) => ipcRenderer.invoke('export-course', args),
   exportSemester: (args) => ipcRenderer.invoke('export-semester', args),
   importFile: (args) => ipcRenderer.invoke('import-file', args),
+  loadExampleSemester: () => ipcRenderer.invoke('load-example-semester'),
 });
 
 // Auto-update bridge. Main → renderer notifications plus a restart trigger.

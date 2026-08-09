@@ -103,6 +103,9 @@ item tags) — see [Mobile app](#mobile-app) and
   save-before-quit dialog protect your work.
 - **Session restore** — reopens the last active semester and view on launch;
   falls back gracefully if the semester was deleted.
+- **Example semester** — a fresh install starts empty; the "No semesters yet"
+  screen offers a "Load example semester" button that adds a small starter
+  semester (2 courses) to explore right away, alongside the "New" button.
 - **Onboarding tour** — auto-launches on first run; replay any time via
   Settings → Tutorial. Each step spotlights a real UI element with a cutout
   and tooltip; supports Back / Next / Skip and keyboard navigation.
@@ -182,7 +185,7 @@ npm run test:coverage   # run with a V8 coverage report (written to coverage/)
   (see `packages/core/vitest.config.mjs`); the run fails if they aren't met.
 
 CI runs the suite on **macOS** and **Ubuntu** (Node 22) on pushes and pull
-requests to `main` and `mobile-prep`, and uploads the coverage report as an
+requests to `main` and `dev`, and uploads the coverage report as an
 artifact. It also runs a macOS packaging build (no publish) so desktop build
 breakage is caught on PRs. A release is only built once CI passes — see
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) and
@@ -359,8 +362,9 @@ unsaved-changes reporting, and the save-before-quit handshake).
 
 - **Development:** the desktop package's `packages/desktop/semesters/` folder.
 - **Packaged app:** `~/Library/Application Support/Lectio/semesters/`
-  (`app.getPath('userData')`), so your data persists across app updates. On
-  first launch the app seeds this folder with the bundled `example.json`.
+  (`app.getPath('userData')`), so your data persists across app updates. It's
+  empty on first launch — use the "New" button or the "Load example
+  semester" empty-state action to add your first semester.
 
 ## Adding a semester manually
 
