@@ -431,6 +431,12 @@ Releases are built and published automatically by CI:
    `.exe`, `.zip`, and **`latest.yml`** (Windows) to the GitHub Release for that
    tag.
 
+Two additional repo secrets are required for the app to be able to sign in once
+built: `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+(same values as `packages/mobile/.env`). Without them, `sync-supabase.js` now
+fails the CI build on purpose rather than shipping a build that can never reach
+the server.
+
 To build locally without publishing, run `npm run build:mac` (artifacts land in
 `dist/`).
 
