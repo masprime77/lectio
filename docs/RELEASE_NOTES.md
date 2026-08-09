@@ -1,5 +1,13 @@
 ## Unreleased
 
+- Chore: bumped version to 1.0.1 across the root, desktop, and mobile
+  packages, and `packages/mobile/app.json`'s `expo.version`; `@lectio/core`'s
+  independent version was left untouched, as was `expo.ios.buildNumber`
+  (unset — EAS manages it remotely via `appVersionSource: "remote"` +
+  `autoIncrement` on the production build profile).
+
+## 1.0.1 — 2026-08-09
+
 - Changed: restyled the desktop "Continue with Google" / "Continue with
   Apple" buttons as full-width branded pills (14px corner radius, soft
   shadow, circular icon badge) and moved them above the email/password
