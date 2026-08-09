@@ -197,14 +197,14 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
 ## Workflow & conventions
 
 - **Branches:** work on a feature/phase branch and PR into the active
-  integration branch (currently **`mobile-prep`** for the mobile work), which is
+  integration branch (currently **`dev`**), which is
   periodically merged to `main`. `main` is protected (PR required, 0 approvals so
   the owner can self-merge, required checks `Test (macos-latest)` +
   `Test (ubuntu-latest)`, must be up to date, no force-push). Sync your branch
   with its base before opening a PR (`git merge origin/<base>`).
 - **Commits:** Conventional-Commits style — `feat:`, `fix:`, `chore:`, `ci:`,
   `docs:`, `test:`, `refactor:`. Small, focused commits.
-- **CI/CD:** `.github/workflows/ci.yml` runs on `main` + `mobile-prep` (tests on
+- **CI/CD:** `.github/workflows/ci.yml` runs on `main` + `dev` (tests on
   macOS + Ubuntu, plus a macOS packaging build with no publish) and gates
   `release.yml`. Release flow: bump `version` in `package.json` → PR → merge →
   `git tag vX.Y.Z && git push origin vX.Y.Z`. The release workflow runs CI, then
