@@ -5,6 +5,9 @@
   independent version was left untouched, as was `expo.ios.buildNumber`
   (unset — EAS manages it remotely via `appVersionSource: "remote"` +
   `autoIncrement` on the production build profile).
+- Fixed: the Google and Apple sign-in icons were missing on downloaded/
+  packaged builds (they only ever showed in dev mode) — their SVG assets
+  were never added to electron-builder's packaging whitelist.
 
 ## 1.0.1 — 2026-08-09
 
