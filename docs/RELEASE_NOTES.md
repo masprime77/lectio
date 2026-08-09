@@ -1,5 +1,15 @@
 ## Unreleased
 
+- Changed: restyled the desktop "Continue with Google" / "Continue with
+  Apple" buttons as full-width branded pills (14px corner radius, soft
+  shadow, circular icon badge) and moved them above the email/password
+  form, ahead of an "or continue with email" divider. Google's icon comes
+  from Google's official pre-approved brand icon download; Apple's uses
+  the logo-only artwork from Apple Design Resources, recolored via a CSS
+  mask so the same file works on the button's black (light theme) and
+  white (dark theme) variants. No behavior change — same
+  `#signin-google`/`#signin-apple` ids and click handlers from the OAuth
+  groundwork above.
 - Added: groundwork for desktop "Sign in with Google" / "Sign in with Apple".
   `packages/core/src/integrations/oauth-redirect.js`
   parses a captured `lectio://auth-callback` redirect from a Supabase
