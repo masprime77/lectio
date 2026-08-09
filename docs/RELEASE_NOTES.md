@@ -20,6 +20,10 @@
 - Chore: untracked `spikes/moodle-poc/inspect-result.json` (a personal-data
   spike output that predated its `.gitignore` rule) from the repo, and
   removed a developer name from an HTML comment on the public landing page.
+- Docs: updated `README.md`, `CLAUDE.md`, and `.github/workflows/ci.yml` to
+  reflect the example-semester/tutorial changes above and to drop the
+  stale `mobile-prep` branch reference (the active integration branch is
+  `dev`).
 
 ## 1.0.1 — 2026-08-09
 
