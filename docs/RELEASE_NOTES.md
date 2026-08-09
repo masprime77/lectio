@@ -1,5 +1,14 @@
 ## Unreleased
 
+- Fixed: the mobile app crashed instantly on launch whenever
+  `EXPO_PUBLIC_SUPABASE_URL`/`EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` were
+  missing (as in TestFlight build 1.0.0 #3, whose EAS build had neither var
+  configured). `packages/mobile/src/supabase/client.ts` threw at module
+  scope on import — before `AuthProvider`, before `RootLayout`, before React
+  ever mounted, so no error boundary or retry screen could catch it. It now
+  exports `isSupabaseConfigured` instead of throwing, and
+  `AuthProvider.tsx`'s `loadSession()` short-circuits straight to the
+  existing "Can't reach Lectio's servers" retry screen when unconfigured.
 - Added: the mobile app now uses the desktop app's icon instead of Expo's
   default. `packages/mobile/assets/icon.png` is generated from
   `packages/desktop/assets/icon.png` with its (fully opaque) alpha channel
