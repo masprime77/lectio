@@ -67,6 +67,11 @@ jobs:
       - name: Build macOS app (no publish)
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
+          # Real Supabase config so this packaging-sanity build exercises the
+          # same path a release does — sync-supabase.js exits non-zero in CI
+          # when these are missing, so the secrets are required here too.
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
         run: npm run build:mac --workspace @lectio/desktop -- --publish never
 
   # Gate the mobile package on a clean TypeScript typecheck. The mobile unit
