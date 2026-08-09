@@ -23,6 +23,7 @@ import { saveWithConflict } from '../src/sync/saveWithConflict';
 import { getMoodleImportSession, clearMoodleImportSession } from '../src/moodle/import-session';
 import { useTheme } from '../src/theme';
 import { SheetHeader } from '../src/components/SheetHeader';
+import { NumericKeyboardDoneBar, NUMERIC_KEYBOARD_ACCESSORY_ID } from '../src/components/NumericKeyboardDoneBar';
 import type { MoodleWeek } from '../types/lectio-core';
 
 // Same suggestion heuristic as desktop's Phase 16 Part C
@@ -275,6 +276,7 @@ export default function MoodleTriageScreen() {
                 <TextInput
                   style={[styles.weekInput, { borderColor: theme.border, color: theme.text, backgroundColor: theme.surface }]}
                   keyboardType="number-pad"
+                  inputAccessoryViewID={NUMERIC_KEYBOARD_ACCESSORY_ID}
                   placeholder="Wk"
                   placeholderTextColor={theme.muted}
                   value={d.week}
@@ -325,6 +327,7 @@ export default function MoodleTriageScreen() {
         }}
         contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24 }}
       />
+      <NumericKeyboardDoneBar />
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {busy ? (
         <ActivityIndicator color={theme.accent} style={{ marginVertical: 12 }} />

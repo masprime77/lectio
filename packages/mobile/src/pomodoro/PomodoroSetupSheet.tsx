@@ -21,6 +21,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { clampPomodoroSettings } from '@lectio/core/pomodoro-core';
 import { getCourses } from '@lectio/core/planner-core';
+import { NumericKeyboardDoneBar, NUMERIC_KEYBOARD_ACCESSORY_ID } from '../components/NumericKeyboardDoneBar';
 import { useTheme } from '../theme';
 import type { PomodoroSettings, Semester } from '../../types/lectio-core';
 
@@ -93,6 +94,7 @@ export function PomodoroSetupSheet({
         value={value}
         onChangeText={onChange}
         keyboardType="number-pad"
+        inputAccessoryViewID={NUMERIC_KEYBOARD_ACCESSORY_ID}
         style={[
           styles.input,
           { color: theme.text, borderColor: theme.border, backgroundColor: theme.surfaceAlt },
@@ -158,6 +160,7 @@ export function PomodoroSetupSheet({
           </Pressable>
         </AnimatedPressable>
       </Pressable>
+      <NumericKeyboardDoneBar />
     </Modal>
   );
 }
