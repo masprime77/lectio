@@ -1077,7 +1077,7 @@ body.electron-app .header-inner { padding-left: 80px; }
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  margin: 0 0 1rem;
+  margin: 1rem 0;
   color: var(--muted);
   font-size: 0.8rem;
 }
