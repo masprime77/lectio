@@ -1407,11 +1407,16 @@ const TUTORIAL_STEPS = [
       'This is the semester selector. Lectio comes with an example semester so you can explore right away. You can create your own with the "New" button.',
     targetSelector: '#semester-select',
     setup: async () => {
-      // Ensure the example semester (id "ss2025") is loaded, if it exists.
-      // If the user already has a different semester active, do nothing.
+      // Ensure the example semester (id "ss2025") is loaded, loading the
+      // bundled example first if the user hasn't already (e.g. someone who
+      // starts the tour before ever hitting the empty-state button).
       const list = await api.list();
-      const example = list.find((s) => s.id === 'ss2025');
-      if (example && state.semesterId !== 'ss2025') {
+      let example = list.find((s) => s.id === 'ss2025');
+      if (!example) {
+        await window.planner.loadExampleSemester();
+        await populateSelector();
+      }
+      if (state.semesterId !== 'ss2025') {
         await loadSemester('ss2025');
       }
     },
@@ -1446,6 +1451,30 @@ const TUTORIAL_STEPS = [
     description:
       'Use the sort dropdown to reorder courses by progress, alphabetically, or by the week with the most pending work.',
     targetSelector: '#sort-select',
+    setup: null,
+  },
+  {
+    id: 'breakdown',
+    title: 'Readings vs. tasks',
+    description:
+      'The Breakdown button splits each course\'s progress into separate readings and tasks bars, plus a total for the whole semester.',
+    targetSelector: '#breakdown-btn',
+    setup: null,
+  },
+  {
+    id: 'focus-mode',
+    title: 'Focus on one course',
+    description:
+      'Click a course name on the dashboard to focus on it — the other courses collapse out of the way so you can concentrate on one at a time. Click it again to unfocus.',
+    targetSelector: '.progress-course-name',
+    setup: null,
+  },
+  {
+    id: 'feedback',
+    title: 'Send feedback',
+    description:
+      'Found a bug or have an idea? The feedback button lets you send a bug report or feature request straight from the app.',
+    targetSelector: '#feedback-btn',
     setup: null,
   },
   {
@@ -2289,9 +2318,28 @@ function renderEmptyState() {
   state.semesterId = null;
   state.semester = null;
   document.getElementById('dashboard').innerHTML =
-    '<h2>No semesters yet</h2><div class="current-week">Create one with the “New Semester” button.</div>';
+    '<h2>No semesters yet</h2>' +
+    '<div class="current-week">Create one with the “New” button, or start from a small example.</div>' +
+    '<button type="button" id="load-example-btn" class="btn">Load example semester</button>';
   document.getElementById('planner').innerHTML = '';
   setSemesterActionsEnabled(false);
+  const loadBtn = document.getElementById('load-example-btn');
+  if (loadBtn) loadBtn.addEventListener('click', () => loadExampleSemesterFlow(loadBtn));
+}
+
+// Loads the bundled example semester on explicit user request (desktop no
+// longer auto-seeds userData on first launch — see main.js's
+// ensureSemestersDir).
+async function loadExampleSemesterFlow(btn) {
+  await withBusy(btn, 'Loading…', async () => {
+    try {
+      const id = await window.planner.loadExampleSemester();
+      await populateSelector();
+      await loadSemester(id);
+    } catch (err) {
+      alert('Could not load the example semester: ' + (err.message || err));
+    }
+  });
 }
 
 function setSemesterActionsEnabled(enabled) {
@@ -2605,9 +2653,9 @@ function setupModal() {
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) closeModal();
   });
-  document.getElementById('new-semester-form').addEventListener('submit', (e) => {
+  document.getElementById('new-semester-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    submitModal();
+    await submitModal();
   });
 
   // Tab switching between Semester / Courses / Tags / Reading-Task panels.
@@ -2870,6 +2918,17 @@ async function submitModal() {
     return;
   }
 
+  try {
+    await submitSemesterFromModal();
+  } catch (err) {
+    alert('Could not save the semester: ' + (err.message || err));
+  }
+}
+
+// Create or update the semester described by the Semester/Courses tabs.
+// Split out from submitModal so errors thrown anywhere in here (including
+// storage failures) are caught in one place instead of failing silently.
+async function submitSemesterFromModal() {
   const name = document.getElementById('ns-name').value.trim();
   const startDate = document.getElementById('ns-start').value;
   const weeks = parseInt(document.getElementById('ns-weeks').value, 10) || 15;
