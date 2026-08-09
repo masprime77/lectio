@@ -83,6 +83,40 @@
     await c.auth.signOut();
   }
 
+  // Browser-based OAuth via Supabase (used for BOTH Google and Apple on
+  // desktop — Electron has no native Sign in with Apple bridge, so both
+  // providers go through the same signInWithOAuth() + captured-redirect
+  // flow, mirroring packages/mobile/src/auth/oauth.ts's signInWithProvider().
+  async function signInWithProvider(provider) {
+    const c = client();
+    if (!c) throw new Error('Cannot reach the server. Check your connection and try again.');
+
+    const redirectTo = 'lectio://auth-callback';
+    const { data, error } = await c.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo, skipBrowserRedirect: true },
+    });
+    if (error) throw error;
+    if (!data || !data.url) throw new Error('Could not start sign-in.');
+
+    const result = await window.providerAuth.captureRedirect(data.url);
+
+    if (result.type === 'code') {
+      const { error: exErr } = await c.auth.exchangeCodeForSession(result.code);
+      if (exErr) throw exErr;
+      return;
+    }
+    if (result.type === 'tokens') {
+      const { error: sErr } = await c.auth.setSession({
+        access_token: result.access_token,
+        refresh_token: result.refresh_token,
+      });
+      if (sErr) throw sErr;
+      return;
+    }
+    throw new Error('Sign-in did not return a session.');
+  }
+
   // Mirror of packages/mobile/src/auth/auth-errors.ts — kept identical by hand so
   // the two apps say the same thing (the desktop must not import from mobile).
   function friendlyAuthError(err) {
@@ -115,6 +149,7 @@
     signIn,
     signUp,
     signOut,
+    signInWithProvider,
     updateEmail,
     updatePassword,
     deleteAccount,
