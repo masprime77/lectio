@@ -1,5 +1,10 @@
 ## Unreleased
 
+- Added: the mobile app now uses the desktop app's icon instead of Expo's
+  default. `packages/mobile/assets/icon.png` is generated from
+  `packages/desktop/assets/icon.png` with its (fully opaque) alpha channel
+  stripped, since iOS App Store binary validation rejects icons that carry
+  an alpha channel; `app.json`'s new `icon` field points at it.
 - Fixed: `packages/desktop/build/afterSign.js` now fails loudly with an
   actionable error when only some of the five macOS signing secrets
   (`CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_TEAM_ID`, `APPLE_ID`,
