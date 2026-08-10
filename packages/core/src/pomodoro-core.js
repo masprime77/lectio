@@ -338,6 +338,41 @@
       : 0;
   }
 
+  // Where a semester's studied time went, ready for a chart or a legend:
+  //   { totalSeconds, courses: [{ id, name, color, seconds, share, percent }] }
+  // Courses with no tracked time are left out — an empty slice is noise in a
+  // chart, and a caller that wants to list every course already has the
+  // semester. What remains is sorted most-studied first. `share` is the exact
+  // fraction of totalSeconds; `percent` is that rounded to a whole number, so
+  // the percents are labels and may total 99 or 101 rather than exactly 100.
+  // A semester with no courses, nothing studied yet, or no semester at all
+  // gives { totalSeconds: 0, courses: [] }. Never mutates its argument.
+  function studyTimeByCourse(semester) {
+    const list = semester && Array.isArray(semester.courses) ? semester.courses : [];
+    const tracked = [];
+    let totalSeconds = 0;
+    list.forEach((course) => {
+      const seconds = getCourseStudySeconds(course);
+      if (!Number.isFinite(seconds) || seconds <= 0) return;
+      totalSeconds += seconds;
+      tracked.push({
+        id: course.id,
+        name: course.name,
+        color: course.color || null,
+        seconds,
+      });
+    });
+    tracked.sort((a, b) => b.seconds - a.seconds);
+    return {
+      totalSeconds,
+      courses: tracked.map((c) => ({
+        ...c,
+        share: c.seconds / totalSeconds,
+        percent: Math.round((c.seconds / totalSeconds) * 100),
+      })),
+    };
+  }
+
   function uidLocal(prefix) {
     return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
   }
@@ -448,6 +483,7 @@
     // study time
     ensureStudyTime,
     getCourseStudySeconds,
+    studyTimeByCourse,
     addStudyTime,
     setStudyTime,
     formatClock,

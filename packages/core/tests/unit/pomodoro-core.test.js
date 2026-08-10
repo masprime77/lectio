@@ -198,6 +198,92 @@ describe('getCourseStudySeconds', () => {
   });
 });
 
+describe('studyTimeByCourse', () => {
+  const course = (id, seconds, over) => ({
+    id,
+    name: id.toUpperCase(),
+    color: '#4A90D9',
+    ...(seconds == null ? {} : { studyTime: { totalSeconds: seconds, sessions: [] } }),
+    ...over,
+  });
+  const semester = (courses) => ({ id: 'ss2025', name: 'Summer', courses });
+
+  it('is empty for a semester with no courses, or no semester at all', () => {
+    const empty = { totalSeconds: 0, courses: [] };
+    expect(pomodoro.studyTimeByCourse(semester([]))).toEqual(empty);
+    expect(pomodoro.studyTimeByCourse({ id: 'ss2025' })).toEqual(empty);
+    expect(pomodoro.studyTimeByCourse(null)).toEqual(empty);
+    expect(pomodoro.studyTimeByCourse(undefined)).toEqual(empty);
+    expect(pomodoro.studyTimeByCourse({ courses: 'nope' })).toEqual(empty);
+  });
+
+  it('is empty when nothing has been studied yet', () => {
+    const none = semester([course('a'), course('b', 0), course('c', null)]);
+    expect(pomodoro.studyTimeByCourse(none)).toEqual({ totalSeconds: 0, courses: [] });
+  });
+
+  it('leaves out the courses with no tracked time', () => {
+    const mixed = semester([course('a', 1800), course('b'), course('c', 600)]);
+    const out = pomodoro.studyTimeByCourse(mixed);
+    expect(out.courses.map((c) => c.id)).toEqual(['a', 'c']);
+    expect(out.totalSeconds).toBe(2400);
+  });
+
+  it('reports seconds, share and percent, sorted most-studied first', () => {
+    const mixed = semester([
+      course('short', 900), // 15m
+      course('long', 5400), // 1h30
+      course('mid', 2700), // 45m
+    ]);
+    const out = pomodoro.studyTimeByCourse(mixed);
+    expect(out.totalSeconds).toBe(9000);
+    expect(out.courses).toEqual([
+      { id: 'long', name: 'LONG', color: '#4A90D9', seconds: 5400, share: 0.6, percent: 60 },
+      { id: 'mid', name: 'MID', color: '#4A90D9', seconds: 2700, share: 0.3, percent: 30 },
+      { id: 'short', name: 'SHORT', color: '#4A90D9', seconds: 900, share: 0.1, percent: 10 },
+    ]);
+  });
+
+  it('shares always add up to 1, and percents to 100 within rounding', () => {
+    const thirds = semester([course('a', 1000), course('b', 1000), course('c', 1000)]);
+    const out = pomodoro.studyTimeByCourse(thirds);
+    const shares = out.courses.reduce((sum, c) => sum + c.share, 0);
+    expect(shares).toBeCloseTo(1, 10);
+    // 33 + 33 + 33: rounding to whole numbers cannot always total exactly 100.
+    const percents = out.courses.reduce((sum, c) => sum + c.percent, 0);
+    expect(Math.abs(100 - percents)).toBeLessThanOrEqual(1);
+    expect(out.courses.every((c) => c.percent === 33)).toBe(true);
+  });
+
+  it('gives a lone studied course the whole 100%', () => {
+    const solo = semester([course('a'), course('b', 300)]);
+    expect(pomodoro.studyTimeByCourse(solo).courses).toEqual([
+      { id: 'b', name: 'B', color: '#4A90D9', seconds: 300, share: 1, percent: 100 },
+    ]);
+  });
+
+  it('defaults a missing colour to null and survives malformed courses', () => {
+    const odd = semester([
+      null,
+      course('a', 60, { color: undefined }),
+      { id: 'b', studyTime: { totalSeconds: 'lots' } },
+      { id: 'c', studyTime: { totalSeconds: NaN } },
+      { id: 'd', studyTime: { totalSeconds: -50 } },
+    ]);
+    const out = pomodoro.studyTimeByCourse(odd);
+    expect(out.courses).toEqual([
+      { id: 'a', name: 'A', color: null, seconds: 60, share: 1, percent: 100 },
+    ]);
+  });
+
+  it('does not mutate the semester it reads', () => {
+    const source = semester([course('a', 600), course('b')]);
+    const before = JSON.parse(JSON.stringify(source));
+    pomodoro.studyTimeByCourse(source);
+    expect(source).toEqual(before);
+  });
+});
+
 describe('addStudyTime', () => {
   it('increments the total and appends a session with the given source', () => {
     const course = { id: 'c-1' };
