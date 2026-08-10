@@ -2350,6 +2350,8 @@ function renderPomodoroControl() {
     s.courseId && state.semester ? state.semester.courses.find((c) => c.id === s.courseId) : null;
   const label = s.phase === 'work' ? (course ? course.name : 'Free study') : phaseLabel(s.phase);
 
+  const meter = pomodoroDotsHtml(s) + pomodoroProgressHtml(s);
+
   // Waiting on the user: show that the phase finished rather than a frozen
   // 00:00, and reopen the modal on click.
   if (isAwaitingAdvance(s)) {
@@ -2357,7 +2359,8 @@ function renderPomodoroControl() {
     btn.innerHTML =
       `${icon('check')}` +
       `<span class="pomodoro-clock">Done</span>` +
-      `<span class="pomodoro-label">${escapeHtml(label)}</span>`;
+      `<span class="pomodoro-label">${escapeHtml(label)}</span>` +
+      meter;
     btn.title = 'Finished — choose what happens next';
     reportPomodoroToTray();
     return;
@@ -2369,9 +2372,49 @@ function renderPomodoroControl() {
   btn.innerHTML =
     `${icon(paused ? 'player-play' : 'player-pause')}` +
     `<span class="pomodoro-clock">${formatClock(remainingSeconds(s))}</span>` +
-    `<span class="pomodoro-label">${escapeHtml(label)}</span>`;
+    `<span class="pomodoro-label">${escapeHtml(label)}</span>` +
+    meter;
   btn.title = paused ? 'Resume' : 'Pause';
   reportPomodoroToTray();
+}
+
+// ---- Timer control meter (phase progress + cycle dots) ---------------------
+// Both are decoration for the clock that is already spelled out in text, so
+// they are aria-hidden; the button's own label and title carry the meaning.
+
+// How far into the current phase the session is, 0..1. Paused sessions freeze
+// with remainingSeconds(), and a phase waiting to be advanced reads as full.
+function pomodoroPhaseProgress(session) {
+  const full = phaseDurationSeconds(session.phase, state.pomodoro.settings);
+  if (!full) return 0;
+  if (isAwaitingAdvance(session)) return 1;
+  return Math.min(1, Math.max(0, (full - remainingSeconds(session)) / full));
+}
+
+// A hairline fill along the bottom edge of the button. Absolutely positioned
+// so the control keeps its single-row, 32px header height.
+function pomodoroProgressHtml(session) {
+  const pct = Math.round(pomodoroPhaseProgress(session) * 100);
+  return (
+    '<span class="pomodoro-progress" aria-hidden="true">' +
+    `<span class="pomodoro-progress-fill" style="width:${pct}%"></span>` +
+    '</span>'
+  );
+}
+
+// One dot per focus block in the configured cycle, filled left to right.
+// completedPomodoros reaches the full count during the long break (every dot
+// lit), and core resets it to 0 by returning the session to idle once that
+// break is over — so the row resets exactly when the cycle does.
+function pomodoroDotsHtml(session) {
+  const count = clampPomodoroSettings(state.pomodoro.settings).pomodorosUntilLongBreak;
+  const within = session.completedPomodoros % count;
+  const filled = within === 0 && session.completedPomodoros > 0 ? count : within;
+  let html = '<span class="pomodoro-dots" aria-hidden="true">';
+  for (let i = 0; i < count; i++) {
+    html += `<span class="pomodoro-dot${i < filled ? ' pomodoro-dot--on' : ''}"></span>`;
+  }
+  return html + '</span>';
 }
 
 // Push the header control's current display state to the Tray (main has no

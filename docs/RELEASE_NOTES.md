@@ -42,6 +42,18 @@
 - Fixed (mobile): stopping or skipping from the parked state no longer credits
   the focus block a second time (it is already credited in full the moment it
   completes).
+- Added (desktop): the header timer control now shows how far through the
+  current phase you are, as a hairline fill along the bottom edge of the
+  button. It freezes with a paused session and reads full for a phase waiting
+  to be advanced.
+- Added (desktop): a row of dots on the same control — one per focus block in
+  the configured cycle (`pomodorosUntilLongBreak`), filled left to right as
+  blocks are completed, all lit through the long break, and gone once the
+  cycle ends and the session returns to idle.
+- Changed (desktop): both new elements follow the existing phase colour coding
+  (blue focus / green break / amber waiting). The control keeps its single
+  32px header row — the fill is positioned inside the button rather than
+  adding a second row — so the header's alignment is unchanged.
 
 ## 1.0.2 — 2026-08-09
 
