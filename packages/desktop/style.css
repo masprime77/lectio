@@ -297,6 +297,56 @@ body.electron-app .header-inner { padding-left: 80px; }
   display: inline-flex;
   align-items: center;
 }
+/* --- Floating corner controls --------------------------------------------
+   The study timer (bottom-left) and "+ New semester" (bottom-right) are pinned
+   to the window rather than sitting in the header row. z-index stays under the
+   modal overlay (100) and the tutorial (300), so modals still cover them and
+   the tutorial scrim still dims them — only its spotlight cut-out lets them
+   through, which is what the #pomodoro-control / #new-btn steps rely on. */
+.floating-timer,
+.floating-new {
+  position: fixed;
+  bottom: 1.1rem;
+  z-index: 50;
+}
+.floating-timer { left: 1.1rem; }
+.floating-new { right: 1.1rem; }
+
+/* Each piece keeps its own border and phase colouring — the elevation is what
+   makes the group read as floating, not a wrapper pill around it. */
+.floating-timer > * {
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.18);
+}
+.floating-timer .pomodoro-btn {
+  height: 36px;
+  border-radius: 999px;
+  background: var(--surface);
+}
+.floating-timer .pomodoro-aux {
+  height: 32px;
+  width: 32px;
+  padding: 0;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Icon-only round action button; the "New" label is hidden rather than removed
+   so app.js's existing markup keeps working. */
+.floating-new {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border-radius: 50%;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.24);
+}
+.floating-new span { display: none; }
+.floating-new .ti { width: 22px; height: 22px; }
+
 /* --- Pomodoro study timer ------------------------------------------------ */
 .pomodoro-control { display: flex; align-items: center; gap: 0.25rem; }
 
@@ -583,7 +633,9 @@ body.electron-app .header-inner { padding-left: 80px; }
 .btn-danger:hover { background: var(--danger-bg); }
 
 /* Layout */
-.main { max-width: 100%; margin: 0 auto; padding: 1rem; }
+/* Bottom padding clears the two floating corner controls, so the last row of
+   content can always be scrolled out from under them. */
+.main { max-width: 100%; margin: 0 auto; padding: 1rem 1rem 5rem; }
 
 /* Dashboard */
 .dashboard {
