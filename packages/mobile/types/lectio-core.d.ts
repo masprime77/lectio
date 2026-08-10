@@ -347,6 +347,8 @@ export interface PomodoroSession {
   endsAt: number;
   pausedAt: number | null;
   completedPomodoros: number;
+  /** True once the phase has run out and the user has not confirmed moving on. */
+  awaitingAdvance: boolean;
   courseId: string | null;
   semesterId: string | null;
 }
@@ -362,6 +364,24 @@ export interface StudySession {
 export interface StudyTime {
   totalSeconds: number;
   sessions: StudySession[];
+}
+
+/** One course's slice of a semester's tracked study time. */
+export interface StudyTimeSlice {
+  id: string;
+  name: string;
+  color: string | null;
+  seconds: number;
+  /** Exact fraction of totalSeconds, 0..1. */
+  share: number;
+  /** `share` as a whole number; rounded per slice, so these may total 99/101. */
+  percent: number;
+}
+
+export interface StudyTimeBreakdown {
+  totalSeconds: number;
+  /** Most-studied first; courses with no tracked time are omitted. */
+  courses: StudyTimeSlice[];
 }
 
 export const DEFAULT_POMODORO_SETTINGS: PomodoroSettings;
@@ -381,6 +401,8 @@ export function remainingSeconds(session: PomodoroSession, nowMs?: number): numb
 export function isRunning(session: PomodoroSession): boolean;
 export function isPaused(session: PomodoroSession): boolean;
 export function isPhaseComplete(session: PomodoroSession, nowMs?: number): boolean;
+export function isAwaitingAdvance(session: PomodoroSession): boolean;
+export function markPhaseComplete(session: PomodoroSession, nowMs?: number): PomodoroSession;
 export function pauseSession(session: PomodoroSession, nowMs?: number): PomodoroSession;
 export function resumeSession(session: PomodoroSession, nowMs?: number): PomodoroSession;
 export function elapsedWorkSeconds(
@@ -398,11 +420,17 @@ export function skipPhase(
   settings: PomodoroSettings,
   nowMs?: number
 ): PomodoroSession;
+export function confirmAdvance(
+  session: PomodoroSession,
+  settings: PomodoroSettings,
+  nowMs?: number
+): PomodoroSession;
 export function phaseLabel(phase: PomodoroPhase): string;
 export function rehydrateSession(raw: unknown, nowMs?: number): PomodoroSession;
 
 export function ensureStudyTime(course: Course): StudyTime;
 export function getCourseStudySeconds(course: Course): number;
+export function studyTimeByCourse(semester: Semester | null | undefined): StudyTimeBreakdown;
 export function addStudyTime(
   course: Course,
   seconds: number,
