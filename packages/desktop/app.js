@@ -380,6 +380,7 @@ const {
   phaseDurationSeconds,
   addStudyTime,
   getCourseStudySeconds,
+  studyTimeByCourse,
   setStudyTime,
   formatClock,
   formatHoursMinutes,
@@ -432,6 +433,7 @@ const ICONS = {
   'player-stop':
     '<path d="M5 5m0 2a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2z" />',
   'player-skip-forward': '<path d="M4 5v14l12 -7z" /><path d="M20 5l0 14" />',
+  'chart-pie': '<path d="M12 12l0 -9a9 9 0 1 0 9 9l-9 0" />',
 };
 
 function icon(name) {
@@ -2029,6 +2031,7 @@ async function setupPomodoro() {
   document.getElementById('pomodoro-start').addEventListener('click', startPomodoroFromModal);
 
   setupPomodoroAdvanceModal();
+  setupStudyTimePanel();
 
   // A session restored from a previous launch keeps running.
   const restored = state.pomodoro.session;
@@ -2282,6 +2285,7 @@ function creditStudySeconds(session, seconds) {
   addStudyTime(course, seconds, { source: 'pomodoro' });
   persist();
   renderDashboard();
+  renderStudyTimePanel();
   if (state.view === 'course') renderPlanner();
 }
 
@@ -2439,6 +2443,203 @@ function reportPomodoroToTray() {
     label,
     paused: pomodoroIsPaused(s),
   });
+}
+
+// ---------------------------------------------------------------------------
+// Study Time panel
+//
+// Where the semester's *tracked time* went: a ring of per-course slices, the
+// total in the middle, and a legend. Deliberately separate from the dashboard's
+// Breakdown panel, which answers a different question (readings/tasks
+// completion) — the only thing they share is that both are per course.
+//
+// It also owns the one control that has to live somewhere: while a session is
+// running, which course it credits. All the arithmetic comes from core's
+// studyTimeByCourse(); the ring is inline SVG in the same spirit as icon().
+// ---------------------------------------------------------------------------
+
+const STUDY_RING = { size: 148, radius: 58, width: 20 };
+
+function setupStudyTimePanel() {
+  const overlay = document.getElementById('studytime-overlay');
+  if (!overlay) return;
+  const openBtn = document.getElementById('studytime-btn');
+  openBtn.innerHTML = icon('chart-pie');
+  openBtn.addEventListener('click', openStudyTimePanel);
+  const closeBtn = document.getElementById('studytime-close');
+  closeBtn.innerHTML = icon('x');
+  closeBtn.addEventListener('click', closeStudyTimePanel);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeStudyTimePanel();
+  });
+}
+
+function isStudyTimePanelOpen() {
+  const overlay = document.getElementById('studytime-overlay');
+  return !!overlay && !overlay.classList.contains('hidden');
+}
+
+// Opening and closing are pure UI — a running session keeps running.
+function openStudyTimePanel() {
+  const overlay = document.getElementById('studytime-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('hidden');
+  renderStudyTimePanel();
+  document.getElementById('studytime-close').focus();
+}
+
+function closeStudyTimePanel() {
+  const overlay = document.getElementById('studytime-overlay');
+  if (overlay) overlay.classList.add('hidden');
+}
+
+// One stroked arc per course, drawn from 12 o'clock. stroke-dasharray sets each
+// slice's length and stroke-dashoffset walks around the circle; a hairline gap
+// keeps neighbouring slices apart when there is more than one.
+function studyTimeRingHtml(breakdown) {
+  const { size, radius, width } = STUDY_RING;
+  const circumference = 2 * Math.PI * radius;
+  const center = size / 2;
+  const gap = breakdown.courses.length > 1 ? 3 : 0;
+  let offset = 0;
+  let segments = '';
+  breakdown.courses.forEach((entry) => {
+    const arc = entry.share * circumference;
+    const drawn = Math.max(1, arc - gap);
+    segments +=
+      `<circle class="st-seg" cx="${center}" cy="${center}" r="${radius}" fill="none"` +
+      ` stroke="${escapeHtml(entry.color || 'currentColor')}" stroke-width="${width}"` +
+      ` stroke-dasharray="${drawn.toFixed(2)} ${(circumference - drawn).toFixed(2)}"` +
+      ` stroke-dashoffset="${(-offset).toFixed(2)}">` +
+      `<title>${escapeHtml(entry.name || 'Untitled')} — ${formatHoursMinutes(entry.seconds)}</title>` +
+      '</circle>';
+    offset += arc;
+  });
+  return (
+    `<svg class="st-ring" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}"` +
+    ' role="img" aria-label="Study time per course">' +
+    `<g transform="rotate(-90 ${center} ${center})">` +
+    `<circle class="st-ring-track" cx="${center}" cy="${center}" r="${radius}" fill="none" stroke-width="${width}" />` +
+    segments +
+    '</g></svg>'
+  );
+}
+
+function studyTimeLegendHtml(breakdown) {
+  if (breakdown.courses.length === 0) {
+    return (
+      '<p class="st-empty">No study time tracked yet. Finish a focus block, or set a ' +
+      "course's studied time from the dashboard.</p>"
+    );
+  }
+  const rows = breakdown.courses
+    .map(
+      (entry) =>
+        '<li class="st-legend-row">' +
+        `<span class="st-swatch" style="background:${escapeHtml(entry.color || 'var(--muted)')}"></span>` +
+        `<span class="st-legend-name">${escapeHtml(entry.name || 'Untitled')}</span>` +
+        `<span class="st-legend-value">${formatHoursMinutes(entry.seconds)}</span>` +
+        `<span class="st-legend-pct">${entry.percent}%</span>` +
+        '</li>'
+    )
+    .join('');
+  return `<ul class="st-legend">${rows}</ul>`;
+}
+
+// The running session's course. Absent a session there is nothing to re-point,
+// so the panel is simply read-only.
+function studyTimeSwitchHtml() {
+  const s = state.pomodoro.session;
+  if (s.phase === 'idle') {
+    return '<p class="st-switch-hint">No timer running — start one to track time against a course.</p>';
+  }
+  const options = [
+    `<option value=""${s.courseId ? '' : ' selected'}>Free study (no course)</option>`,
+  ];
+  if (state.semester) {
+    sortedCourses(state.semester.courses).forEach((c) => {
+      options.push(
+        `<option value="${escapeHtml(c.id)}"${c.id === s.courseId ? ' selected' : ''}>` +
+          `${escapeHtml(c.name)}</option>`
+      );
+    });
+  }
+  const midBlock = s.phase === 'work' && !isAwaitingAdvance(s);
+  const hint = midBlock
+    ? 'Minutes already studied in this block stay with the course they were earned on — switching banks them and starts a fresh block for the new course.'
+    : 'The next focus block is credited to this course.';
+  return (
+    '<div class="st-switch">' +
+    '<label class="st-switch-label" for="studytime-course">This session credits</label>' +
+    `<select id="studytime-course">${options.join('')}</select>` +
+    `<p class="st-switch-hint">${hint}</p>` +
+    '</div>'
+  );
+}
+
+// Cheap enough to rebuild wholesale; called on open and whenever the numbers
+// behind it move. A no-op while the panel is closed.
+function renderStudyTimePanel() {
+  if (!isStudyTimePanelOpen()) return;
+  const body = document.getElementById('studytime-body');
+  if (!state.semester) {
+    body.innerHTML =
+      '<p class="st-empty">Open a semester to see where your study time went.</p>' +
+      studyTimeSwitchHtml();
+  } else {
+    const breakdown = studyTimeByCourse(state.semester);
+    body.innerHTML =
+      '<div class="st-chart">' +
+      studyTimeRingHtml(breakdown) +
+      '<div class="st-ring-center">' +
+      `<span class="st-ring-total">${formatHoursMinutes(breakdown.totalSeconds)}</span>` +
+      '<span class="st-ring-sub">studied</span>' +
+      '</div>' +
+      '</div>' +
+      studyTimeLegendHtml(breakdown) +
+      studyTimeSwitchHtml();
+  }
+
+  const select = document.getElementById('studytime-course');
+  if (select) {
+    select.addEventListener('change', () => switchPomodoroCourse(select.value || null));
+  }
+}
+
+// Re-point the running session at another course (or at free study) without
+// stopping the clock.
+function switchPomodoroCourse(courseId) {
+  const s = state.pomodoro.session;
+  if (s.phase === 'idle') return;
+  const nextCourseId = courseId || null;
+  if ((s.courseId || null) === nextCourseId) return;
+  const nextSemesterId = nextCourseId ? state.semesterId : null;
+
+  if (s.phase !== 'work' || isAwaitingAdvance(s)) {
+    // Nothing is accruing: a break credits nothing, and a finished block was
+    // already credited to the course that earned it. Just re-point the session.
+    state.pomodoro.session = { ...s, courseId: nextCourseId, semesterId: nextSemesterId };
+  } else {
+    // Mid-block. Bank what the old course has actually earned, on the same
+    // terms as stopping or skipping would (creditElapsedWork, 30s floor), then
+    // start a fresh block for the new course — a completed block always credits
+    // its full length, so the banked part must not also be part of the next one.
+    creditElapsedWork(s);
+    const fresh = startSession(state.pomodoro.settings, {
+      courseId: nextCourseId,
+      semesterId: nextSemesterId,
+    });
+    state.pomodoro.session = {
+      ...fresh,
+      completedPomodoros: s.completedPomodoros,
+      // A paused session stays paused, with the new block's full time on it.
+      pausedAt: s.pausedAt != null ? Date.now() : null,
+    };
+  }
+
+  persistPomodoroSession();
+  renderPomodoroControl();
+  renderStudyTimePanel();
 }
 
 // Swap a studied-time label for an inline text input. Mirrors

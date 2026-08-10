@@ -131,6 +131,8 @@
                   title="Skip to next phase" aria-label="Skip to next phase"></button>
           <button type="button" id="pomodoro-stop-btn" class="icon-btn pomodoro-aux hidden"
                   title="Stop timer" aria-label="Stop timer"></button>
+          <button type="button" id="studytime-btn" class="icon-btn pomodoro-aux"
+                  title="Study time" aria-label="Show study time"></button>
         </div>
         <select id="sort-select" title="Sort courses" aria-label="Sort courses">
           <option value="week-desc">Weeks: high to low</option>
@@ -350,6 +352,22 @@
           <button type="button" id="pomodoro-start" class="btn btn-primary">Start</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Study time: where the semester's tracked study time went (ring + legend),
+       and, while a session runs, which course it credits. Separate from the
+       dashboard's Breakdown panel, which is about readings/tasks completion.
+       Body is rendered by renderStudyTimePanel() in app.js. -->
+  <div id="studytime-overlay" class="modal-overlay hidden">
+    <div class="modal studytime-modal" role="dialog" aria-modal="true"
+         aria-labelledby="studytime-title">
+      <div class="settings-header">
+        <h2 id="studytime-title">Study time</h2>
+        <button id="studytime-close" class="icon-btn" aria-label="Close"></button>
+      </div>
+
+      <div id="studytime-body"></div>
     </div>
   </div>
 
