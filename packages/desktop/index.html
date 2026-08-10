@@ -124,14 +124,6 @@
           <button type="button" id="collapse-all-btn" class="collapse-btn" title="Collapse all weeks" aria-label="Collapse all weeks"></button>
           <button type="button" id="expand-current-btn" class="collapse-btn" title="Expand current week only" aria-label="Expand current week only"></button>
         </div>
-        <div class="pomodoro-control" id="pomodoro-control">
-          <button type="button" id="pomodoro-btn" class="btn btn-small pomodoro-btn"
-                  title="Start a study timer" aria-label="Start a study timer"></button>
-          <button type="button" id="pomodoro-skip-btn" class="icon-btn pomodoro-aux hidden"
-                  title="Skip to next phase" aria-label="Skip to next phase"></button>
-          <button type="button" id="pomodoro-stop-btn" class="icon-btn pomodoro-aux hidden"
-                  title="Stop timer" aria-label="Stop timer"></button>
-        </div>
         <select id="sort-select" title="Sort courses" aria-label="Sort courses">
           <option value="week-desc">Weeks: high to low</option>
           <option value="week-asc">Weeks: low to high</option>
@@ -139,10 +131,6 @@
           <option value="progress-asc">Progress: low % first</option>
           <option value="alpha-asc">A-Z</option>
         </select>
-        <button id="new-btn" class="btn btn-primary btn-icon-text">
-          <!-- icon injected by app.js -->
-          <span>New</span>
-        </button>
         <button id="feedback-btn" class="icon-btn" title="Feedback" aria-label="Feedback"></button>
         <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings"></button>
       </div>
@@ -162,6 +150,29 @@
     <section id="dashboard" class="dashboard"></section>
     <section id="planner" class="planner"></section>
   </main>
+
+  <!-- Floating corner controls. Both used to sit inline in .header-controls;
+       they are pinned to the window's bottom corners instead, outside the
+       header's drag region. Their JS wiring is unchanged — app.js still finds
+       them by id, including the onboarding tutorial's spotlight steps. -->
+  <div class="pomodoro-control floating-timer" id="pomodoro-control">
+    <button type="button" id="pomodoro-btn" class="btn btn-small pomodoro-btn"
+            title="Start a study timer" aria-label="Start a study timer"></button>
+    <button type="button" id="pomodoro-skip-btn" class="icon-btn pomodoro-aux hidden"
+            title="Skip to next phase" aria-label="Skip to next phase"></button>
+    <button type="button" id="pomodoro-stop-btn" class="icon-btn pomodoro-aux hidden"
+            title="Stop timer" aria-label="Stop timer"></button>
+    <button type="button" id="studytime-btn" class="icon-btn pomodoro-aux"
+            title="Study time" aria-label="Show study time"></button>
+  </div>
+
+  <!-- Icon-only: the "New" label is dropped in favour of the tooltip and
+       aria-label (app.js still injects the + icon and its span). -->
+  <button id="new-btn" class="btn btn-primary btn-icon-text floating-new"
+          title="New semester" aria-label="New semester">
+    <!-- icon injected by app.js -->
+    <span>New</span>
+  </button>
 
   <!-- Tutorial overlay -->
   <div id="tutorial-overlay" class="tutorial-overlay hidden" role="dialog" aria-modal="true" aria-label="Tutorial">
@@ -348,6 +359,46 @@
         <div class="modal-actions-right">
           <button type="button" id="pomodoro-cancel" class="btn">Cancel</button>
           <button type="button" id="pomodoro-start" class="btn btn-primary">Start</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Study time: where the semester's tracked study time went (ring + legend),
+       and, while a session runs, which course it credits. Separate from the
+       dashboard's Breakdown panel, which is about readings/tasks completion.
+       Body is rendered by renderStudyTimePanel() in app.js. -->
+  <div id="studytime-overlay" class="modal-overlay hidden">
+    <div class="modal studytime-modal" role="dialog" aria-modal="true"
+         aria-labelledby="studytime-title">
+      <div class="settings-header">
+        <h2 id="studytime-title">Study time</h2>
+        <button id="studytime-close" class="icon-btn" aria-label="Close"></button>
+      </div>
+
+      <div id="studytime-body"></div>
+    </div>
+  </div>
+
+  <!-- Phase-complete gate: a finished focus block or break waits here until the
+       user chooses to move on. Nothing advances on its own — see
+       handlePomodoroPhaseComplete() / confirmPomodoroAdvance() in app.js.
+       Title, message and confirm label are filled in per phase. -->
+  <div id="pomodoro-advance-overlay" class="modal-overlay hidden">
+    <div class="modal pomodoro-advance-modal" role="dialog" aria-modal="true"
+         aria-labelledby="pomodoro-advance-title">
+      <div class="settings-header">
+        <h2 id="pomodoro-advance-title">Focus block done</h2>
+        <button id="pomodoro-advance-close" class="icon-btn" aria-label="Close"></button>
+      </div>
+
+      <p class="pomodoro-advance-message" id="pomodoro-advance-message"></p>
+
+      <div class="modal-actions">
+        <div class="modal-actions-left"></div>
+        <div class="modal-actions-right">
+          <button type="button" id="pomodoro-advance-stop" class="btn">Stop timer</button>
+          <button type="button" id="pomodoro-advance-confirm" class="btn btn-primary">Start break</button>
         </div>
       </div>
     </div>

@@ -1,5 +1,145 @@
 ## Unreleased
 
+## 1.1.0 — 2026-08-10
+
+- Changed (core): a Pomodoro phase no longer transitions on its own when its
+  deadline passes. The session shape gained an `awaitingAdvance` flag, and
+  `markPhaseComplete()` parks a finished phase in that state so the UI can ask
+  before moving on; `isAwaitingAdvance()` reports it. Study-time crediting is
+  unchanged — callers still credit at the moment completion is detected.
+- Added (core): `confirmAdvance()`, the explicit "user said yes" transition
+  (a thin alias of `advanceSession`, which still handles work → short/long
+  break, short break → work, and long break → idle, measured from the
+  confirmation rather than the missed deadline).
+- Fixed (core): `rehydrateSession()` restores a parked session in the same
+  awaiting-advance state instead of collapsing an expired break to idle, so
+  closing and reopening the app does not skip the confirmation.
+- Changed (desktop): a finished focus block or break no longer rolls straight
+  into the next phase. The study timer now asks first, in a new modal that
+  offers to start the break / next focus block or to stop the timer; the OS
+  notification stays a heads-up and no longer decides anything on its own.
+  A finished long break ends the cycle with a single "Finish session".
+- Changed (desktop): the header timer button gets a third state — an amber,
+  gently pulsing "Done" pill (with the course name) while a finished phase
+  waits for you, instead of a frozen-looking 00:00. Clicking it reopens the
+  question, and the tray reports "Done" in place of the countdown.
+- Fixed (desktop): stopping or skipping from the waiting state credits the
+  finished block exactly once — the block is credited the moment it completes,
+  so the partial-time credit is now skipped there rather than double-counting.
+- Changed (desktop): a session parked mid-question survives a restart — the
+  app reopens the modal instead of resuming a phase you never confirmed, and
+  the 1 Hz repaint tick pauses while nothing is counting down.
+- Changed (mobile): a finished focus block or break no longer rolls into the
+  next phase on its own. `completePhase` credits the block and parks the
+  session, and the "what's next?" alert — start the break / next focus block,
+  or stop — is now what performs the transition, instead of a notice shown
+  after the fact. A finished long break offers a single "Finish session".
+- Changed (mobile): the parked state persists like any other session state, so
+  backgrounding, a force-quit, or tapping the OS notification hours later all
+  return to the same unanswered question rather than to a phase that moved on
+  unseen; the question is re-asked on foreground or by tapping the pill.
+- Changed (mobile): the timer FAB gained a third state — an amber "Done" pill
+  with a tick, distinct from the running countdown — and the 1 s repaint and
+  deadline notification are both skipped while a phase sits parked.
+- Fixed (mobile): stopping or skipping from the parked state no longer credits
+  the focus block a second time (it is already credited in full the moment it
+  completes).
+- Added (desktop): the header timer control now shows how far through the
+  current phase you are, as a hairline fill along the bottom edge of the
+  button. It freezes with a paused session and reads full for a phase waiting
+  to be advanced.
+- Added (desktop): a row of dots on the same control — one per focus block in
+  the configured cycle (`pomodorosUntilLongBreak`), filled left to right as
+  blocks are completed, all lit through the long break, and gone once the
+  cycle ends and the session returns to idle.
+- Changed (desktop): both new elements follow the existing phase colour coding
+  (blue focus / green break / amber waiting). The control keeps its single
+  32px header row — the fill is positioned inside the button rather than
+  adding a second row — so the header's alignment is unchanged.
+- Added (mobile): the timer pill now shows phase progress as a thin bar under
+  the clock, filling as the phase runs down. It freezes while paused and reads
+  full on the "Done" pill waiting for confirmation.
+- Added (mobile): cycle dots on the pill too — one per focus block in the
+  configured cycle, filled as blocks are completed. They stack above the clock
+  rather than beside it, so the pill keeps its 56px height and its width still
+  follows the clock text; for unusually long cycles (more than 8 blocks) the
+  dots are omitted, since a row that wide would distort the pill.
+- Changed (mobile): the pill's accessibility label now also announces how many
+  focus blocks of the cycle are done; tap-to-pause, long-press-to-skip and the
+  stop square are unchanged.
+- Added (core): `studyTimeByCourse(semester)` — a pure helper that summarizes
+  where a semester's studied time went, returning `{ totalSeconds, courses }`
+  where each course carries its id, name, colour, seconds, exact `share` of
+  the total and a rounded `percent`. It is the data source for the Study Time
+  dashboard panel the apps will add next.
+- Note (core): `studyTimeByCourse` omits courses with no tracked time (an
+  empty slice is noise in a chart) and sorts the rest most-studied first; a
+  semester with no courses, nothing studied, or no semester at all returns
+  `{ totalSeconds: 0, courses: [] }`. Because `percent` is rounded per course,
+  the percents are labels and can total 99 or 101 — `share` is the exact value.
+- Added (desktop): a **Study time** panel, opened from the new chart button on
+  the header's timer control. It shows a ring of per-course slices sized by
+  each course's share of the semester's tracked time and coloured with the
+  course's own accent, the semester total in the middle, and a legend of
+  names, hours and percentages. It is a separate panel from the dashboard's
+  Breakdown, which is about readings/tasks completion, not hours.
+- Added (desktop): while a session is running, the Study time panel can
+  re-point it at another course (or at free study) without stopping the clock.
+  Mid-block, the minutes already worked are banked to the course that earned
+  them — on the same terms as stopping or skipping — and a fresh block starts
+  for the new course, so nothing is lost and nothing is counted twice. On a
+  break, or on a finished block waiting to be advanced, the switch simply
+  changes which course the next block credits.
+- Note (desktop): the ring is hand-rolled inline SVG (stroked arcs) in the
+  same spirit as the app's `icon()` helper — no charting library was added.
+- Added (mobile): a **Study time** bottom sheet (`StudyTimeDashboard`), opened
+  from a small chart button above the timer FAB — present in every timer state,
+  so it stays reachable while a session runs. It mirrors the desktop panel: a
+  ring of per-course slices in each course's colour, the semester total in the
+  middle, and a legend of names, hours and percentages.
+- Added (mobile): the sheet can re-point a running session at another course
+  (or free study) without stopping it. Mid focus block the minutes already
+  worked are banked to the course that earned them and a fresh block starts for
+  the new one; on a break or a finished block it only changes which course the
+  next block credits. This needed one new provider method, `switchCourse`,
+  since the crediting has to happen where the session state lives.
+- Changed (desktop): the study timer moved out of the header row to a floating
+  control pinned to the window's bottom-left corner, keeping its course/phase
+  label, its progress bar and dots, and its skip / stop / study-time buttons
+  (now round, elevated pills). Its button is slightly taller (36px) than the
+  header row allowed.
+- Changed (desktop): "New" moved to a floating, icon-only round "+" button in
+  the bottom-right corner. The label is dropped in favour of its tooltip and
+  aria-label ("New semester"); the click handler is unchanged.
+- Added (mobile): the course detail screen groups Readings and Tasks under
+  collapsible "Week N" headers with their date ranges, mirroring the desktop
+  course view. The Readings/Tasks sections and their "+ Add" controls are
+  unchanged; the current week starts open and the rest collapsed.
+- Added (mobile): each week section's open/closed state is remembered per
+  course, section and week (a new `openCourseWeeks` preference in AsyncStorage),
+  so leaving the screen and coming back keeps it as you left it. Only sections
+  you have actually toggled are stored — the rest follow the default.
+- Note (mobile): items with no week are kept in a trailing "No week" group,
+  which starts open since they used to be visible in the flat list. The
+  week-asc / week-desc sort orders now set the direction the week *groups* are
+  listed in (item order inside a group is untouched, as every item there shares
+  one week).
+- Fixed (desktop): the onboarding tutorial's copy caught up with the move — it
+  no longer tells you to click a "New" label that is now an icon-only "+" in
+  the bottom-right, and the study-timer step points at the bottom-left corner
+  and mentions the study-time button.
+- Note (desktop): both float below modals and the onboarding tutorial's scrim
+  (z-index 50 against their 100/300), so every overlay still covers them, and
+  the tutorial's `#pomodoro-control` and `#new-btn` steps still spotlight them
+  correctly — the spotlight already worked in viewport coordinates, so no
+  positioning logic needed changing. Main content gained bottom padding so it
+  can always be scrolled clear of both corners.
+- Note (mobile): the ring is drawn from plain Views — a circle of small ticks,
+  each coloured by the course whose share covers it — because there is no SVG
+  library in the package and none was worth adding for one chart. A course with
+  less than about 2% of the total is too small for a tick and shows in the
+  legend only.
+
 ## 1.0.2 — 2026-08-09
 
 - Chore: bumped version to 1.0.1 across the root, desktop, and mobile

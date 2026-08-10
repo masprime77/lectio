@@ -19,6 +19,13 @@
 // Crediting study time is untouched and still only happens in completePhase;
 // the scheduled notification is a pure heads-up and never itself writes
 // studyTime, so there's no risk of double-crediting from adding it.
+//
+// No phase ever advances on its own: completePhase credits and then parks the
+// session in core's awaiting-advance state, and only the Alert raised by
+// promptAdvance (or the pill that re-opens it) performs the transition. That
+// parked state persists like any other, so backgrounding, a force-quit or a
+// notification tapped hours later all come back to the same unanswered
+// question rather than to a phase that moved on unseen.
 import {
   createContext,
   useCallback,
@@ -32,12 +39,14 @@ import { Alert, AppState } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import {
   addStudyTime,
-  advanceSession,
   clampPomodoroSettings,
+  confirmAdvance,
   createIdleSession,
   elapsedWorkSeconds,
+  isAwaitingAdvance,
   isPaused,
   isPhaseComplete,
+  markPhaseComplete,
   pauseSession,
   phaseDurationSeconds,
   rehydrateSession,
@@ -59,6 +68,10 @@ interface PomodoroContextValue {
   remaining: number;
   running: boolean;
   paused: boolean;
+  /** The phase finished and is waiting for the user to confirm moving on. */
+  awaiting: boolean;
+  /** Re-ask "what's next?" for a session that is awaiting advance. */
+  promptAdvance: () => void;
   start: (opts: {
     settings: PomodoroSettings;
     courseId: string | null;
@@ -67,6 +80,8 @@ interface PomodoroContextValue {
   togglePause: () => void;
   skip: () => void;
   stop: () => void;
+  /** Re-point a live session at another course (null = free study). */
+  switchCourse: (courseId: string | null, semesterId: string | null) => void;
 }
 
 const PomodoroContext = createContext<PomodoroContextValue | null>(null);
@@ -94,6 +109,10 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   // (or not scheduling) the next.
   const notificationIdRef = useRef<string | null>(null);
 
+  // True while the "what's next?" Alert is on screen, so the 1s refresh and a
+  // foreground event can't stack a second copy of it on top of the first.
+  const promptOpenRef = useRef(false);
+
   // Keep at most one scheduled notification in sync with the session: cancel
   // whatever was there, then — only for a running (not idle, not paused)
   // session — schedule one for its deadline. This is what makes the alert
@@ -110,7 +129,9 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
       );
       notificationIdRef.current = null;
     }
-    if (next.phase === 'idle' || next.pausedAt != null) return;
+    // Nothing to schedule for a phase that is over (its deadline is already in
+    // the past) or one that is paused / idle.
+    if (next.phase === 'idle' || next.pausedAt != null || isAwaitingAdvance(next)) return;
 
     const { status: existing } = await Notifications.getPermissionsAsync();
     let granted = existing === 'granted';
@@ -169,33 +190,99 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Advance past a finished phase, crediting a completed focus block in full.
-  const completePhase = useCallback(
+  // Ask what happens next. This Alert *is* the gate: nothing has advanced when
+  // it appears, and only its buttons move the session on. Backgrounded, it is
+  // skipped entirely — the scheduled OS notification is the heads-up there, and
+  // the session stays parked until the user comes back and answers (on
+  // foreground, or by tapping the pill).
+  const promptAdvance = useCallback(
     (s: PomodoroSession) => {
-      const finishedPhase = s.phase;
-      if (finishedPhase === 'work') {
-        void creditStudyTime(s, phaseDurationSeconds('work', settingsRef.current));
-      }
-      const next = advanceSession(s, settingsRef.current);
-      applySession(next);
-      if (AppState.currentState === 'active') {
-        const body =
-          finishedPhase === 'work'
-            ? 'Focus block complete — take a break.'
-            : 'Break over — back to it.';
-        Alert.alert('Study timer', body);
-      }
+      if (!isAwaitingAdvance(s)) return;
+      if (AppState.currentState !== 'active' || promptOpenRef.current) return;
+      promptOpenRef.current = true;
+
+      const set = settingsRef.current;
+      const long = (s.completedPomodoros + 1) % set.pomodorosUntilLongBreak === 0;
+      const copy =
+        s.phase === 'work'
+          ? {
+              title: 'Focus block done',
+              body: `That block is logged. Take a ${
+                long ? set.longBreakMinutes : set.shortBreakMinutes
+              }-minute break?`,
+              confirm: long ? 'Start long break' : 'Start break',
+              canStop: true,
+            }
+          : s.phase === 'shortBreak'
+            ? {
+                title: 'Break over',
+                body: `Ready for another ${set.workMinutes}-minute focus block?`,
+                confirm: 'Start focus block',
+                canStop: true,
+              }
+            : {
+                // A long break ends the cycle, so confirming and stopping are
+                // the same thing — only one button makes sense.
+                title: 'Long break over',
+                body: `That is ${set.pomodorosUntilLongBreak} focus blocks and a long break — a full cycle.`,
+                confirm: 'Finish session',
+                canStop: false,
+              };
+
+      // Both buttons re-read the live session: the pill's stop control may have
+      // ended it while this Alert sat on screen.
+      const advance = () => {
+        promptOpenRef.current = false;
+        const current = sessionRef.current;
+        if (!isAwaitingAdvance(current)) return;
+        applySession(confirmAdvance(current, settingsRef.current));
+      };
+      const end = () => {
+        promptOpenRef.current = false;
+        // No partial credit here: a finished focus block was already credited
+        // in full when it completed.
+        if (isAwaitingAdvance(sessionRef.current)) applySession(createIdleSession());
+      };
+
+      Alert.alert(
+        copy.title,
+        copy.body,
+        copy.canStop
+          ? [
+              { text: 'Stop timer', style: 'cancel', onPress: end },
+              { text: copy.confirm, onPress: advance },
+            ]
+          : [{ text: copy.confirm, onPress: advance }],
+        // Android lets an Alert be dismissed by tapping outside; without this
+        // the flag would stay set and the question could never be re-asked.
+        { onDismiss: () => (promptOpenRef.current = false) }
+      );
     },
-    [applySession, creditStudyTime]
+    [applySession]
   );
 
-  // Recompute now: advance if the deadline passed, otherwise just repaint.
+  // A finished phase credits its time and parks — it never advances by itself.
+  const completePhase = useCallback(
+    (s: PomodoroSession) => {
+      if (s.phase === 'work') {
+        void creditStudyTime(s, phaseDurationSeconds('work', settingsRef.current));
+      }
+      const parked = markPhaseComplete(s);
+      applySession(parked);
+      promptAdvance(parked);
+    },
+    [applySession, creditStudyTime, promptAdvance]
+  );
+
+  // Recompute now: park a phase whose deadline passed, re-ask if one is already
+  // parked (the completion may have happened while backgrounded), else repaint.
   const refresh = useCallback(() => {
     const s = sessionRef.current;
     if (s.phase === 'idle') return;
-    if (isPhaseComplete(s)) completePhase(s);
+    if (isAwaitingAdvance(s)) promptAdvance(s);
+    else if (isPhaseComplete(s)) completePhase(s);
     else setRemaining(remainingSeconds(s));
-  }, [completePhase]);
+  }, [completePhase, promptAdvance]);
 
   // Restore persisted settings + session on mount.
   useEffect(() => {
@@ -238,7 +325,11 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
       sessionRef.current = restored;
       setSession(restored);
       setRemaining(remainingSeconds(restored));
-      if (restored.phase !== 'idle' && isPhaseComplete(restored)) {
+      if (restored.phase !== 'idle' && isAwaitingAdvance(restored)) {
+        // Parked before the app was closed — the question is still unanswered,
+        // and there is nothing to schedule for a deadline already past.
+        promptAdvance(restored);
+      } else if (restored.phase !== 'idle' && isPhaseComplete(restored)) {
         completePhase(restored);
       } else if (restored.phase !== 'idle') {
         // Still running (or paused): re-establish the notification — or the
@@ -250,14 +341,15 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [completePhase, syncScheduledNotification]);
+  }, [completePhase, promptAdvance, syncScheduledNotification]);
 
-  // 1s repaint while a session is running. Nothing decrements here.
+  // 1s repaint while a session is running. Nothing decrements here. A parked
+  // session has no clock left to repaint, so it is left alone.
   useEffect(() => {
-    if (session.phase === 'idle' || isPaused(session)) return;
+    if (session.phase === 'idle' || isPaused(session) || isAwaitingAdvance(session)) return;
     const id = setInterval(refresh, 1000);
     return () => clearInterval(id);
-  }, [session.phase, session.pausedAt, session.endsAt, refresh]);
+  }, [session.phase, session.pausedAt, session.endsAt, session.awaitingAdvance, refresh]);
 
   // Foreground recompute: the interval may have been throttled or stopped
   // entirely while backgrounded, so re-derive from the deadline on return.
@@ -298,7 +390,9 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   // ignored under 30s so a mis-tap does not litter the session log.
   const creditPartial = useCallback(
     (s: PomodoroSession) => {
-      if (s.phase !== 'work') return;
+      // A parked focus block was already credited in full when it finished —
+      // crediting elapsed time again here would count it twice.
+      if (s.phase !== 'work' || isAwaitingAdvance(s)) return;
       const elapsed = elapsedWorkSeconds(s, settingsRef.current);
       if (elapsed >= 30) void creditStudyTime(s, elapsed);
     },
@@ -319,18 +413,60 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     applySession(createIdleSession());
   }, [applySession, creditPartial]);
 
+  // Change which course the *running* session credits, without stopping it.
+  // Mid focus block the minutes already worked are banked to the course that
+  // earned them — the same rule stop and skip use — and a fresh block starts
+  // for the new course, because a completed block always credits its full
+  // length and the banked part must not be counted inside it. On a break, or on
+  // a block already credited and waiting to be advanced, nothing is accruing,
+  // so this is only a change of who gets the next block.
+  const switchCourse = useCallback(
+    (courseId: string | null, semesterId: string | null) => {
+      const s = sessionRef.current;
+      if (s.phase === 'idle') return;
+      const nextCourseId = courseId || null;
+      if ((s.courseId || null) === nextCourseId) return;
+      const nextSemesterId = nextCourseId ? semesterId : null;
+
+      if (s.phase !== 'work' || isAwaitingAdvance(s)) {
+        applySession({ ...s, courseId: nextCourseId, semesterId: nextSemesterId });
+        return;
+      }
+      creditPartial(s);
+      const fresh = startSession(settingsRef.current, {
+        courseId: nextCourseId,
+        semesterId: nextSemesterId,
+      });
+      applySession({
+        ...fresh,
+        completedPomodoros: s.completedPomodoros,
+        // A paused session stays paused, with the new block's full time on it.
+        pausedAt: s.pausedAt != null ? Date.now() : null,
+      });
+    },
+    [applySession, creditPartial]
+  );
+
+  // The pill's tap target while a phase is parked: re-open the question.
+  const promptAdvanceNow = useCallback(() => {
+    promptAdvance(sessionRef.current);
+  }, [promptAdvance]);
+
   return (
     <PomodoroContext.Provider
       value={{
         session,
         settings,
         remaining,
-        running: session.phase !== 'idle' && !isPaused(session),
+        running: session.phase !== 'idle' && !isPaused(session) && !isAwaitingAdvance(session),
         paused: isPaused(session),
+        awaiting: isAwaitingAdvance(session),
+        promptAdvance: promptAdvanceNow,
         start,
         togglePause,
         skip,
         stop,
+        switchCourse,
       }}
     >
       {children}

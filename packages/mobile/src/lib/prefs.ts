@@ -11,6 +11,7 @@ const K = {
   tutorialSeen: 'lectio:pref:tutorialSeen',
   pomodoroSettings: 'lectio:pref:pomodoroSettings',
   pomodoroSession: 'lectio:pref:pomodoroSession',
+  openCourseWeeks: 'lectio:pref:openCourseWeeks',
 } as const;
 
 async function getString(key: string): Promise<string | null> {
@@ -58,4 +59,11 @@ export const prefs = {
   getPomodoroSession: () => getString(K.pomodoroSession),
   setPomodoroSession: (json: string) => setString(K.pomodoroSession, json),
   clearPomodoroSession: () => remove(K.pomodoroSession),
+
+  // Which week sections are expanded on the course detail screen, as a JSON
+  // map keyed by "<courseId>:<kind>:<week>". Only the sections the user has
+  // actually toggled are stored; everything else falls back to the default
+  // (the current week open). Parsed defensively by the caller.
+  getOpenCourseWeeks: () => getString(K.openCourseWeeks),
+  setOpenCourseWeeks: (json: string) => setString(K.openCourseWeeks, json),
 };
