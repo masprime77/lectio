@@ -9,7 +9,7 @@ import { ProgressBar } from '../ProgressBar';
 import { SortMenu } from '../SortMenu';
 import { SwipeableRow } from '../SwipeableRow';
 import { TagPickerSheet } from '../TagPickerSheet';
-import { sortedItems, type Kind, type UseCourseDetailResult } from './useCourseDetail';
+import type { Kind, UseCourseDetailResult, WeekGroup } from './useCourseDetail';
 import type { PlannerItem, Tag } from '../../../types/lectio-core';
 
 export interface CourseDetailBodyProps {
@@ -33,8 +33,7 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
     );
   }
 
-  const { course, readingTags, taskTags, progress, editing, selected, sortOrder, picker } =
-    result;
+  const { course, readingTags, taskTags, progress, editing, selected, picker } = result;
 
   const renderItem = (kind: Kind, item: PlannerItem, tags: Tag[]) => {
     const tag = tags.find((t) => t.id === item.status);
@@ -87,6 +86,35 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
     );
   };
 
+  // A "Week N · Apr 7 – Apr 13" header with a chevron, and its items when open.
+  // Same idea as the desktop course view's collapsible .course-week-header.
+  const renderWeekGroup = (kind: Kind, group: WeekGroup, tags: Tag[]) => (
+    <View key={group.key}>
+      <Pressable
+        onPress={() => result.toggleWeek(group)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: group.open }}
+        accessibilityLabel={`${group.title}, ${group.items.length} ${
+          group.items.length === 1 ? 'item' : 'items'
+        }`}
+        accessibilityHint={group.open ? 'Collapses this week' : 'Expands this week'}
+        style={({ pressed }) => [
+          styles.weekHeader,
+          { borderBottomColor: theme.border },
+          pressed && { opacity: 0.6 },
+        ]}
+      >
+        <Chevron open={group.open} color={theme.muted} />
+        <Text style={[styles.weekTitle, { color: theme.text }]}>{group.title}</Text>
+        {/* Always rendered: it doubles as the flexible spacer that pushes the
+            count to the right, and the no-week group has no date range. */}
+        <Text style={[styles.weekRange, { color: theme.muted }]}>{group.range}</Text>
+        <Text style={[styles.weekCount, { color: theme.muted }]}>{group.items.length}</Text>
+      </Pressable>
+      {group.open && group.items.map((item) => renderItem(kind, item, tags))}
+    </View>
+  );
+
   return (
     <>
       <ScrollView
@@ -128,7 +156,7 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
             </Text>
           </Pressable>
         ) : (
-          sortedItems(course.readings, sortOrder).map((r) => renderItem('reading', r, readingTags))
+          result.weekGroups('reading').map((g) => renderWeekGroup('reading', g, readingTags))
         )}
 
         <View style={[styles.sectionHeader, { marginTop: 24 }]}>
@@ -142,7 +170,7 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
             <Text style={[styles.empty, { color: theme.muted }]}>No tasks. Tap to add one.</Text>
           </Pressable>
         ) : (
-          sortedItems(course.tasks, sortOrder).map((t) => renderItem('task', t, taskTags))
+          result.weekGroups('task').map((g) => renderWeekGroup('task', g, taskTags))
         )}
       </ScrollView>
       <StudyTimeEditor
@@ -158,7 +186,7 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
       <Fab onPress={() => router.push(`/add?context=tags&id=${result.semester?.id}`)} />
       <SortMenu
         visible={result.sortMenuOpen}
-        current={sortOrder}
+        current={result.sortOrder}
         onPick={result.pickSortOrder}
         onClose={() => result.setSortMenuOpen(false)}
       />
@@ -171,6 +199,15 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
         onClose={() => result.setPicker(null)}
       />
     </>
+  );
+}
+
+/** Collapsed points right, expanded points down. Drawn, not an icon font. */
+function Chevron({ open, color }: { open: boolean; color: string }) {
+  return (
+    <View
+      style={[styles.chevron, { borderLeftColor: color }, open && { transform: [{ rotate: '90deg' }] }]}
+    />
   );
 }
 
@@ -196,6 +233,29 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { fontSize: 20, fontWeight: '700' },
   empty: { fontSize: 14 },
+
+  weekHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    marginBottom: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  weekTitle: { fontSize: 14, fontWeight: '600' },
+  weekRange: { fontSize: 12, flex: 1 },
+  weekCount: { fontSize: 12, fontVariant: ['tabular-nums'] },
+  chevron: {
+    width: 0,
+    height: 0,
+    borderTopWidth: 5,
+    borderBottomWidth: 5,
+    borderLeftWidth: 8,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+    borderRightColor: 'transparent',
+  },
+
   itemContainer: { marginBottom: 8 },
   item: {
     flexDirection: 'row',

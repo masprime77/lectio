@@ -96,14 +96,22 @@
   // showing the correct remaining time with no catch-up logic.
   //
   // Session shape:
-  //   { phase, endsAt, pausedAt, completedPomodoros, courseId, semesterId }
+  //   { phase, endsAt, pausedAt, completedPomodoros, awaitingAdvance,
+  //     courseId, semesterId }
   //   phase              'idle' | 'work' | 'shortBreak' | 'longBreak'
   //   endsAt             epoch ms when the current phase ends (0 when idle)
   //   pausedAt           epoch ms when paused, or null when running
   //   completedPomodoros work phases finished so far this session
+  //   awaitingAdvance    true once the phase has run out and the user has not
+  //                      yet confirmed moving on (see markPhaseComplete)
   //   courseId           course to credit, or null for a free-study session
   //   semesterId         semester the session was started against
   // It is a plain JSON-safe object so it can be persisted as-is.
+  //
+  // A phase never transitions on its own: when its deadline passes the caller
+  // parks it with markPhaseComplete() — the session keeps its phase and sits in
+  // the awaiting-advance state until the user confirms, at which point
+  // confirmAdvance() / advanceSession() performs the actual transition.
 
   function createIdleSession() {
     return {
@@ -111,6 +119,7 @@
       endsAt: 0,
       pausedAt: null,
       completedPomodoros: 0,
+      awaitingAdvance: false,
       courseId: null,
       semesterId: null,
     };
@@ -133,6 +142,7 @@
       endsAt: now + phaseDurationSeconds('work', settings) * 1000,
       pausedAt: null,
       completedPomodoros: 0,
+      awaitingAdvance: false,
       courseId: o.courseId || null,
       semesterId: o.semesterId || null,
     };
@@ -147,19 +157,39 @@
     return Math.max(0, Math.ceil((session.endsAt - ref) / 1000));
   }
 
+  // A session parked in the awaiting-advance state is neither running nor
+  // paused: its clock is done, it is just waiting on the user.
   function isRunning(session) {
-    return !!session && session.phase !== 'idle' && session.pausedAt == null;
+    return !!session && session.phase !== 'idle' && session.pausedAt == null && !session.awaitingAdvance;
   }
 
   function isPaused(session) {
     return !!session && session.phase !== 'idle' && session.pausedAt != null;
   }
 
-  // True once a running phase has reached its deadline.
+  // True once a running phase has reached its deadline and has not been parked
+  // yet — i.e. the caller still owes it a markPhaseComplete() (and, for a work
+  // phase, the study-time credit that goes with it). Turns false again once the
+  // session is parked, so a polling caller only ever handles a completion once.
   function isPhaseComplete(session, nowMs) {
     if (!isRunning(session)) return false;
     const now = typeof nowMs === 'number' ? nowMs : Date.now();
     return now >= session.endsAt;
+  }
+
+  // True while a finished phase is waiting for the user to confirm moving on.
+  function isAwaitingAdvance(session) {
+    return !!session && session.phase !== 'idle' && session.awaitingAdvance === true;
+  }
+
+  // Park a phase whose deadline has passed instead of transitioning: the phase
+  // is kept as-is and flagged awaiting-advance, so the UI can ask before moving
+  // on. Any session that is not a running, past-deadline one is returned
+  // untouched. Callers credit study time at this moment, independently of when
+  // the user actually confirms.
+  function markPhaseComplete(session, nowMs) {
+    if (!isPhaseComplete(session, nowMs)) return session;
+    return { ...session, awaitingAdvance: true };
   }
 
   function pauseSession(session, nowMs) {
@@ -190,7 +220,10 @@
 
   // Advance to the next phase, keeping the same course/semester. Mirrors
   // advancePhase(): work -> shortBreak, or longBreak every nth pomodoro;
-  // shortBreak -> work; longBreak -> idle (one full cycle done).
+  // shortBreak -> work; longBreak -> idle (one full cycle done). The new phase
+  // is measured from `nowMs`, not from the old deadline, so a session parked
+  // awaiting advance starts its next phase when the user confirms; the
+  // awaiting-advance flag is cleared by the transition.
   function advanceSession(session, settings, nowMs) {
     const s = clampPomodoroSettings(settings);
     const now = typeof nowMs === 'number' ? nowMs : Date.now();
@@ -206,6 +239,7 @@
         endsAt: now + phaseDurationSeconds(nextPhase, s) * 1000,
         pausedAt: null,
         completedPomodoros: completed,
+        awaitingAdvance: false,
         ...carry,
       };
     }
@@ -216,6 +250,7 @@
         endsAt: now + phaseDurationSeconds('work', s) * 1000,
         pausedAt: null,
         completedPomodoros: session.completedPomodoros,
+        awaitingAdvance: false,
         ...carry,
       };
     }
@@ -230,6 +265,13 @@
     return advanceSession(session, settings, nowMs);
   }
 
+  // The user confirmed the "phase done — move on?" prompt: leave the
+  // awaiting-advance state by performing the transition. Identical to
+  // advanceSession; named separately so call sites read clearly.
+  function confirmAdvance(session, settings, nowMs) {
+    return advanceSession(session, settings, nowMs);
+  }
+
   // Human label for the current phase, for the timer face.
   function phaseLabel(phase) {
     if (phase === 'work') return 'Focus';
@@ -241,7 +283,10 @@
   // Restores a session read back from storage. Anything malformed, or a
   // session whose break already ended while the app was closed, collapses to
   // idle. A *work* phase that ended while away is returned as-is so the caller
-  // can still credit its time before advancing — see the UI parts.
+  // can still credit its time before advancing — see the UI parts. A session
+  // parked awaiting advance comes back in exactly that state, whatever its
+  // phase: the confirmation the user never gave is still pending, so it must
+  // neither collapse to idle nor skip ahead.
   function rehydrateSession(raw, nowMs) {
     const now = typeof nowMs === 'number' ? nowMs : Date.now();
     if (!raw || typeof raw !== 'object') return createIdleSession();
@@ -259,9 +304,12 @@
         typeof raw.completedPomodoros === 'number' && raw.completedPomodoros >= 0
           ? Math.floor(raw.completedPomodoros)
           : 0,
+      awaitingAdvance: raw.awaitingAdvance === true,
       courseId: typeof raw.courseId === 'string' ? raw.courseId : null,
       semesterId: typeof raw.semesterId === 'string' ? raw.semesterId : null,
     };
+    // A parked phase is still waiting on the user — preserve it as-is.
+    if (session.awaitingAdvance) return session;
     // A break that expired while the app was closed is simply over — there is
     // nothing to credit and no value in resuming it.
     if (session.phase !== 'work' && session.pausedAt == null && now >= session.endsAt) {
@@ -288,6 +336,41 @@
     return course && course.studyTime && typeof course.studyTime.totalSeconds === 'number'
       ? course.studyTime.totalSeconds
       : 0;
+  }
+
+  // Where a semester's studied time went, ready for a chart or a legend:
+  //   { totalSeconds, courses: [{ id, name, color, seconds, share, percent }] }
+  // Courses with no tracked time are left out — an empty slice is noise in a
+  // chart, and a caller that wants to list every course already has the
+  // semester. What remains is sorted most-studied first. `share` is the exact
+  // fraction of totalSeconds; `percent` is that rounded to a whole number, so
+  // the percents are labels and may total 99 or 101 rather than exactly 100.
+  // A semester with no courses, nothing studied yet, or no semester at all
+  // gives { totalSeconds: 0, courses: [] }. Never mutates its argument.
+  function studyTimeByCourse(semester) {
+    const list = semester && Array.isArray(semester.courses) ? semester.courses : [];
+    const tracked = [];
+    let totalSeconds = 0;
+    list.forEach((course) => {
+      const seconds = getCourseStudySeconds(course);
+      if (!Number.isFinite(seconds) || seconds <= 0) return;
+      totalSeconds += seconds;
+      tracked.push({
+        id: course.id,
+        name: course.name,
+        color: course.color || null,
+        seconds,
+      });
+    });
+    tracked.sort((a, b) => b.seconds - a.seconds);
+    return {
+      totalSeconds,
+      courses: tracked.map((c) => ({
+        ...c,
+        share: c.seconds / totalSeconds,
+        percent: Math.round((c.seconds / totalSeconds) * 100),
+      })),
+    };
   }
 
   function uidLocal(prefix) {
@@ -387,16 +470,20 @@
     isRunning,
     isPaused,
     isPhaseComplete,
+    isAwaitingAdvance,
+    markPhaseComplete,
     pauseSession,
     resumeSession,
     elapsedWorkSeconds,
     advanceSession,
     skipPhase,
+    confirmAdvance,
     phaseLabel,
     rehydrateSession,
     // study time
     ensureStudyTime,
     getCourseStudySeconds,
+    studyTimeByCourse,
     addStudyTime,
     setStudyTime,
     formatClock,
