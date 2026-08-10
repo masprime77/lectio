@@ -27,6 +27,21 @@
 - Changed (desktop): a session parked mid-question survives a restart — the
   app reopens the modal instead of resuming a phase you never confirmed, and
   the 1 Hz repaint tick pauses while nothing is counting down.
+- Changed (mobile): a finished focus block or break no longer rolls into the
+  next phase on its own. `completePhase` credits the block and parks the
+  session, and the "what's next?" alert — start the break / next focus block,
+  or stop — is now what performs the transition, instead of a notice shown
+  after the fact. A finished long break offers a single "Finish session".
+- Changed (mobile): the parked state persists like any other session state, so
+  backgrounding, a force-quit, or tapping the OS notification hours later all
+  return to the same unanswered question rather than to a phase that moved on
+  unseen; the question is re-asked on foreground or by tapping the pill.
+- Changed (mobile): the timer FAB gained a third state — an amber "Done" pill
+  with a tick, distinct from the running countdown — and the 1 s repaint and
+  deadline notification are both skipped while a phase sits parked.
+- Fixed (mobile): stopping or skipping from the parked state no longer credits
+  the focus block a second time (it is already credited in full the moment it
+  completes).
 
 ## 1.0.2 — 2026-08-09
 

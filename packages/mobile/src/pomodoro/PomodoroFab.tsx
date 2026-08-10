@@ -1,6 +1,9 @@
 // The study-timer FAB. Idle: a round clock button that opens the setup sheet.
 // Running: a wider pill showing the live MM:SS, tapped to pause/resume, with a
 // small stop square to end it and a long-press to skip to the next phase.
+// Done: an amber pill with a tick reading "Done" instead of a stopped 00:00,
+// for a phase that finished and is waiting on the "what's next?" answer —
+// tapping it re-opens that question.
 //
 // Sits above the "+" Fab (which keeps its own bottom offset), so the hosting
 // screen's list needs enough bottom padding for both — see the paddingBottom
@@ -27,7 +30,8 @@ export function PomodoroFab({
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { session, settings, remaining, paused, start, togglePause, skip, stop } = usePomodoro();
+  const { session, settings, remaining, paused, awaiting, promptAdvance, start, togglePause, skip, stop } =
+    usePomodoro();
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const idle = session.phase === 'idle';
@@ -80,6 +84,40 @@ export function PomodoroFab({
           ]}
         >
           <ClockGlyph color={theme.accent} />
+        </Pressable>
+        {sheet}
+      </>
+    );
+  }
+
+  // Finished, waiting for an answer: amber and static, so it never reads as a
+  // countdown that froze. Tapping re-asks; the stop square still ends it.
+  if (awaiting) {
+    return (
+      <>
+        <Pressable
+          onPress={promptAdvance}
+          accessibilityRole="button"
+          accessibilityLabel={`Study timer, ${phaseLabel(session.phase)} finished`}
+          accessibilityHint="Tap to choose whether to move on to the next phase"
+          style={({ pressed }) => [
+            styles.fab,
+            styles.pill,
+            { bottom, backgroundColor: DONE, borderWidth: 0 },
+            pressed && { opacity: 0.8 },
+          ]}
+        >
+          <CheckGlyph color="#fff" />
+          <Text style={[styles.clock, { color: '#fff' }]}>Done</Text>
+          <Pressable
+            onPress={confirmStop}
+            accessibilityRole="button"
+            accessibilityLabel="Stop the study timer"
+            hitSlop={8}
+            style={({ pressed }) => [styles.stopHit, pressed && { opacity: 0.6 }]}
+          >
+            <View style={[styles.stopSquare, { backgroundColor: '#fff' }]} />
+          </Pressable>
         </Pressable>
         {sheet}
       </>
@@ -152,6 +190,15 @@ function PlayGlyph({ color }: { color: string }) {
   return <View style={[styles.playTriangle, { borderLeftColor: color }]} />;
 }
 
+/** A tick: two edges of a box, rotated 45°. */
+function CheckGlyph({ color }: { color: string }) {
+  return <View style={[styles.check, { borderColor: color }]} />;
+}
+
+// The "waiting for you" amber. Not a theme token: it is the only place in the
+// mobile UI that needs it, and it reads the same on both backgrounds.
+const DONE = '#e0952f';
+
 const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
@@ -192,6 +239,16 @@ const styles = StyleSheet.create({
     borderTopColor: 'transparent',
     borderBottomColor: 'transparent',
     borderRightColor: 'transparent',
+  },
+  check: {
+    width: 14,
+    height: 8,
+    borderLeftWidth: 2.5,
+    borderBottomWidth: 2.5,
+    borderTopWidth: 0,
+    borderRightWidth: 0,
+    transform: [{ rotate: '-45deg' }],
+    marginTop: -3,
   },
   stopHit: { padding: 2 },
   stopSquare: { width: 12, height: 12, borderRadius: 2 },
