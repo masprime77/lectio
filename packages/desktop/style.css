@@ -326,6 +326,22 @@ body.electron-app .header-inner { padding-left: 80px; }
   color: var(--st-done);
 }
 .pomodoro-btn--paused { opacity: 0.65; }
+/* Phase finished, waiting for the user to confirm what's next: amber and
+   gently pulsing, so it never reads as a frozen or broken countdown. Doubled
+   class because plain `.btn` is defined further down the file and would
+   otherwise win on equal specificity. */
+.pomodoro-btn.pomodoro-btn--done {
+  border-color: var(--st-seen);
+  color: var(--st-seen);
+  animation: pomodoro-done-pulse 1.8s ease-in-out infinite;
+}
+@keyframes pomodoro-done-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pomodoro-btn--done { animation: none; }
+}
 .pomodoro-aux { padding: 0.2rem 0.3rem; }
 .pomodoro-aux .ti { width: 16px; height: 16px; }
 
@@ -338,6 +354,16 @@ body.electron-app .header-inner { padding-left: 80px; }
   gap: 0 0.75rem;
 }
 .pomodoro-hint { font-size: 0.75rem; color: var(--muted); margin: 0 0 0.5rem; }
+
+/* Phase-complete gate — same modal shell as the setup modal above, just
+   narrower since it is one line of copy and two buttons. */
+.pomodoro-advance-modal { min-width: 360px; max-width: 420px; }
+.pomodoro-advance-message {
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0 0 1rem;
+}
 
 .selector-group { display: flex; gap: 0.25rem; align-items: center; }
 
