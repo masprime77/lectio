@@ -109,6 +109,19 @@
 - Changed (desktop): "New" moved to a floating, icon-only round "+" button in
   the bottom-right corner. The label is dropped in favour of its tooltip and
   aria-label ("New semester"); the click handler is unchanged.
+- Added (mobile): the course detail screen groups Readings and Tasks under
+  collapsible "Week N" headers with their date ranges, mirroring the desktop
+  course view. The Readings/Tasks sections and their "+ Add" controls are
+  unchanged; the current week starts open and the rest collapsed.
+- Added (mobile): each week section's open/closed state is remembered per
+  course, section and week (a new `openCourseWeeks` preference in AsyncStorage),
+  so leaving the screen and coming back keeps it as you left it. Only sections
+  you have actually toggled are stored — the rest follow the default.
+- Note (mobile): items with no week are kept in a trailing "No week" group,
+  which starts open since they used to be visible in the flat list. The
+  week-asc / week-desc sort orders now set the direction the week *groups* are
+  listed in (item order inside a group is untouched, as every item there shares
+  one week).
 - Note (desktop): both float below modals and the onboarding tutorial's scrim
   (z-index 50 against their 100/300), so every overlay still covers them, and
   the tutorial's `#pomodoro-control` and `#new-btn` steps still spotlight them
