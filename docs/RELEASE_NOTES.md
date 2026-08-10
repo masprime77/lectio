@@ -1,5 +1,18 @@
 ## Unreleased
 
+- Changed (core): a Pomodoro phase no longer transitions on its own when its
+  deadline passes. The session shape gained an `awaitingAdvance` flag, and
+  `markPhaseComplete()` parks a finished phase in that state so the UI can ask
+  before moving on; `isAwaitingAdvance()` reports it. Study-time crediting is
+  unchanged — callers still credit at the moment completion is detected.
+- Added (core): `confirmAdvance()`, the explicit "user said yes" transition
+  (a thin alias of `advanceSession`, which still handles work → short/long
+  break, short break → work, and long break → idle, measured from the
+  confirmation rather than the missed deadline).
+- Fixed (core): `rehydrateSession()` restores a parked session in the same
+  awaiting-advance state instead of collapsing an expired break to idle, so
+  closing and reopening the app does not skip the confirmation.
+
 ## 1.0.2 — 2026-08-09
 
 - Chore: bumped version to 1.0.1 across the root, desktop, and mobile
