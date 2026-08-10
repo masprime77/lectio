@@ -65,6 +65,16 @@
 - Changed (mobile): the pill's accessibility label now also announces how many
   focus blocks of the cycle are done; tap-to-pause, long-press-to-skip and the
   stop square are unchanged.
+- Added (core): `studyTimeByCourse(semester)` — a pure helper that summarizes
+  where a semester's studied time went, returning `{ totalSeconds, courses }`
+  where each course carries its id, name, colour, seconds, exact `share` of
+  the total and a rounded `percent`. It is the data source for the Study Time
+  dashboard panel the apps will add next.
+- Note (core): `studyTimeByCourse` omits courses with no tracked time (an
+  empty slice is noise in a chart) and sorts the rest most-studied first; a
+  semester with no courses, nothing studied, or no semester at all returns
+  `{ totalSeconds: 0, courses: [] }`. Because `percent` is rounded per course,
+  the percents are labels and can total 99 or 101 — `share` is the exact value.
 
 ## 1.0.2 — 2026-08-09
 
