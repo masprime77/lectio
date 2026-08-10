@@ -90,6 +90,22 @@
   changes which course the next block credits.
 - Note (desktop): the ring is hand-rolled inline SVG (stroked arcs) in the
   same spirit as the app's `icon()` helper — no charting library was added.
+- Added (mobile): a **Study time** bottom sheet (`StudyTimeDashboard`), opened
+  from a small chart button above the timer FAB — present in every timer state,
+  so it stays reachable while a session runs. It mirrors the desktop panel: a
+  ring of per-course slices in each course's colour, the semester total in the
+  middle, and a legend of names, hours and percentages.
+- Added (mobile): the sheet can re-point a running session at another course
+  (or free study) without stopping it. Mid focus block the minutes already
+  worked are banked to the course that earned them and a fresh block starts for
+  the new one; on a break or a finished block it only changes which course the
+  next block credits. This needed one new provider method, `switchCourse`,
+  since the crediting has to happen where the session state lives.
+- Note (mobile): the ring is drawn from plain Views — a circle of small ticks,
+  each coloured by the course whose share covers it — because there is no SVG
+  library in the package and none was worth adding for one chart. A course with
+  less than about 2% of the total is too small for a tick and shows in the
+  legend only.
 
 ## 1.0.2 — 2026-08-09
 
