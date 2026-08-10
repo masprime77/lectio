@@ -101,6 +101,20 @@
   the new one; on a break or a finished block it only changes which course the
   next block credits. This needed one new provider method, `switchCourse`,
   since the crediting has to happen where the session state lives.
+- Changed (desktop): the study timer moved out of the header row to a floating
+  control pinned to the window's bottom-left corner, keeping its course/phase
+  label, its progress bar and dots, and its skip / stop / study-time buttons
+  (now round, elevated pills). Its button is slightly taller (36px) than the
+  header row allowed.
+- Changed (desktop): "New" moved to a floating, icon-only round "+" button in
+  the bottom-right corner. The label is dropped in favour of its tooltip and
+  aria-label ("New semester"); the click handler is unchanged.
+- Note (desktop): both float below modals and the onboarding tutorial's scrim
+  (z-index 50 against their 100/300), so every overlay still covers them, and
+  the tutorial's `#pomodoro-control` and `#new-btn` steps still spotlight them
+  correctly — the spotlight already worked in viewport coordinates, so no
+  positioning logic needed changing. Main content gained bottom padding so it
+  can always be scrolled clear of both corners.
 - Note (mobile): the ring is drawn from plain Views — a circle of small ticks,
   each coloured by the course whose share covers it — because there is no SVG
   library in the package and none was worth adding for one chart. A course with
