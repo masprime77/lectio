@@ -347,6 +347,8 @@ export interface PomodoroSession {
   endsAt: number;
   pausedAt: number | null;
   completedPomodoros: number;
+  /** True once the phase has run out and the user has not confirmed moving on. */
+  awaitingAdvance: boolean;
   courseId: string | null;
   semesterId: string | null;
 }
@@ -381,6 +383,8 @@ export function remainingSeconds(session: PomodoroSession, nowMs?: number): numb
 export function isRunning(session: PomodoroSession): boolean;
 export function isPaused(session: PomodoroSession): boolean;
 export function isPhaseComplete(session: PomodoroSession, nowMs?: number): boolean;
+export function isAwaitingAdvance(session: PomodoroSession): boolean;
+export function markPhaseComplete(session: PomodoroSession, nowMs?: number): PomodoroSession;
 export function pauseSession(session: PomodoroSession, nowMs?: number): PomodoroSession;
 export function resumeSession(session: PomodoroSession, nowMs?: number): PomodoroSession;
 export function elapsedWorkSeconds(
@@ -394,6 +398,11 @@ export function advanceSession(
   nowMs?: number
 ): PomodoroSession;
 export function skipPhase(
+  session: PomodoroSession,
+  settings: PomodoroSettings,
+  nowMs?: number
+): PomodoroSession;
+export function confirmAdvance(
   session: PomodoroSession,
   settings: PomodoroSettings,
   nowMs?: number
