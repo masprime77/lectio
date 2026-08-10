@@ -75,6 +75,21 @@
   semester with no courses, nothing studied, or no semester at all returns
   `{ totalSeconds: 0, courses: [] }`. Because `percent` is rounded per course,
   the percents are labels and can total 99 or 101 — `share` is the exact value.
+- Added (desktop): a **Study time** panel, opened from the new chart button on
+  the header's timer control. It shows a ring of per-course slices sized by
+  each course's share of the semester's tracked time and coloured with the
+  course's own accent, the semester total in the middle, and a legend of
+  names, hours and percentages. It is a separate panel from the dashboard's
+  Breakdown, which is about readings/tasks completion, not hours.
+- Added (desktop): while a session is running, the Study time panel can
+  re-point it at another course (or at free study) without stopping the clock.
+  Mid-block, the minutes already worked are banked to the course that earned
+  them — on the same terms as stopping or skipping — and a fresh block starts
+  for the new course, so nothing is lost and nothing is counted twice. On a
+  break, or on a finished block waiting to be advanced, the switch simply
+  changes which course the next block credits.
+- Note (desktop): the ring is hand-rolled inline SVG (stroked arcs) in the
+  same spirit as the app's `icon()` helper — no charting library was added.
 
 ## 1.0.2 — 2026-08-09
 
