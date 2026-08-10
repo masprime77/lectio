@@ -198,6 +198,92 @@ describe('getCourseStudySeconds', () => {
   });
 });
 
+describe('studyTimeByCourse', () => {
+  const course = (id, seconds, over) => ({
+    id,
+    name: id.toUpperCase(),
+    color: '#4A90D9',
+    ...(seconds == null ? {} : { studyTime: { totalSeconds: seconds, sessions: [] } }),
+    ...over,
+  });
+  const semester = (courses) => ({ id: 'ss2025', name: 'Summer', courses });
+
+  it('is empty for a semester with no courses, or no semester at all', () => {
+    const empty = { totalSeconds: 0, courses: [] };
+    expect(pomodoro.studyTimeByCourse(semester([]))).toEqual(empty);
+    expect(pomodoro.studyTimeByCourse({ id: 'ss2025' })).toEqual(empty);
+    expect(pomodoro.studyTimeByCourse(null)).toEqual(empty);
+    expect(pomodoro.studyTimeByCourse(undefined)).toEqual(empty);
+    expect(pomodoro.studyTimeByCourse({ courses: 'nope' })).toEqual(empty);
+  });
+
+  it('is empty when nothing has been studied yet', () => {
+    const none = semester([course('a'), course('b', 0), course('c', null)]);
+    expect(pomodoro.studyTimeByCourse(none)).toEqual({ totalSeconds: 0, courses: [] });
+  });
+
+  it('leaves out the courses with no tracked time', () => {
+    const mixed = semester([course('a', 1800), course('b'), course('c', 600)]);
+    const out = pomodoro.studyTimeByCourse(mixed);
+    expect(out.courses.map((c) => c.id)).toEqual(['a', 'c']);
+    expect(out.totalSeconds).toBe(2400);
+  });
+
+  it('reports seconds, share and percent, sorted most-studied first', () => {
+    const mixed = semester([
+      course('short', 900), // 15m
+      course('long', 5400), // 1h30
+      course('mid', 2700), // 45m
+    ]);
+    const out = pomodoro.studyTimeByCourse(mixed);
+    expect(out.totalSeconds).toBe(9000);
+    expect(out.courses).toEqual([
+      { id: 'long', name: 'LONG', color: '#4A90D9', seconds: 5400, share: 0.6, percent: 60 },
+      { id: 'mid', name: 'MID', color: '#4A90D9', seconds: 2700, share: 0.3, percent: 30 },
+      { id: 'short', name: 'SHORT', color: '#4A90D9', seconds: 900, share: 0.1, percent: 10 },
+    ]);
+  });
+
+  it('shares always add up to 1, and percents to 100 within rounding', () => {
+    const thirds = semester([course('a', 1000), course('b', 1000), course('c', 1000)]);
+    const out = pomodoro.studyTimeByCourse(thirds);
+    const shares = out.courses.reduce((sum, c) => sum + c.share, 0);
+    expect(shares).toBeCloseTo(1, 10);
+    // 33 + 33 + 33: rounding to whole numbers cannot always total exactly 100.
+    const percents = out.courses.reduce((sum, c) => sum + c.percent, 0);
+    expect(Math.abs(100 - percents)).toBeLessThanOrEqual(1);
+    expect(out.courses.every((c) => c.percent === 33)).toBe(true);
+  });
+
+  it('gives a lone studied course the whole 100%', () => {
+    const solo = semester([course('a'), course('b', 300)]);
+    expect(pomodoro.studyTimeByCourse(solo).courses).toEqual([
+      { id: 'b', name: 'B', color: '#4A90D9', seconds: 300, share: 1, percent: 100 },
+    ]);
+  });
+
+  it('defaults a missing colour to null and survives malformed courses', () => {
+    const odd = semester([
+      null,
+      course('a', 60, { color: undefined }),
+      { id: 'b', studyTime: { totalSeconds: 'lots' } },
+      { id: 'c', studyTime: { totalSeconds: NaN } },
+      { id: 'd', studyTime: { totalSeconds: -50 } },
+    ]);
+    const out = pomodoro.studyTimeByCourse(odd);
+    expect(out.courses).toEqual([
+      { id: 'a', name: 'A', color: null, seconds: 60, share: 1, percent: 100 },
+    ]);
+  });
+
+  it('does not mutate the semester it reads', () => {
+    const source = semester([course('a', 600), course('b')]);
+    const before = JSON.parse(JSON.stringify(source));
+    pomodoro.studyTimeByCourse(source);
+    expect(source).toEqual(before);
+  });
+});
+
 describe('addStudyTime', () => {
   it('increments the total and appends a session with the given source', () => {
     const course = { id: 'c-1' };
@@ -378,6 +464,7 @@ describe('deadline-based session', () => {
         endsAt: 0,
         pausedAt: null,
         completedPomodoros: 0,
+        awaitingAdvance: false,
         courseId: null,
         semesterId: null,
       });
@@ -404,6 +491,7 @@ describe('deadline-based session', () => {
         endsAt: T + WORK * 1000,
         pausedAt: null,
         completedPomodoros: 0,
+        awaitingAdvance: false,
         courseId: 'c1',
         semesterId: 's1',
       });
@@ -475,6 +563,72 @@ describe('deadline-based session', () => {
 
     it('is false for an idle session', () => {
       expect(pomodoro.isPhaseComplete(pomodoro.createIdleSession(), T)).toBe(false);
+    });
+  });
+
+  describe('markPhaseComplete / isAwaitingAdvance', () => {
+    const DONE = T + WORK * 1000; // "now" at the end of the work phase
+    const parked = (over) => pomodoro.markPhaseComplete(started(over), DONE);
+
+    it('a fresh session is not awaiting advance', () => {
+      expect(pomodoro.isAwaitingAdvance(started())).toBe(false);
+      expect(pomodoro.isAwaitingAdvance(pomodoro.createIdleSession())).toBe(false);
+      expect(pomodoro.isAwaitingAdvance(null)).toBe(false);
+    });
+
+    it('parks a finished phase instead of transitioning to the next one', () => {
+      const s = parked();
+      expect(s.phase).toBe('work');
+      expect(s.completedPomodoros).toBe(0);
+      expect(s.endsAt).toBe(DONE);
+      expect(s.courseId).toBe('c1');
+      expect(pomodoro.isAwaitingAdvance(s)).toBe(true);
+    });
+
+    it('leaves a parked phase parked however long the user takes', () => {
+      const s = parked();
+      const muchLater = DONE + 86_400_000;
+      expect(pomodoro.markPhaseComplete(s, muchLater)).toBe(s);
+      expect(pomodoro.isAwaitingAdvance(s)).toBe(true);
+      expect(pomodoro.remainingSeconds(s, muchLater)).toBe(0);
+    });
+
+    it('reports a parked session as neither running nor paused', () => {
+      const s = parked();
+      expect(pomodoro.isRunning(s)).toBe(false);
+      expect(pomodoro.isPaused(s)).toBe(false);
+    });
+
+    it('stops reporting the phase as complete once parked, so it is handled once', () => {
+      const s = parked();
+      expect(pomodoro.isPhaseComplete(s, DONE)).toBe(false);
+      expect(pomodoro.isPhaseComplete(s, DONE + 60_000)).toBe(false);
+    });
+
+    it('cannot be paused or resumed while parked', () => {
+      const s = parked();
+      expect(pomodoro.pauseSession(s, DONE + 1000)).toBe(s);
+      expect(pomodoro.resumeSession(s, DONE + 1000)).toBe(s);
+    });
+
+    it('returns a session that has not reached its deadline unchanged', () => {
+      const live = started();
+      expect(pomodoro.markPhaseComplete(live, T + 60_000)).toBe(live);
+      const paused = pomodoro.pauseSession(live, T + 60_000);
+      expect(pomodoro.markPhaseComplete(paused, T + 10 * WORK * 1000)).toBe(paused);
+    });
+
+    it('returns an idle or missing session unchanged', () => {
+      const idle = pomodoro.createIdleSession();
+      expect(pomodoro.markPhaseComplete(idle, T)).toBe(idle);
+      expect(pomodoro.markPhaseComplete(null, T)).toBeNull();
+    });
+
+    it('parks every phase, not just work', () => {
+      const onBreak = pomodoro.advanceSession(started(), settings(), DONE);
+      const breakDone = pomodoro.markPhaseComplete(onBreak, onBreak.endsAt);
+      expect(breakDone.phase).toBe('shortBreak');
+      expect(pomodoro.isAwaitingAdvance(breakDone)).toBe(true);
     });
   });
 
@@ -607,6 +761,61 @@ describe('deadline-based session', () => {
     });
   });
 
+  // The transition a parked phase has been waiting for: nothing moves until
+  // the user confirms, and then it moves exactly as it always did.
+  describe('confirmAdvance (leaving the awaiting-advance state)', () => {
+    const N = T + WORK * 1000; // "now" at the end of a work phase
+    const CONFIRMED = N + 120_000; // the user took two minutes to confirm
+    const park = (session, at) => pomodoro.markPhaseComplete(session, at);
+
+    it('sends a parked work phase to a short break, clearing the flag', () => {
+      const next = pomodoro.confirmAdvance(park(started(), N), settings(), CONFIRMED);
+      expect(next.phase).toBe('shortBreak');
+      expect(next.completedPomodoros).toBe(1);
+      expect(next.awaitingAdvance).toBe(false);
+      expect(pomodoro.isAwaitingAdvance(next)).toBe(false);
+      expect(pomodoro.isRunning(next)).toBe(true);
+    });
+
+    it('sends the nth parked work phase to a long break', () => {
+      const next = pomodoro.confirmAdvance(
+        park(started({ completedPomodoros: 3 }), N),
+        settings(),
+        CONFIRMED
+      );
+      expect(next.phase).toBe('longBreak');
+      expect(next.completedPomodoros).toBe(4);
+    });
+
+    it('sends a parked short break back to work, keeping the pomodoro count', () => {
+      const onBreak = pomodoro.advanceSession(started(), settings(), N);
+      const back = pomodoro.confirmAdvance(park(onBreak, onBreak.endsAt), settings(), CONFIRMED);
+      expect(back.phase).toBe('work');
+      expect(back.completedPomodoros).toBe(1);
+      expect(back.awaitingAdvance).toBe(false);
+    });
+
+    it('ends the cycle after a parked long break', () => {
+      const onLong = pomodoro.advanceSession(started({ completedPomodoros: 3 }), settings(), N);
+      expect(onLong.phase).toBe('longBreak');
+      expect(
+        pomodoro.confirmAdvance(park(onLong, onLong.endsAt), settings(), CONFIRMED)
+      ).toEqual(pomodoro.createIdleSession());
+    });
+
+    it('measures the new phase from the confirmation, not the missed deadline', () => {
+      const next = pomodoro.confirmAdvance(park(started(), N), settings(), CONFIRMED);
+      expect(next.endsAt).toBe(CONFIRMED + SHORT * 1000);
+    });
+
+    it('is the same transition as advanceSession', () => {
+      const p = park(started(), N);
+      expect(pomodoro.confirmAdvance(p, settings(), CONFIRMED)).toEqual(
+        pomodoro.advanceSession(p, settings(), CONFIRMED)
+      );
+    });
+  });
+
   describe('skipPhase', () => {
     it('mid-phase produces the same result as advanceSession', () => {
       const mid = T + 60_000;
@@ -672,6 +881,37 @@ describe('deadline-based session', () => {
       const back = pomodoro.rehydrateSession(live, T + 10 * WORK * 1000);
       expect(back).toEqual(live);
       expect(pomodoro.elapsedWorkSeconds(back, settings(), T + 10 * WORK * 1000)).toBe(WORK);
+    });
+
+    it('round-trips a parked work phase, however long the app was closed', () => {
+      const parked = pomodoro.markPhaseComplete(started(), T + WORK * 1000);
+      const stored = JSON.parse(JSON.stringify(parked));
+      const back = pomodoro.rehydrateSession(stored, T + 86_400_000);
+      expect(back).toEqual(parked);
+      expect(pomodoro.isAwaitingAdvance(back)).toBe(true);
+    });
+
+    it('keeps a parked break instead of collapsing it to idle', () => {
+      const onBreak = pomodoro.advanceSession(started(), settings(), T + WORK * 1000);
+      const parked = pomodoro.markPhaseComplete(onBreak, onBreak.endsAt);
+      const back = pomodoro.rehydrateSession(JSON.parse(JSON.stringify(parked)), onBreak.endsAt + 86_400_000);
+      expect(back).toEqual(parked);
+      expect(back.phase).toBe('shortBreak');
+      expect(back.completedPomodoros).toBe(1);
+    });
+
+    it('never advances a parked phase on its own', () => {
+      const parked = pomodoro.markPhaseComplete(started(), T + WORK * 1000);
+      const back = pomodoro.rehydrateSession(parked, T + 10 * WORK * 1000);
+      expect(back.phase).toBe('work');
+      expect(back.completedPomodoros).toBe(0);
+      expect(pomodoro.isPhaseComplete(back, T + 10 * WORK * 1000)).toBe(false);
+    });
+
+    it('treats a missing or non-boolean awaitingAdvance as not parked', () => {
+      const raw = { phase: 'work', endsAt: T + WORK * 1000, pausedAt: null, completedPomodoros: 0 };
+      expect(pomodoro.rehydrateSession(raw, T).awaitingAdvance).toBe(false);
+      expect(pomodoro.rehydrateSession({ ...raw, awaitingAdvance: 'yes' }, T).awaitingAdvance).toBe(false);
     });
 
     it('normalizes a bad completedPomodoros to 0 and drops non-string ids', () => {
