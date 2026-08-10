@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 1.1.0 — 2026-08-10
+
 - Changed (core): a Pomodoro phase no longer transitions on its own when its
   deadline passes. The session shape gained an `awaitingAdvance` flag, and
   `markPhaseComplete()` parks a finished phase in that state so the UI can ask
