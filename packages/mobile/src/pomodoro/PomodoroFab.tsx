@@ -12,10 +12,14 @@
 // Every glyph here is drawn from plain Views (clock face, pause bars, play
 // triangle, stop square) rather than an emoji or an icon library, matching the
 // rest of the mobile UI.
+//
+// Both non-idle pills stack a cycle-dot row, the clock and a phase-progress bar
+// in the space the clock alone used to occupy, so the pill keeps its 56px
+// height and its width still follows the clock text.
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { formatClock, phaseLabel } from '@lectio/core/pomodoro-core';
+import { formatClock, phaseDurationSeconds, phaseLabel } from '@lectio/core/pomodoro-core';
 import { useTheme } from '../theme';
 import { usePomodoro } from './PomodoroProvider';
 import { PomodoroSetupSheet } from './PomodoroSetupSheet';
@@ -38,6 +42,22 @@ export function PomodoroFab({
   const focus = session.phase === 'work';
   // Sits one FAB-height plus a gap above the "+" button.
   const bottom = insets.bottom + 24 + 56 + 12;
+
+  // How far through the current phase, 0..1. A paused session freezes because
+  // `remaining` does; a finished one waiting on an answer reads as full.
+  const phaseSeconds = phaseDurationSeconds(session.phase, settings);
+  const progress = awaiting
+    ? 1
+    : phaseSeconds > 0
+      ? Math.min(1, Math.max(0, (phaseSeconds - remaining) / phaseSeconds))
+      : 0;
+
+  // One dot per focus block in the cycle. completedPomodoros reaches the full
+  // count during the long break (every dot lit) and core resets it to 0 by
+  // returning the session to idle once that break ends.
+  const cycle = settings.pomodorosUntilLongBreak;
+  const within = session.completedPomodoros % cycle;
+  const blocksDone = within === 0 && session.completedPomodoros > 0 ? cycle : within;
 
   function confirmStop() {
     Alert.alert('Stop the timer?', 'Time studied so far in this block is still counted.', [
@@ -98,7 +118,9 @@ export function PomodoroFab({
         <Pressable
           onPress={promptAdvance}
           accessibilityRole="button"
-          accessibilityLabel={`Study timer, ${phaseLabel(session.phase)} finished`}
+          accessibilityLabel={`Study timer, ${phaseLabel(
+            session.phase
+          )} finished, ${blocksDone} of ${cycle} focus blocks done`}
           accessibilityHint="Tap to choose whether to move on to the next phase"
           style={({ pressed }) => [
             styles.fab,
@@ -108,7 +130,14 @@ export function PomodoroFab({
           ]}
         >
           <CheckGlyph color="#fff" />
-          <Text style={[styles.clock, { color: '#fff' }]}>Done</Text>
+          <PhaseMeter
+            label="Done"
+            progress={1}
+            dots={cycle}
+            filled={blocksDone}
+            fg="#fff"
+            track="rgba(255,255,255,0.4)"
+          />
           <Pressable
             onPress={confirmStop}
             accessibilityRole="button"
@@ -135,7 +164,7 @@ export function PomodoroFab({
         accessibilityRole="button"
         accessibilityLabel={`Study timer, ${phaseLabel(session.phase)}, ${formatClock(
           remaining
-        )} remaining, ${paused ? 'paused' : 'running'}`}
+        )} remaining, ${paused ? 'paused' : 'running'}, ${blocksDone} of ${cycle} focus blocks done`}
         accessibilityHint="Tap to pause or resume, long-press to skip to the next phase"
         style={({ pressed }) => [
           styles.fab,
@@ -150,7 +179,14 @@ export function PomodoroFab({
         ]}
       >
         {paused ? <PlayGlyph color={fg} /> : <PauseGlyph color={fg} />}
-        <Text style={[styles.clock, { color: fg }]}>{formatClock(remaining)}</Text>
+        <PhaseMeter
+          label={formatClock(remaining)}
+          progress={progress}
+          dots={cycle}
+          filled={blocksDone}
+          fg={fg}
+          track={onAccent ? 'rgba(255,255,255,0.4)' : theme.track}
+        />
         <Pressable
           onPress={confirmStop}
           accessibilityRole="button"
@@ -190,6 +226,53 @@ function PlayGlyph({ color }: { color: string }) {
   return <View style={[styles.playTriangle, { borderLeftColor: color }]} />;
 }
 
+/**
+ * The middle of a pill: cycle dots, the clock (or "Done"), and a phase-progress
+ * bar. Everything is centred on the clock text, which still sets the pill's
+ * width — the bar stretches to it and the dots stay narrower. Dots are dropped
+ * for unusually long cycles, where a row of them would be wider than the clock
+ * and would push the pill out of shape; the bar always shows.
+ */
+function PhaseMeter({
+  label,
+  progress,
+  dots,
+  filled,
+  fg,
+  track,
+}: {
+  label: string;
+  progress: number;
+  dots: number;
+  filled: number;
+  fg: string;
+  track: string;
+}) {
+  return (
+    <View style={styles.meter}>
+      {dots <= 8 && (
+        <View style={styles.dots}>
+          {Array.from({ length: dots }, (_, i) => (
+            <View
+              key={i}
+              style={[styles.dot, { backgroundColor: i < filled ? fg : track }]}
+            />
+          ))}
+        </View>
+      )}
+      <Text style={[styles.clock, { color: fg }]}>{label}</Text>
+      <View style={[styles.progressTrack, { backgroundColor: track }]}>
+        <View
+          style={[
+            styles.progressFill,
+            { backgroundColor: fg, width: `${Math.round(progress * 100)}%` },
+          ]}
+        />
+      </View>
+    </View>
+  );
+}
+
 /** A tick: two edges of a box, rotated 45°. */
 function CheckGlyph({ color }: { color: string }) {
   return <View style={[styles.check, { borderColor: color }]} />;
@@ -215,7 +298,15 @@ const styles = StyleSheet.create({
   round: { width: 56, borderRadius: 28 },
   pill: { flexDirection: 'row', gap: 10, borderRadius: 28, paddingHorizontal: 18 },
   // tabular-nums keeps the pill from jittering in width every second.
-  clock: { fontSize: 17, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  clock: { fontSize: 17, fontWeight: '700', fontVariant: ['tabular-nums'], textAlign: 'center' },
+
+  // Dots + clock + progress bar, stacked in the clock's old slot. `stretch`
+  // hands the bar the clock's width, so nothing here widens the pill.
+  meter: { alignItems: 'stretch', gap: 3 },
+  dots: { flexDirection: 'row', justifyContent: 'center', gap: 3 },
+  dot: { width: 4, height: 4, borderRadius: 2 },
+  progressTrack: { height: 3, borderRadius: 1.5, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 1.5 },
 
   clockFace: {
     width: 24,

@@ -54,6 +54,17 @@
   (blue focus / green break / amber waiting). The control keeps its single
   32px header row — the fill is positioned inside the button rather than
   adding a second row — so the header's alignment is unchanged.
+- Added (mobile): the timer pill now shows phase progress as a thin bar under
+  the clock, filling as the phase runs down. It freezes while paused and reads
+  full on the "Done" pill waiting for confirmation.
+- Added (mobile): cycle dots on the pill too — one per focus block in the
+  configured cycle, filled as blocks are completed. They stack above the clock
+  rather than beside it, so the pill keeps its 56px height and its width still
+  follows the clock text; for unusually long cycles (more than 8 blocks) the
+  dots are omitted, since a row that wide would distort the pill.
+- Changed (mobile): the pill's accessibility label now also announces how many
+  focus blocks of the cycle are done; tap-to-pause, long-press-to-skip and the
+  stop square are unchanged.
 
 ## 1.0.2 — 2026-08-09
 
