@@ -305,6 +305,9 @@ body.electron-app .header-inner { padding-left: 80px; }
   align-items: center;
   gap: 0.4rem;
   white-space: nowrap;
+  /* Anchors the progress fill; the clip keeps it inside the rounded corners. */
+  position: relative;
+  overflow: hidden;
 }
 .pomodoro-btn .pomodoro-clock {
   font-variant-numeric: tabular-nums; /* stops the width jittering each second */
@@ -342,6 +345,41 @@ body.electron-app .header-inner { padding-left: 80px; }
 @media (prefers-reduced-motion: reduce) {
   .pomodoro-btn--done { animation: none; }
 }
+/* Phase progress: a hairline along the bottom edge *inside* the button, so the
+   control stays a single 32px row and the header keeps its alignment. */
+.pomodoro-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--track);
+}
+.pomodoro-progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--muted);
+}
+
+/* One dot per focus block in the cycle; unfilled ones stay as a faint track. */
+.pomodoro-dots { display: inline-flex; align-items: center; gap: 3px; }
+.pomodoro-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--border);
+}
+.pomodoro-dot--on { background: var(--muted); }
+
+/* Phase color coding for both, mirroring the button's own work/break/done
+   states (these target child elements, so plain `.btn` never competes). */
+.pomodoro-btn--work .pomodoro-progress-fill,
+.pomodoro-btn--work .pomodoro-dot--on { background: var(--primary); }
+.pomodoro-btn--break .pomodoro-progress-fill,
+.pomodoro-btn--break .pomodoro-dot--on { background: var(--st-done); }
+.pomodoro-btn--done .pomodoro-progress-fill,
+.pomodoro-btn--done .pomodoro-dot--on { background: var(--st-seen); }
+
 .pomodoro-aux { padding: 0.2rem 0.3rem; }
 .pomodoro-aux .ti { width: 16px; height: 16px; }
 
