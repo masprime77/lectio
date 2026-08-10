@@ -23,6 +23,7 @@ import { formatClock, phaseDurationSeconds, phaseLabel } from '@lectio/core/pomo
 import { useTheme } from '../theme';
 import { usePomodoro } from './PomodoroProvider';
 import { PomodoroSetupSheet } from './PomodoroSetupSheet';
+import { StudyTimeDashboard } from './StudyTimeDashboard';
 import type { Semester } from '../../types/lectio-core';
 
 export function PomodoroFab({
@@ -37,6 +38,7 @@ export function PomodoroFab({
   const { session, settings, remaining, paused, awaiting, promptAdvance, start, togglePause, skip, stop } =
     usePomodoro();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [dashboardOpen, setDashboardOpen] = useState(false);
 
   const idle = session.phase === 'idle';
   const focus = session.phase === 'work';
@@ -65,6 +67,40 @@ export function PomodoroFab({
       { text: 'Stop', style: 'destructive', onPress: stop },
     ]);
   }
+
+  // A smaller satellite above the timer button, in every state — the pill is
+  // already carrying tap-to-pause, long-press-to-skip and stop, and study time
+  // has to stay reachable while a session runs (that is where the course
+  // switcher lives).
+  const studyButton = (
+    <Pressable
+      onPress={() => setDashboardOpen(true)}
+      accessibilityRole="button"
+      accessibilityLabel="Study time"
+      accessibilityHint="Shows tracked study time per course"
+      style={({ pressed }) => [
+        styles.fab,
+        styles.studyFab,
+        {
+          bottom: bottom + 56 + 10,
+          backgroundColor: theme.surface,
+          borderColor: theme.border,
+          borderWidth: StyleSheet.hairlineWidth,
+        },
+        pressed && { opacity: 0.8 },
+      ]}
+    >
+      <BarsGlyph color={theme.accent} />
+    </Pressable>
+  );
+
+  const dashboard = (
+    <StudyTimeDashboard
+      visible={dashboardOpen}
+      semester={semester}
+      onClose={() => setDashboardOpen(false)}
+    />
+  );
 
   const sheet = (
     <PomodoroSetupSheet
@@ -105,7 +141,9 @@ export function PomodoroFab({
         >
           <ClockGlyph color={theme.accent} />
         </Pressable>
+        {studyButton}
         {sheet}
+        {dashboard}
       </>
     );
   }
@@ -148,7 +186,9 @@ export function PomodoroFab({
             <View style={[styles.stopSquare, { backgroundColor: '#fff' }]} />
           </Pressable>
         </Pressable>
+        {studyButton}
         {sheet}
+        {dashboard}
       </>
     );
   }
@@ -197,7 +237,9 @@ export function PomodoroFab({
           <View style={[styles.stopSquare, { backgroundColor: fg }]} />
         </Pressable>
       </Pressable>
+      {studyButton}
       {sheet}
+      {dashboard}
     </>
   );
 }
@@ -273,6 +315,17 @@ function PhaseMeter({
   );
 }
 
+/** Three bars of different heights — the study-time button's glyph. */
+function BarsGlyph({ color }: { color: string }) {
+  return (
+    <View style={styles.barsWrap}>
+      <View style={[styles.bar, { height: 7, backgroundColor: color }]} />
+      <View style={[styles.bar, { height: 15, backgroundColor: color }]} />
+      <View style={[styles.bar, { height: 11, backgroundColor: color }]} />
+    </View>
+  );
+}
+
 /** A tick: two edges of a box, rotated 45°. */
 function CheckGlyph({ color }: { color: string }) {
   return <View style={[styles.check, { borderColor: color }]} />;
@@ -296,6 +349,10 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   round: { width: 56, borderRadius: 28 },
+  // Smaller than the timer button and centred over it (right: 20 + (56-44)/2).
+  studyFab: { width: 44, height: 44, right: 26, borderRadius: 22 },
+  barsWrap: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 15 },
+  bar: { width: 4, borderRadius: 1.5 },
   pill: { flexDirection: 'row', gap: 10, borderRadius: 28, paddingHorizontal: 18 },
   // tabular-nums keeps the pill from jittering in width every second.
   clock: { fontSize: 17, fontWeight: '700', fontVariant: ['tabular-nums'], textAlign: 'center' },

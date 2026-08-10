@@ -366,6 +366,24 @@ export interface StudyTime {
   sessions: StudySession[];
 }
 
+/** One course's slice of a semester's tracked study time. */
+export interface StudyTimeSlice {
+  id: string;
+  name: string;
+  color: string | null;
+  seconds: number;
+  /** Exact fraction of totalSeconds, 0..1. */
+  share: number;
+  /** `share` as a whole number; rounded per slice, so these may total 99/101. */
+  percent: number;
+}
+
+export interface StudyTimeBreakdown {
+  totalSeconds: number;
+  /** Most-studied first; courses with no tracked time are omitted. */
+  courses: StudyTimeSlice[];
+}
+
 export const DEFAULT_POMODORO_SETTINGS: PomodoroSettings;
 export const MAX_SESSIONS: number;
 export function clampPomodoroSettings(
@@ -412,6 +430,7 @@ export function rehydrateSession(raw: unknown, nowMs?: number): PomodoroSession;
 
 export function ensureStudyTime(course: Course): StudyTime;
 export function getCourseStudySeconds(course: Course): number;
+export function studyTimeByCourse(semester: Semester | null | undefined): StudyTimeBreakdown;
 export function addStudyTime(
   course: Course,
   seconds: number,

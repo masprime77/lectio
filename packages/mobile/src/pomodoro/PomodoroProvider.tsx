@@ -80,6 +80,8 @@ interface PomodoroContextValue {
   togglePause: () => void;
   skip: () => void;
   stop: () => void;
+  /** Re-point a live session at another course (null = free study). */
+  switchCourse: (courseId: string | null, semesterId: string | null) => void;
 }
 
 const PomodoroContext = createContext<PomodoroContextValue | null>(null);
@@ -411,6 +413,40 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     applySession(createIdleSession());
   }, [applySession, creditPartial]);
 
+  // Change which course the *running* session credits, without stopping it.
+  // Mid focus block the minutes already worked are banked to the course that
+  // earned them — the same rule stop and skip use — and a fresh block starts
+  // for the new course, because a completed block always credits its full
+  // length and the banked part must not be counted inside it. On a break, or on
+  // a block already credited and waiting to be advanced, nothing is accruing,
+  // so this is only a change of who gets the next block.
+  const switchCourse = useCallback(
+    (courseId: string | null, semesterId: string | null) => {
+      const s = sessionRef.current;
+      if (s.phase === 'idle') return;
+      const nextCourseId = courseId || null;
+      if ((s.courseId || null) === nextCourseId) return;
+      const nextSemesterId = nextCourseId ? semesterId : null;
+
+      if (s.phase !== 'work' || isAwaitingAdvance(s)) {
+        applySession({ ...s, courseId: nextCourseId, semesterId: nextSemesterId });
+        return;
+      }
+      creditPartial(s);
+      const fresh = startSession(settingsRef.current, {
+        courseId: nextCourseId,
+        semesterId: nextSemesterId,
+      });
+      applySession({
+        ...fresh,
+        completedPomodoros: s.completedPomodoros,
+        // A paused session stays paused, with the new block's full time on it.
+        pausedAt: s.pausedAt != null ? Date.now() : null,
+      });
+    },
+    [applySession, creditPartial]
+  );
+
   // The pill's tap target while a phase is parked: re-open the question.
   const promptAdvanceNow = useCallback(() => {
     promptAdvance(sessionRef.current);
@@ -430,6 +466,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
         togglePause,
         skip,
         stop,
+        switchCourse,
       }}
     >
       {children}
