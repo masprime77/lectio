@@ -12,6 +12,21 @@
 - Fixed (core): `rehydrateSession()` restores a parked session in the same
   awaiting-advance state instead of collapsing an expired break to idle, so
   closing and reopening the app does not skip the confirmation.
+- Changed (desktop): a finished focus block or break no longer rolls straight
+  into the next phase. The study timer now asks first, in a new modal that
+  offers to start the break / next focus block or to stop the timer; the OS
+  notification stays a heads-up and no longer decides anything on its own.
+  A finished long break ends the cycle with a single "Finish session".
+- Changed (desktop): the header timer button gets a third state — an amber,
+  gently pulsing "Done" pill (with the course name) while a finished phase
+  waits for you, instead of a frozen-looking 00:00. Clicking it reopens the
+  question, and the tray reports "Done" in place of the countdown.
+- Fixed (desktop): stopping or skipping from the waiting state credits the
+  finished block exactly once — the block is credited the moment it completes,
+  so the partial-time credit is now skipped there rather than double-counting.
+- Changed (desktop): a session parked mid-question survives a restart — the
+  app reopens the modal instead of resuming a phase you never confirmed, and
+  the 1 Hz repaint tick pauses while nothing is counting down.
 
 ## 1.0.2 — 2026-08-09
 

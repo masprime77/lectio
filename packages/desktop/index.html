@@ -353,6 +353,30 @@
     </div>
   </div>
 
+  <!-- Phase-complete gate: a finished focus block or break waits here until the
+       user chooses to move on. Nothing advances on its own — see
+       handlePomodoroPhaseComplete() / confirmPomodoroAdvance() in app.js.
+       Title, message and confirm label are filled in per phase. -->
+  <div id="pomodoro-advance-overlay" class="modal-overlay hidden">
+    <div class="modal pomodoro-advance-modal" role="dialog" aria-modal="true"
+         aria-labelledby="pomodoro-advance-title">
+      <div class="settings-header">
+        <h2 id="pomodoro-advance-title">Focus block done</h2>
+        <button id="pomodoro-advance-close" class="icon-btn" aria-label="Close"></button>
+      </div>
+
+      <p class="pomodoro-advance-message" id="pomodoro-advance-message"></p>
+
+      <div class="modal-actions">
+        <div class="modal-actions-left"></div>
+        <div class="modal-actions-right">
+          <button type="button" id="pomodoro-advance-stop" class="btn">Stop timer</button>
+          <button type="button" id="pomodoro-advance-confirm" class="btn btn-primary">Start break</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Settings modal -->
   <div id="settings-overlay" class="modal-overlay hidden">
     <div class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
