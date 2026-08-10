@@ -115,6 +115,8 @@ export interface UseCourseDetailResult {
   /** This section's items, split into collapsible week groups. */
   weekGroups: (kind: Kind) => WeekGroup[];
   toggleWeek: (group: WeekGroup) => void;
+  /** Bulk expand/collapse — the desktop header's chevrons-down/up buttons. */
+  setWeeksOpen: (groups: WeekGroup[], open: boolean) => void;
   toggleEditing: () => void;
   toggleSelect: (itemId: string) => void;
   confirmDeleteItem: (kind: Kind, item: PlannerItem) => void;
@@ -166,6 +168,19 @@ export function useCourseDetail(
   const toggleWeek = useCallback((group: WeekGroup) => {
     setOpenWeeks((prev) => {
       const next = { ...prev, [group.key]: !group.open };
+      void prefs.setOpenCourseWeeks(JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  // Writes an explicit value for every group in the section, so the sections
+  // the user has never touched stop following the current-week default too.
+  const setWeeksOpen = useCallback((groups: WeekGroup[], open: boolean) => {
+    setOpenWeeks((prev) => {
+      const next = { ...prev };
+      groups.forEach((g) => {
+        next[g.key] = open;
+      });
       void prefs.setOpenCourseWeeks(JSON.stringify(next));
       return next;
     });
@@ -361,6 +376,7 @@ export function useCourseDetail(
     timeEditorOpen,
     weekGroups,
     toggleWeek,
+    setWeeksOpen,
     toggleEditing,
     toggleSelect,
     confirmDeleteItem,
