@@ -1485,7 +1485,7 @@ const TUTORIAL_STEPS = [
     id: 'pomodoro',
     title: 'Study timer',
     description:
-      'Start a Pomodoro timer for any course: set your focus and break lengths, and Lectio tracks how long you have studied each course. The button becomes a live countdown — click it to pause, skip ahead, or stop.',
+      'Start a Pomodoro timer for any course from the bottom-left corner: set your focus and break lengths, and Lectio tracks how long you have studied each course. The button becomes a live countdown — click it to pause, skip ahead, or stop, and the chart button opens your study time.',
     targetSelector: '#pomodoro-control',
     setup: null,
   },
@@ -1493,7 +1493,7 @@ const TUTORIAL_STEPS = [
     id: 'new-semester',
     title: 'Create your own semester',
     description:
-      'Ready to start planning? Click "New" to create a semester: give it a name, a start date, a number of weeks, and add your courses. You can always edit it later.',
+      'Ready to start planning? Click the "+" button in the bottom-right corner to create a semester: give it a name, a start date, a number of weeks, and add your courses. You can always edit it later.',
     targetSelector: '#new-btn',
     setup: null,
   },

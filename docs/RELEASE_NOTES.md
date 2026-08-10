@@ -122,6 +122,10 @@
   week-asc / week-desc sort orders now set the direction the week *groups* are
   listed in (item order inside a group is untouched, as every item there shares
   one week).
+- Fixed (desktop): the onboarding tutorial's copy caught up with the move — it
+  no longer tells you to click a "New" label that is now an icon-only "+" in
+  the bottom-right, and the study-timer step points at the bottom-left corner
+  and mentions the study-time button.
 - Note (desktop): both float below modals and the onboarding tutorial's scrim
   (z-index 50 against their 100/300), so every overlay still covers them, and
   the tutorial's `#pomodoro-control` and `#new-btn` steps still spotlight them
