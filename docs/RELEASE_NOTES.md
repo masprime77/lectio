@@ -1,5 +1,14 @@
 ## Unreleased
 
+## 1.1.1 — 2026-08-11
+
+- Added (mobile): the course screen's Readings and Tasks sections each gained an
+  "Expand all" / "Collapse all" control next to their "+ Add" button — the
+  mobile counterpart of the desktop header's bulk expand/collapse chevrons. The
+  label reflects the section's current state, the choice persists with the
+  per-week open/closed preferences, and the control is hidden for a section with
+  fewer than two weeks.
+
 ## 1.1.0 — 2026-08-10
 
 - Changed (core): a Pomodoro phase no longer transitions on its own when its

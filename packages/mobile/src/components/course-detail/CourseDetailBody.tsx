@@ -115,6 +115,30 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
     </View>
   );
 
+  // "Expand all" / "Collapse all" for one section's week headers — the mobile
+  // equivalent of the desktop header's chevrons-down/up buttons. Hidden when
+  // there is at most one week to toggle.
+  const renderCollapseAll = (groups: WeekGroup[]) => {
+    if (groups.length < 2) return null;
+    const allOpen = groups.every((g) => g.open);
+    return (
+      <Pressable
+        onPress={() => result.setWeeksOpen(groups, !allOpen)}
+        accessibilityRole="button"
+        accessibilityLabel={allOpen ? 'Collapse all weeks' : 'Expand all weeks'}
+        hitSlop={8}
+        style={({ pressed }) => pressed && { opacity: 0.6 }}
+      >
+        <Text style={[styles.bulkToggle, { color: theme.muted }]}>
+          {allOpen ? 'Collapse all' : 'Expand all'}
+        </Text>
+      </Pressable>
+    );
+  };
+
+  const readingGroups = result.weekGroups('reading');
+  const taskGroups = result.weekGroups('task');
+
   return (
     <>
       <ScrollView
@@ -145,9 +169,12 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
 
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Readings</Text>
-          <Pressable onPress={() => result.pushAddItem('reading')}>
-            <Text style={{ color: theme.accent, fontSize: 15 }}>+ Add</Text>
-          </Pressable>
+          <View style={styles.sectionActions}>
+            {renderCollapseAll(readingGroups)}
+            <Pressable onPress={() => result.pushAddItem('reading')}>
+              <Text style={{ color: theme.accent, fontSize: 15 }}>+ Add</Text>
+            </Pressable>
+          </View>
         </View>
         {course.readings.length === 0 ? (
           <Pressable onPress={() => result.pushAddItem('reading')}>
@@ -156,21 +183,24 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
             </Text>
           </Pressable>
         ) : (
-          result.weekGroups('reading').map((g) => renderWeekGroup('reading', g, readingTags))
+          readingGroups.map((g) => renderWeekGroup('reading', g, readingTags))
         )}
 
         <View style={[styles.sectionHeader, { marginTop: 24 }]}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Tasks</Text>
-          <Pressable onPress={() => result.pushAddItem('task')}>
-            <Text style={{ color: theme.accent, fontSize: 15 }}>+ Add</Text>
-          </Pressable>
+          <View style={styles.sectionActions}>
+            {renderCollapseAll(taskGroups)}
+            <Pressable onPress={() => result.pushAddItem('task')}>
+              <Text style={{ color: theme.accent, fontSize: 15 }}>+ Add</Text>
+            </Pressable>
+          </View>
         </View>
         {course.tasks.length === 0 ? (
           <Pressable onPress={() => result.pushAddItem('task')}>
             <Text style={[styles.empty, { color: theme.muted }]}>No tasks. Tap to add one.</Text>
           </Pressable>
         ) : (
-          result.weekGroups('task').map((g) => renderWeekGroup('task', g, taskTags))
+          taskGroups.map((g) => renderWeekGroup('task', g, taskTags))
         )}
       </ScrollView>
       <StudyTimeEditor
@@ -231,7 +261,9 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 8,
   },
+  sectionActions: { flexDirection: 'row', alignItems: 'baseline', gap: 14 },
   sectionTitle: { fontSize: 20, fontWeight: '700' },
+  bulkToggle: { fontSize: 13 },
   empty: { fontSize: 14 },
 
   weekHeader: {
