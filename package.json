@@ -1,6 +1,6 @@
 {
   "name": "lectio",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "description": "Lectio — a minimal desktop app for planning a university semester, backed by JSON files",
   "workspaces": [
