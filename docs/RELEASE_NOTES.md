@@ -1,5 +1,12 @@
 ## Unreleased
 
+- Fixed (mobile): importing a course from a file no longer silently carries the
+  source semester's progress. The import now asks **Reset progress** or **Keep
+  progress**, the same choice the semester import offers. Resetting puts every
+  reading and task back on its pending tag and clears the task due dates, which
+  belonged to the semester the course came from; keeping preserves them. Either
+  way the course and its items get fresh ids, so an import still can't collide
+  with anything already in the semester.
 - Fixed (desktop): upgrading from a pre-cloud version re-opened the "Upload
   local semesters to your account?" offer at **every** launch. "Not now" closed
   the window without recording anything, and once the semesters were already in
