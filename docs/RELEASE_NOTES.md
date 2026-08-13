@@ -1,5 +1,13 @@
 ## Unreleased
 
+- Fixed (mobile): weeks left on **Skip** in the Moodle import screen were still
+  imported. The confirm step treated a week with no recorded decision as
+  importable while the rows drew it as skipped; both now read the same default,
+  so a row that looks skipped is skipped. Leaving every week on Skip explains
+  what to do instead of importing nothing under the banner of success, and
+  "Import selected" stays disabled until the semester has loaded, so tapping it
+  the instant the screen opens can no longer import against an empty decision
+  map.
 - Fixed (mobile): importing a course from a file no longer silently carries the
   source semester's progress. The import now asks **Reset progress** or **Keep
   progress**, the same choice the semester import offers. Resetting puts every
