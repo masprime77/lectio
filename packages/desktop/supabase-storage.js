@@ -31,12 +31,24 @@
     migrate = global.PlannerMigrate && global.PlannerMigrate.migrateStatusToTagId;
     // conflict.js is vendored + loaded before this file (see index.html), exposing
     // window.PlannerConflict — the same pattern as migrate → window.PlannerMigrate.
-    const conflict = global.PlannerConflict || {};
-    detectConflict = conflict.detectConflict;
-    ConflictError = conflict.ConflictError;
+    // If the build shipped without it, taking `undefined` here would defer the
+    // failure to the first cloud save, where it reads as an unrelated TypeError
+    // — so refuse to build an adapter that cannot detect conflicts.
+    const conflict = global.PlannerConflict;
+    const hasConflict =
+      conflict && typeof conflict.detectConflict === 'function' && typeof conflict.ConflictError === 'function';
+    detectConflict = hasConflict ? conflict.detectConflict : null;
+    ConflictError = hasConflict ? conflict.ConflictError : null;
     // assertStorage isn't exposed to the renderer; the adapter shape is verified
     // by the contract test in Node, so skip it here.
-    const createSupabaseStorage = factory(migrate, null, detectConflict, ConflictError);
+    const createSupabaseStorage = hasConflict
+      ? factory(migrate, null, detectConflict, ConflictError)
+      : () => {
+          throw new Error(
+            'Cloud storage is unavailable: window.PlannerConflict is missing (conflict.js was ' +
+              'not loaded). This build of Lectio is incomplete — reinstall or update the app.'
+          );
+        };
     global.createSupabaseStorage = createSupabaseStorage;
     // Construct the live adapter once the renderer client is up (11.1).
     if (global.lectioSupabase) {

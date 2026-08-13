@@ -1,5 +1,20 @@
 ## Unreleased
 
+- Fixed (desktop): packaged builds shipped without `moodle.js`,
+  `moodle-client.js` and `conflict.js` — three of the six core files the
+  renderer loads — because the electron-builder file allowlist had drifted from
+  the list `sync-core.js` vendors. Connecting a Moodle account failed with
+  "Could not verify the connection: Cannot read properties of undefined
+  (reading 'createMoodleClient')", and cloud saves threw on the missing
+  conflict detection. All six files are bundled again.
+- Changed (desktop): `sync-core` now fails (and with it start/dev/build) when a
+  file it vendors is missing from the packaging allowlist, so the two lists
+  cannot drift apart unnoticed again.
+- Changed (desktop): a missing vendored global now fails loudly instead of
+  silently. The Supabase adapter refuses to be constructed without
+  `window.PlannerConflict`, and the Moodle entry points check for the Moodle
+  globals up front and show a readable message rather than a `TypeError`.
+
 ## 1.1.1 — 2026-08-11
 
 - Added (mobile): the course screen's Readings and Tasks sections each gained an
