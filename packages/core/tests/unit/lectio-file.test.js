@@ -9,6 +9,7 @@ const {
   parseSemesterFile,
   parseCourseFile,
   withResetStatuses,
+  withResetCourseItems,
   slugify,
   uniqueSemesterId,
   prepareImportedCourse,
@@ -127,6 +128,35 @@ describe('withResetStatuses', () => {
   it('tolerates a course missing readings/tasks', () => {
     const sem = { id: 's', name: 's', courses: [{ id: 'c', name: 'c' }] };
     expect(() => withResetStatuses(sem)).not.toThrow();
+  });
+});
+
+describe('withResetCourseItems', () => {
+  it('resets item statuses and clears task due dates without mutating input', () => {
+    const course = sampleCourse();
+    const reset = withResetCourseItems(course);
+    expect(reset.readings[0].status).toBe('r-pending');
+    expect(reset.tasks[0].status).toBe('t-pending');
+    expect(reset.tasks[0].dueDate).toBe('');
+    // input untouched
+    expect(course.readings[0].status).toBe('r-studied');
+    expect(course.tasks[0].status).toBe('t-done');
+    expect(course.tasks[0].dueDate).toBe('2025-04-14');
+  });
+
+  it('preserves every other field (ids, titles, weeks, course identity)', () => {
+    const reset = withResetCourseItems(sampleCourse());
+    expect(reset.id).toBe('c1');
+    expect(reset.name).toBe('Algorithms');
+    expect(reset.color).toBe('#4A90D9');
+    expect(reset.readings[0]).toMatchObject({ id: 'r-1', week: 1, title: 'Intro' });
+    expect(reset.tasks[0]).toMatchObject({ id: 't-1', week: 2, title: 'PS1' });
+  });
+
+  it('tolerates a course missing readings/tasks', () => {
+    const course = { id: 'c2', name: 'Empty' };
+    expect(() => withResetCourseItems(course)).not.toThrow();
+    expect(withResetCourseItems(course)).toEqual(course);
   });
 });
 

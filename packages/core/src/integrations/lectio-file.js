@@ -128,6 +128,22 @@
     return clone;
   }
 
+  // Return a deep copy of a single course with every reading/task reset to its
+  // default "pending" tag and every task due date cleared (a due date from the
+  // source semester means nothing in the target one). The course-level
+  // counterpart of `withResetStatuses`; never mutates the input.
+  function withResetCourseItems(course) {
+    const clone = JSON.parse(JSON.stringify(course));
+    (clone.readings || []).forEach((r) => {
+      r.status = 'r-pending';
+    });
+    (clone.tasks || []).forEach((t) => {
+      t.status = 't-pending';
+      t.dueDate = '';
+    });
+    return clone;
+  }
+
   // Tiny slug, re-implemented here so core never depends on the apps'
   // semester-id helpers. Matches the desktop's slugify.
   function slugify(s) {
@@ -174,6 +190,7 @@
     parseSemesterFile,
     parseCourseFile,
     withResetStatuses,
+    withResetCourseItems,
     slugify,
     uniqueSemesterId,
     prepareImportedCourse,
