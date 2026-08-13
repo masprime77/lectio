@@ -216,6 +216,7 @@ export function cleanCourse(course: Course): Course;
 export function parseSemesterFile(payload: unknown): Semester;
 export function parseCourseFile(payload: unknown): Course;
 export function withResetStatuses(semester: Semester): Semester;
+export function withResetCourseItems(course: Course): Course;
 export function slugify(s: string): string;
 export function uniqueSemesterId(
   name: string,
