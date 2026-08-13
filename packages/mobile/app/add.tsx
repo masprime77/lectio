@@ -28,7 +28,7 @@ import { CourseFields } from '../src/add/CourseFields';
 import { TagsFields } from '../src/add/TagsFields';
 import * as transfer from '../src/lib/transfer';
 import { ensureMoodleAccountOrPrompt } from '../src/moodle/ensure-account';
-import type { Semester, SemesterSummary } from '../types/lectio-core';
+import type { Course, Semester, SemesterSummary } from '../types/lectio-core';
 
 const TABS = ['Semester', 'Course', 'Tags'];
 
@@ -135,15 +135,32 @@ export default function AddScreen() {
       .catch((err) => Alert.alert('Import failed', err instanceof Error ? err.message : String(err)));
   }
 
-  // Pick a course file and add it to the selected semester with fresh ids
-  // (never collides), then dismiss the sheet.
+  // Save a picked course into `targetId` (Keep/Reset progress; always fresh ids,
+  // so it never collides) then dismiss the sheet.
+  function finishImportCourse(targetId: string, course: Course, keepStatus: boolean) {
+    transfer
+      .saveImportedCourse(targetId, course, keepStatus)
+      .then(() => router.back())
+      .catch((err) => Alert.alert('Import failed', err instanceof Error ? err.message : String(err)));
+  }
+
+  // Pick a course file and add it to the selected semester, asking whether to
+  // keep the source semester's progress (and task due dates) or start clean.
   function handleImportCourse(targetId: string) {
     transfer
       .pickCourseFile()
-      .then(async (course) => {
+      .then((course) => {
         if (!course) return; // cancelled
-        await transfer.saveImportedCourse(targetId, course);
-        router.back();
+        const n = (course.readings?.length ?? 0) + (course.tasks?.length ?? 0);
+        Alert.alert(
+          'Import course',
+          `Import "${course.name}" (${n} ${n === 1 ? 'item' : 'items'})?`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Reset progress', onPress: () => finishImportCourse(targetId, course, false) },
+            { text: 'Keep progress', onPress: () => finishImportCourse(targetId, course, true) },
+          ]
+        );
       })
       .catch((err) => Alert.alert('Import failed', err instanceof Error ? err.message : String(err)));
   }
