@@ -167,6 +167,19 @@ async function saveWithConflict(id, value) {
     return { applied: value };
   } catch (err) {
     if (err && err.code === 'CONFLICT') {
+      // A "conflict" whose remote copy already matches what we're about to write
+      // is not a real divergence: the row's `updated_at` moved, but the content
+      // is the same, so there is nothing to reconcile and nothing to write.
+      // This is the normal shape for a legacy (pre-cloud) semester that was just
+      // uploaded to the account from this machine — the upload bumped the
+      // timestamp behind the adapter's baseline, and the first edit-free save
+      // after opening it would otherwise pop the "Changed on another device"
+      // modal over two identical copies. Refresh the baseline from the cloud so
+      // the next save compares against the current timestamp, then carry on.
+      if (semestersEqual(value, err.remote)) {
+        await api.load(id).catch(() => {}); // refreshes the adapter's `seen` baseline
+        return { applied: value };
+      }
       const choice = await openConflictModal();
       if (choice === 'cancel') return { cancelled: true };
       if (choice === 'discard') return { applied: err.remote, reloaded: true };
@@ -178,6 +191,37 @@ async function saveWithConflict(id, value) {
     }
     throw err;
   }
+}
+
+// Are these two semester blobs the same data? The local side is JSON
+// round-tripped first so the comparison is against what would actually be
+// written (dropping undefined values, Dates, etc.) — i.e. "is the cloud copy
+// already byte-identical to this save?". Object key order is ignored, since the
+// remote copy comes back from JSON and need not preserve the in-memory order;
+// array order is significant (item order is user-visible).
+function semestersEqual(local, remote) {
+  if (remote == null) return false;
+  let normalized;
+  try {
+    normalized = JSON.parse(JSON.stringify(local));
+  } catch (e) {
+    return false; // not serializable — treat as different rather than guessing
+  }
+  return deepEqual(normalized, remote);
+}
+
+function deepEqual(a, b) {
+  if (a === b) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    return a.length === b.length && a.every((v, i) => deepEqual(v, b[i]));
+  }
+  const keys = Object.keys(a);
+  if (keys.length !== Object.keys(b).length) return false;
+  return keys.every(
+    (k) => Object.prototype.hasOwnProperty.call(b, k) && deepEqual(a[k], b[k])
+  );
 }
 
 // Save the remote (losing) version under a fresh, non-colliding id so the user
