@@ -31,6 +31,23 @@ const files = [
   ['@lectio/core/integrations/moodle', 'moodle.js'],
   ['@lectio/core/integrations/moodle-client', 'moodle-client.js'],
 ];
+// A copy that isn't in the electron-builder `files` allowlist is missing from
+// the packaged app, and the failure only shows up at runtime as an undefined
+// window global. The two lists have drifted apart before, so fail the sync (and
+// with it prestart/predev/prebuild) the moment they disagree.
+const pkg = require('../package.json');
+const packaged = (pkg.build && pkg.build.files) || [];
+const unpackaged = files.map(([, name]) => name).filter((name) => !packaged.includes(name));
+if (unpackaged.length > 0) {
+  console.error(
+    `[sync-core] ${unpackaged.join(', ')} ${unpackaged.length === 1 ? 'is' : 'are'} vendored ` +
+      'next to index.html but missing from "build.files" in packages/desktop/package.json, ' +
+      'so the packaged app would ship without it. Add it there (same order as this ' +
+      "script's `files` list) and re-run."
+  );
+  process.exit(1);
+}
+
 for (const [spec, name] of files) {
   fs.copyFileSync(require.resolve(spec), path.join(__dirname, '..', name));
 }
