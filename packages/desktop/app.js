@@ -4656,6 +4656,33 @@ async function openProfileModal() {
     });
   });
 
+  // Local semesters → re-open the local→cloud upload offer on demand. The
+  // automatic offer is shown only until it's answered once (uploaded or "Not
+  // now"), so this is the way back to it. The account windows are hidden first
+  // so the import modal isn't stacked on top of them.
+  rewireButton('set-local-upload', (btn) => {
+    const cloud = window.lectioSupabaseStorage;
+    const userId = session && session.user && session.user.id;
+    if (!cloud || !window.LocalImport || !userId) {
+      setAccountStatus('Cloud storage is unavailable right now.', true);
+      return;
+    }
+    withBusy(btn, 'Opening…', async () => {
+      try {
+        const local = await window.LocalImport.getLocalSemesters();
+        if (!local.length) {
+          setAccountStatus('No semesters are stored on this computer.', false);
+          return;
+        }
+        hideAccountWindows();
+        await openLocalImportModal(cloud, userId);
+      } catch (e) {
+        console.error('Local upload offer failed:', e);
+        setAccountStatus('Could not read the semesters on this computer.', true);
+      }
+    });
+  });
+
   // Sign out: close the account windows, then sign out — onAuthChange shows the
   // sign-in overlay.
   rewireButton('set-signout', async () => {
@@ -5042,9 +5069,17 @@ function setupSignIn() {
 // ---------------------------------------------------------------------------
 // One-time local→cloud upload (Phase 11.3). The first time an account signs in
 // with semesters in local fs-storage, offer to upload them to the cloud —
-// explicit, confirmed, idempotent, and non-destructive. The "handled" flag is
-// keyed BY USER in localStorage (`localUploadDone:<userId>`) so a different
-// account on the same machine still gets its own offer.
+// explicit, confirmed, idempotent, and non-destructive. Both flags are keyed BY
+// USER in localStorage so a different account on the same machine still gets its
+// own offer:
+//   - `localUploadDone:<userId>`      — an upload ran (or there was nothing to upload)
+//   - `localUploadDismissed:<userId>` — the user answered "Not now"
+// Either one suppresses the AUTOMATIC offer. Without the second flag, "Not now"
+// closed the modal without recording anything, so a user upgrading from a
+// pre-cloud build was re-asked at every single launch — and once the semesters
+// were already in the account each row read "Already in your account", making a
+// routine offer look like a conflict prompt. The offer stays reachable by hand
+// from Settings → Profile → Local semesters, so declining it is never final.
 // ---------------------------------------------------------------------------
 function isLocalUploadDone(userId) {
   return readPref(`localUploadDone:${userId}`) === 'true';
@@ -5052,13 +5087,19 @@ function isLocalUploadDone(userId) {
 function setLocalUploadDone(userId) {
   writePref(`localUploadDone:${userId}`, 'true');
 }
+function isLocalUploadDismissed(userId) {
+  return readPref(`localUploadDismissed:${userId}`) === 'true';
+}
+function setLocalUploadDismissed(userId) {
+  writePref(`localUploadDismissed:${userId}`, 'true');
+}
 
 async function maybeOfferLocalUpload(session) {
   const userId = session && session.user && session.user.id;
   if (!userId) return;
   const cloud = window.lectioSupabaseStorage;
   if (!cloud || !window.LocalImport) return; // not signed into cloud storage
-  if (isLocalUploadDone(userId)) return;
+  if (isLocalUploadDone(userId) || isLocalUploadDismissed(userId)) return;
 
   let local;
   try {
@@ -5133,9 +5174,14 @@ async function openLocalImportModal(cloud, userId) {
     return { semester: item.semester, getAction: row.getAction };
   });
 
-  // "Not now": close without setting the flag, so the offer can return later
-  // (and 11.4's Settings → Profile can re-open it).
-  skipBtn.onclick = () => overlay.classList.add('hidden');
+  // "Not now": record the dismissal so the offer stops coming back on its own.
+  // It's still reachable on demand from Settings → Profile → Local semesters.
+  // (After a successful upload the button becomes "Done" and the flag is already
+  // set by the upload handler, so this stays correct for that path too.)
+  skipBtn.onclick = () => {
+    setLocalUploadDismissed(userId);
+    overlay.classList.add('hidden');
+  };
 
   uploadBtn.onclick = async () => {
     const decisions = rows.map((r) => ({ semester: r.semester, action: r.getAction() }));

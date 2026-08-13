@@ -519,6 +519,14 @@
         <span id="set-account-status" class="hidden" style="font-size:0.8rem;color:var(--muted);"></span>
       </div>
 
+      <!-- Manual entry point for the local→cloud upload offer (Phase 11.3). The
+           automatic offer only appears until it is answered once; this row keeps
+           it reachable afterwards. -->
+      <div class="settings-row">
+        <span class="settings-label">Local semesters</span>
+        <button type="button" id="set-local-upload" class="btn btn-small">Upload to account…</button>
+      </div>
+
       <div class="settings-row">
         <span class="settings-label">Session</span>
         <button type="button" id="set-signout" class="btn btn-small">Sign out</button>
