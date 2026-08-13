@@ -167,6 +167,19 @@ async function saveWithConflict(id, value) {
     return { applied: value };
   } catch (err) {
     if (err && err.code === 'CONFLICT') {
+      // A "conflict" whose remote copy already matches what we're about to write
+      // is not a real divergence: the row's `updated_at` moved, but the content
+      // is the same, so there is nothing to reconcile and nothing to write.
+      // This is the normal shape for a legacy (pre-cloud) semester that was just
+      // uploaded to the account from this machine — the upload bumped the
+      // timestamp behind the adapter's baseline, and the first edit-free save
+      // after opening it would otherwise pop the "Changed on another device"
+      // modal over two identical copies. Refresh the baseline from the cloud so
+      // the next save compares against the current timestamp, then carry on.
+      if (semestersEqual(value, err.remote)) {
+        await api.load(id).catch(() => {}); // refreshes the adapter's `seen` baseline
+        return { applied: value };
+      }
       const choice = await openConflictModal();
       if (choice === 'cancel') return { cancelled: true };
       if (choice === 'discard') return { applied: err.remote, reloaded: true };
@@ -178,6 +191,37 @@ async function saveWithConflict(id, value) {
     }
     throw err;
   }
+}
+
+// Are these two semester blobs the same data? The local side is JSON
+// round-tripped first so the comparison is against what would actually be
+// written (dropping undefined values, Dates, etc.) — i.e. "is the cloud copy
+// already byte-identical to this save?". Object key order is ignored, since the
+// remote copy comes back from JSON and need not preserve the in-memory order;
+// array order is significant (item order is user-visible).
+function semestersEqual(local, remote) {
+  if (remote == null) return false;
+  let normalized;
+  try {
+    normalized = JSON.parse(JSON.stringify(local));
+  } catch (e) {
+    return false; // not serializable — treat as different rather than guessing
+  }
+  return deepEqual(normalized, remote);
+}
+
+function deepEqual(a, b) {
+  if (a === b) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    return a.length === b.length && a.every((v, i) => deepEqual(v, b[i]));
+  }
+  const keys = Object.keys(a);
+  if (keys.length !== Object.keys(b).length) return false;
+  return keys.every(
+    (k) => Object.prototype.hasOwnProperty.call(b, k) && deepEqual(a[k], b[k])
+  );
 }
 
 // Save the remote (losing) version under a fresh, non-colliding id so the user
@@ -4656,6 +4700,33 @@ async function openProfileModal() {
     });
   });
 
+  // Local semesters → re-open the local→cloud upload offer on demand. The
+  // automatic offer is shown only until it's answered once (uploaded or "Not
+  // now"), so this is the way back to it. The account windows are hidden first
+  // so the import modal isn't stacked on top of them.
+  rewireButton('set-local-upload', (btn) => {
+    const cloud = window.lectioSupabaseStorage;
+    const userId = session && session.user && session.user.id;
+    if (!cloud || !window.LocalImport || !userId) {
+      setAccountStatus('Cloud storage is unavailable right now.', true);
+      return;
+    }
+    withBusy(btn, 'Opening…', async () => {
+      try {
+        const local = await window.LocalImport.getLocalSemesters();
+        if (!local.length) {
+          setAccountStatus('No semesters are stored on this computer.', false);
+          return;
+        }
+        hideAccountWindows();
+        await openLocalImportModal(cloud, userId);
+      } catch (e) {
+        console.error('Local upload offer failed:', e);
+        setAccountStatus('Could not read the semesters on this computer.', true);
+      }
+    });
+  });
+
   // Sign out: close the account windows, then sign out — onAuthChange shows the
   // sign-in overlay.
   rewireButton('set-signout', async () => {
@@ -5042,9 +5113,17 @@ function setupSignIn() {
 // ---------------------------------------------------------------------------
 // One-time local→cloud upload (Phase 11.3). The first time an account signs in
 // with semesters in local fs-storage, offer to upload them to the cloud —
-// explicit, confirmed, idempotent, and non-destructive. The "handled" flag is
-// keyed BY USER in localStorage (`localUploadDone:<userId>`) so a different
-// account on the same machine still gets its own offer.
+// explicit, confirmed, idempotent, and non-destructive. Both flags are keyed BY
+// USER in localStorage so a different account on the same machine still gets its
+// own offer:
+//   - `localUploadDone:<userId>`      — an upload ran (or there was nothing to upload)
+//   - `localUploadDismissed:<userId>` — the user answered "Not now"
+// Either one suppresses the AUTOMATIC offer. Without the second flag, "Not now"
+// closed the modal without recording anything, so a user upgrading from a
+// pre-cloud build was re-asked at every single launch — and once the semesters
+// were already in the account each row read "Already in your account", making a
+// routine offer look like a conflict prompt. The offer stays reachable by hand
+// from Settings → Profile → Local semesters, so declining it is never final.
 // ---------------------------------------------------------------------------
 function isLocalUploadDone(userId) {
   return readPref(`localUploadDone:${userId}`) === 'true';
@@ -5052,13 +5131,19 @@ function isLocalUploadDone(userId) {
 function setLocalUploadDone(userId) {
   writePref(`localUploadDone:${userId}`, 'true');
 }
+function isLocalUploadDismissed(userId) {
+  return readPref(`localUploadDismissed:${userId}`) === 'true';
+}
+function setLocalUploadDismissed(userId) {
+  writePref(`localUploadDismissed:${userId}`, 'true');
+}
 
 async function maybeOfferLocalUpload(session) {
   const userId = session && session.user && session.user.id;
   if (!userId) return;
   const cloud = window.lectioSupabaseStorage;
   if (!cloud || !window.LocalImport) return; // not signed into cloud storage
-  if (isLocalUploadDone(userId)) return;
+  if (isLocalUploadDone(userId) || isLocalUploadDismissed(userId)) return;
 
   let local;
   try {
@@ -5133,9 +5218,14 @@ async function openLocalImportModal(cloud, userId) {
     return { semester: item.semester, getAction: row.getAction };
   });
 
-  // "Not now": close without setting the flag, so the offer can return later
-  // (and 11.4's Settings → Profile can re-open it).
-  skipBtn.onclick = () => overlay.classList.add('hidden');
+  // "Not now": record the dismissal so the offer stops coming back on its own.
+  // It's still reachable on demand from Settings → Profile → Local semesters.
+  // (After a successful upload the button becomes "Done" and the flag is already
+  // set by the upload handler, so this stays correct for that path too.)
+  skipBtn.onclick = () => {
+    setLocalUploadDismissed(userId);
+    overlay.classList.add('hidden');
+  };
 
   uploadBtn.onclick = async () => {
     const decisions = rows.map((r) => ({ semester: r.semester, action: r.getAction() }));

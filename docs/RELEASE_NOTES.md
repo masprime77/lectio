@@ -1,5 +1,20 @@
 ## Unreleased
 
+- Fixed (desktop): upgrading from a pre-cloud version re-opened the "Upload
+  local semesters to your account?" offer at **every** launch. "Not now" closed
+  the window without recording anything, and once the semesters were already in
+  the account every row read "Already in your account" — so a routine offer
+  looked like a conflict prompt about an existing semester. Answering it now
+  settles it for good.
+- Added (desktop): Settings → Profile → **Local semesters**, which re-opens the
+  local→cloud upload offer on demand, so declining it is never final. The upload
+  is unchanged: it never overwrites or deletes anything, and re-running it just
+  skips what is already in the account.
+- Fixed (desktop): a semester that is identical locally and in the cloud can no
+  longer raise the "Changed on another device" prompt. A save that would write
+  exactly what the cloud already holds is recognised as a non-conflict, so
+  nothing is written and no choice is asked for — genuine divergences still open
+  the prompt as before.
 - Fixed (desktop): packaged builds shipped without `moodle.js`,
   `moodle-client.js` and `conflict.js` — three of the six core files the
   renderer loads — because the electron-builder file allowlist had drifted from
