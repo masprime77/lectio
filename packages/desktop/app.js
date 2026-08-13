@@ -3711,6 +3711,15 @@ async function withBusy(btn, busyLabel, fn) {
 // multi-account store + SSO capture, Phase 16 Part 0). Any number of accounts
 // can be connected at once, one per Moodle base URL.
 // ---------------------------------------------------------------------------
+// window.LectioMoodleClient / window.LectioMoodle come from the core files
+// vendored by sync-core.js. If a build ever ships without them, every call site
+// dies on "Cannot read properties of undefined" — check first and hand back a
+// message that says what is actually wrong. Returns null when both are present.
+function missingMoodleGlobals() {
+  if (window.LectioMoodleClient && window.LectioMoodle) return null;
+  return 'Moodle support is missing from this build of Lectio. Reinstall or update the app.';
+}
+
 function setMoodleStatusLine(msg, isError) {
   const el = document.getElementById('set-moodle-status-line');
   if (!el) return;
@@ -3819,6 +3828,11 @@ function setupMoodleSettings() {
       setMoodleStatusLine('Enter a full URL, starting with https://', true);
       return;
     }
+    const missing = missingMoodleGlobals();
+    if (missing) {
+      setMoodleStatusLine(missing, true);
+      return;
+    }
 
     await withBusy(btn, 'Connecting…', async () => {
       let captured;
@@ -3908,6 +3922,11 @@ async function ensureMoodleAccountOrPrompt() {
   } catch (e) {
     accounts = [];
   }
+  const missing = missingMoodleGlobals();
+  if (missing) {
+    alert(missing);
+    return false;
+  }
   if (accounts.length > 0) return true;
   if (confirm('No Moodle account is connected yet. Connect one in Settings now?')) {
     openSettingsModal();
@@ -3931,6 +3950,14 @@ async function loadMoodleCoursesForAccount(baseUrl) {
   nextBtn.disabled = true;
   moodleImport.client = null;
   moodleImport.courses = [];
+
+  const missing = missingMoodleGlobals();
+  if (missing) {
+    loadingEl.classList.add('hidden');
+    errorEl.textContent = missing;
+    errorEl.classList.remove('hidden');
+    return;
+  }
 
   let stored;
   try {
