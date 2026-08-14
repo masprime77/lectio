@@ -1,5 +1,15 @@
 ## Unreleased
 
+- New (desktop): a **select** button in the header puts the course board into
+  multi-select mode. Clicking a row selects it, Cmd/Ctrl-click toggles one, and
+  Shift-click takes a range within a list; Escape (or the button again) leaves
+  the mode. Selections may span weeks, sections and courses, and work the same
+  By Week and By Type.
+- New (desktop): while something is selected, a bar under the header sets a
+  **tag**, moves everything to a **week**, converts the selection between
+  **readings and tasks**, or deletes it — each as one save, not one per item.
+  Setting a tag waits until the selection is all readings or all tasks, since
+  the two have separate tag lists.
 - New (mobile): editing mode on the course screen can now change the selected
   items, not just delete them. A bar at the bottom sets a **tag**, moves
   everything to a **week**, or converts the selection between **readings and
