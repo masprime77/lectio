@@ -14,6 +14,14 @@ const state = {
   focusedCourseId: null, // null = the full course board; course id = focused mode
   sortOrder: restoreSort(), // course sort order — restored from last session
   breakdownOpen: false, // progress breakdown panel visibility
+  // Multi-select on the course board. `selecting` is the mode itself (rows
+  // become selection targets instead of edit targets); `selection` holds item
+  // ids, so a selection survives a re-render and the id-preserving kind
+  // conversion. `selectionAnchor` is the last row clicked without Shift — the
+  // other end of a Shift-click range.
+  selecting: false,
+  selection: new Set(),
+  selectionAnchor: null,
   tutorialStep: 0,   // current step index (0-based)
   tutorialActive: false, // whether the overlay is visible
   // Pomodoro study timer. `session` is core's deadline-based state; `settings`
@@ -442,6 +450,8 @@ const ICONS = {
   'chevrons-down': '<path d="M7 7l5 5l5 -5" /><path d="M7 13l5 5l5 -5" />',
   'chevrons-up': '<path d="M7 11l5 -5l5 5" /><path d="M7 17l5 -5l5 5" />',
   x: '<path d="M18 6l-12 12" /><path d="M6 6l12 12" />',
+  'list-check':
+    '<path d="M3.5 5.5l1.5 1.5l2.5 -2.5" /><path d="M3.5 11.5l1.5 1.5l2.5 -2.5" /><path d="M3.5 17.5l1.5 1.5l2.5 -2.5" /><path d="M11 6l9 0" /><path d="M11 12l9 0" /><path d="M11 18l9 0" />',
   pencil:
     '<path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" /><path d="M13.5 6.5l4 4" />',
   trash:
@@ -530,6 +540,10 @@ async function loadSemester(id) {
   state.semesterId = id;
   state.semester = await api.load(id);
   state.focusedCourseId = null; // focus never persists across semester switches
+  // Selected ids belong to the semester that was on screen — they mean nothing
+  // in the new one, so the selection is dropped with it.
+  state.selection.clear();
+  state.selectionAnchor = null;
   document.getElementById('semester-select').value = id;
   writePref('lastActiveSemesterId', id); // remember for next launch
   setSemesterActionsEnabled(true);
@@ -542,6 +556,9 @@ async function loadSemester(id) {
 function render() {
   renderDashboard();
   renderPlanner();
+  // Follows the board: the bar's contents depend on what is selected, and the
+  // rows it acts on were just rebuilt.
+  renderSelectionBar();
 }
 
 // Snapshot the scroll offset of every scroller a re-render can disturb. The
@@ -1156,6 +1173,22 @@ function renderItemList(items, type, course, options = {}) {
     const li = document.createElement('li');
     li.className = 'item';
 
+    // Selection mode turns the whole row into one target: the checkbox marks
+    // it, the click handler toggles it, and the row's own controls (rename,
+    // due date, tag menu, delete) are made inert in CSS so a stray click
+    // can't edit an item the user meant to select. An item with no id (only
+    // possible in hand-edited data) simply isn't selectable.
+    if (state.selecting && item.id) {
+      li.classList.add('item--selectable');
+      li.dataset.itemId = item.id;
+      if (state.selection.has(item.id)) li.classList.add('item--selected');
+      const box = document.createElement('span');
+      box.className = 'item-select-box';
+      box.setAttribute('aria-hidden', 'true');
+      li.appendChild(box);
+      li.addEventListener('click', (e) => onSelectRowClick(e, li, item));
+    }
+
     if (options.showWeek) {
       const weekSpan = document.createElement('span');
       weekSpan.className = 'item-week';
@@ -1258,6 +1291,132 @@ function renderItemList(items, type, course, options = {}) {
     ul.appendChild(li);
   });
   return ul;
+}
+
+// ---------------------------------------------------------------------------
+// Multi-select mode: pick several items across the board, then act on all of
+// them at once. The mode is a header toggle; the actions live in a contextual
+// bar that appears with the first selected row. Everything here works the same
+// in both groupings — it hangs off the item rows, which both of them build
+// through renderItemList().
+// ---------------------------------------------------------------------------
+function setupSelectMode() {
+  const btn = document.getElementById('select-mode-btn');
+  btn.innerHTML = icon('list-check');
+  btn.addEventListener('click', () => setSelectMode(!state.selecting));
+
+  // Escape leaves the mode (and drops the selection), like the inline editors.
+  // A modal on top gets it first — its own handler must close the dialog, not
+  // the mode behind it — and so does anything being typed into.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !state.selecting) return;
+    if (isTypingTarget(e.target)) return;
+    if (document.querySelector('.modal-overlay:not(.hidden)')) return;
+    setSelectMode(false);
+  });
+}
+
+// Enter or leave selection mode. Leaving always drops the selection: it exists
+// only to be acted on from the bar, which goes with the mode.
+function setSelectMode(on) {
+  state.selecting = on;
+  state.selection.clear();
+  state.selectionAnchor = null;
+  const btn = document.getElementById('select-mode-btn');
+  if (btn) {
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-pressed', String(on));
+  }
+  // The rows themselves change (checkbox, inert controls), so this is a real
+  // re-render rather than a class flip.
+  if (state.semester) renderPreservingScroll();
+  else renderSelectionBar();
+}
+
+function clearSelection() {
+  state.selection.clear();
+  state.selectionAnchor = null;
+  syncSelectionClasses();
+  renderSelectionBar();
+}
+
+// A click on a row in selection mode. Plain click and Cmd/Ctrl-click both
+// toggle the one row (the plain click has nothing else to do in this mode, and
+// the modifier is what people arrive with from Finder/Explorer); Shift extends
+// from the last row clicked without Shift, within that row's own list — a range
+// across two different weeks or courses isn't a range the user can see.
+function onSelectRowClick(e, li, item) {
+  e.preventDefault();
+  e.stopPropagation();
+  const ids = [...li.parentElement.querySelectorAll('li.item[data-item-id]')].map(
+    (el) => el.dataset.itemId
+  );
+  const anchorIdx = ids.indexOf(state.selectionAnchor);
+  if (e.shiftKey && anchorIdx !== -1) {
+    const to = ids.indexOf(item.id);
+    const [from, until] = anchorIdx < to ? [anchorIdx, to] : [to, anchorIdx];
+    // A range adds; it never deselects what it passes over.
+    ids.slice(from, until + 1).forEach((id) => state.selection.add(id));
+  } else {
+    if (state.selection.has(item.id)) state.selection.delete(item.id);
+    else state.selection.add(item.id);
+    state.selectionAnchor = item.id;
+  }
+  syncSelectionClasses();
+  renderSelectionBar();
+}
+
+// Selecting a row only changes which rows are highlighted and what the bar
+// says, so both are updated in place — rebuilding the board would cost the
+// scroll positions of every column for a class flip.
+function syncSelectionClasses() {
+  document.querySelectorAll('.item--selectable').forEach((li) => {
+    li.classList.toggle('item--selected', state.selection.has(li.dataset.itemId));
+  });
+}
+
+// The selected items, each with the course and the kind of list it sits in.
+// Ids that match nothing are dropped rather than carried as phantoms (an item
+// can disappear under the selection when the cloud copy wins a conflict).
+function selectedEntries() {
+  const sem = state.semester;
+  if (!sem || state.selection.size === 0) return [];
+  const out = [];
+  sem.courses.forEach((course) => {
+    ITEM_TYPES.forEach(({ type, key }) => {
+      (course[key] || []).forEach((item) => {
+        if (item.id && state.selection.has(item.id)) out.push({ course, type, item });
+      });
+    });
+  });
+  return out;
+}
+
+// The contextual bar that tracks the selection. It appears with the first
+// selected row and leaves with the last one, so the header doesn't carry a
+// permanent toolbar; the actions it offers are added on top of this.
+function renderSelectionBar() {
+  const bar = document.getElementById('selection-bar');
+  if (!bar) return;
+  const entries = selectedEntries();
+  bar.innerHTML = '';
+  if (!state.selecting || !state.semester || entries.length === 0) {
+    bar.classList.add('hidden');
+    return;
+  }
+  bar.classList.remove('hidden');
+
+  const count = document.createElement('span');
+  count.className = 'selection-count';
+  count.textContent = `${entries.length} selected`;
+  bar.appendChild(count);
+
+  const clear = document.createElement('button');
+  clear.className = 'btn btn-small selection-clear';
+  clear.textContent = 'Clear';
+  clear.title = 'Deselect everything (Esc leaves selection mode)';
+  clear.addEventListener('click', clearSelection);
+  bar.appendChild(clear);
 }
 
 // Replace a title span with an input for inline renaming. Nothing outside the
@@ -1830,6 +1989,7 @@ async function init() {
   });
 
   setupViewToggle();
+  setupSelectMode();
   setupSort();
   setupPomodoro();
   setupTheme();
