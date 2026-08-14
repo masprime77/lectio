@@ -1,5 +1,13 @@
 ## Unreleased
 
+- New (desktop): readings and tasks can be **dragged between sections** on the
+  course board. By Week, dropping a row on another week moves it there — on the
+  week's Readings or Tasks list to change what it is at the same time, or on a
+  collapsed week's header, which opens on arrival. By Type, dropping on the
+  other section converts a reading into a task (or back). Dropping on any
+  section of another course's column moves the item to that course, and the
+  section under the pointer is outlined so it's clear where the item will land.
+  Dropping a `.lectio.json` file on the window still imports it as before.
 - New (desktop): a **select** button in the header puts the course board into
   multi-select mode. Clicking a row selects it, Cmd/Ctrl-click toggles one, and
   Shift-click takes a range within a list; Escape (or the button again) leaves
