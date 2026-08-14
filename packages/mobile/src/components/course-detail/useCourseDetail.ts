@@ -17,6 +17,20 @@ import type { Course, PlannerItem, Semester, SortOrder, Tag } from '../../../typ
 
 export type Kind = 'reading' | 'task';
 
+/**
+ * How the course screen groups its items — the mobile side of the desktop
+ * header's By Week / By Type toggle:
+ *  - 'type' — a Readings section and a Tasks section, weeks nested inside.
+ *  - 'week' — one section per week, listing that week's readings then tasks.
+ */
+export type GroupMode = 'week' | 'type';
+
+// Type-first is what this screen has always shown, so an existing user opens a
+// course to the same thing after the update and picks By Week when they want
+// it. (The desktop board defaults to By Week; a course column and a phone
+// screen aren't the same amount of room.)
+export const DEFAULT_GROUP_MODE: GroupMode = 'type';
+
 // Week orders sort the readings/tasks by their week (display-only: returns a
 // new array, the on-disk item order is untouched). The other orders affect
 // the courses list, not item ordering, so items keep their stored order.
@@ -42,16 +56,34 @@ export function sortedItems(items: PlannerItem[], order: SortOrder): PlannerItem
 // core has no week/date helper to share, and these are three lines each.
 // ---------------------------------------------------------------------------
 
-/** Items of one week (or the trailing "no week" group when `week` is null). */
-export interface WeekGroup {
-  /** Stable per (course, section, week) — also the persistence key. */
+/** The part of a section the expand/collapse handlers need. */
+export interface CollapsibleSection {
+  /** Stable per (course, section) — also the persistence key. */
   key: string;
+  open: boolean;
+}
+
+/** Items of one week (or the trailing "no week" group when `week` is null). */
+export interface WeekGroup extends CollapsibleSection {
   week: number | null;
   title: string;
   /** "Apr 7 – Apr 13", or '' for the no-week group. */
   range: string;
   items: PlannerItem[];
-  open: boolean;
+}
+
+/**
+ * One week's readings *and* tasks — the top-level section of the By Week
+ * grouping (or the trailing "no week" section when `week` is null).
+ */
+export interface WeekSection extends CollapsibleSection {
+  week: number | null;
+  title: string;
+  range: string;
+  readings: PlannerItem[];
+  tasks: PlannerItem[];
+  /** readings + tasks, for the header's count. */
+  count: number;
 }
 
 function weekStart(startDate: string, week: number): Date {
@@ -111,12 +143,16 @@ export interface UseCourseDetailResult {
   picker: { kind: Kind; item: PlannerItem } | null;
   sortOrder: SortOrder;
   sortMenuOpen: boolean;
+  groupMode: GroupMode;
+  groupMenuOpen: boolean;
   timeEditorOpen: boolean;
-  /** This section's items, split into collapsible week groups. */
+  /** By Type: this section's items, split into collapsible week groups. */
   weekGroups: (kind: Kind) => WeekGroup[];
-  toggleWeek: (group: WeekGroup) => void;
+  /** By Week: every week that has an item, readings and tasks together. */
+  weekSections: () => WeekSection[];
+  toggleWeek: (group: CollapsibleSection) => void;
   /** Bulk expand/collapse — the desktop header's chevrons-down/up buttons. */
-  setWeeksOpen: (groups: WeekGroup[], open: boolean) => void;
+  setWeeksOpen: (groups: CollapsibleSection[], open: boolean) => void;
   toggleEditing: () => void;
   toggleSelect: (itemId: string) => void;
   confirmDeleteItem: (kind: Kind, item: PlannerItem) => void;
@@ -128,8 +164,10 @@ export interface UseCourseDetailResult {
   handleSaveStudyTime: (seconds: number) => void;
   applyStatus: (kind: Kind, itemId: string | undefined, tagId: string) => void;
   pickSortOrder: (order: SortOrder) => void;
+  pickGroupMode: (mode: GroupMode) => void;
   setPicker: (p: { kind: Kind; item: PlannerItem } | null) => void;
   setSortMenuOpen: (open: boolean) => void;
+  setGroupMenuOpen: (open: boolean) => void;
   setTimeEditorOpen: (open: boolean) => void;
 }
 
@@ -144,6 +182,8 @@ export function useCourseDetail(
   const [picker, setPicker] = useState<{ kind: Kind; item: PlannerItem } | null>(null);
   const [sortOrder, pickSortOrder] = useSortOrder();
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [groupMode, setGroupMode] = useState<GroupMode>(DEFAULT_GROUP_MODE);
+  const [groupMenuOpen, setGroupMenuOpen] = useState(false);
   // Hand-corrected studied time (the timer is not the only way to study).
   const [timeEditorOpen, setTimeEditorOpen] = useState(false);
 
@@ -165,7 +205,7 @@ export function useCourseDetail(
   // Takes the group as rendered rather than just its key: an untouched section
   // has no stored value, so the first tap has to flip what is actually on
   // screen (the resolved default), not `undefined`.
-  const toggleWeek = useCallback((group: WeekGroup) => {
+  const toggleWeek = useCallback((group: CollapsibleSection) => {
     setOpenWeeks((prev) => {
       const next = { ...prev, [group.key]: !group.open };
       void prefs.setOpenCourseWeeks(JSON.stringify(next));
@@ -175,7 +215,7 @@ export function useCourseDetail(
 
   // Writes an explicit value for every group in the section, so the sections
   // the user has never touched stop following the current-week default too.
-  const setWeeksOpen = useCallback((groups: WeekGroup[], open: boolean) => {
+  const setWeeksOpen = useCallback((groups: CollapsibleSection[], open: boolean) => {
     setOpenWeeks((prev) => {
       const next = { ...prev };
       groups.forEach((g) => {
@@ -249,6 +289,72 @@ export function useCourseDetail(
     [course, semester, sortOrder, openWeeks]
   );
 
+  // The By Week grouping: one section per week that has anything in it, each
+  // holding that week's readings and then its tasks. Same ordering rules and
+  // same trailing "No week" section as weekGroups(), but the sections span both
+  // kinds — so they get their own keys ("<course>:week:<n>"), which keeps this
+  // mode's open/closed state separate from the type mode's (the desktop keeps
+  // two maps for the same reason).
+  const weekSections = useCallback((): WeekSection[] => {
+    if (!course || !semester) return [];
+    const active = currentWeek(semester);
+
+    const byWeek = new Map<number, { readings: PlannerItem[]; tasks: PlannerItem[] }>();
+    const noWeek: { readings: PlannerItem[]; tasks: PlannerItem[] } = { readings: [], tasks: [] };
+    const collect = (items: PlannerItem[], kind: Kind) => {
+      items.forEach((item) => {
+        if (typeof item.week === 'number') {
+          let bucket = byWeek.get(item.week);
+          if (!bucket) {
+            bucket = { readings: [], tasks: [] };
+            byWeek.set(item.week, bucket);
+          }
+          if (kind === 'reading') bucket.readings.push(item);
+          else bucket.tasks.push(item);
+        } else if (kind === 'reading') {
+          noWeek.readings.push(item);
+        } else {
+          noWeek.tasks.push(item);
+        }
+      });
+    };
+    collect(course.readings, 'reading');
+    collect(course.tasks, 'task');
+
+    const weeks = [...byWeek.keys()].sort((a, b) => a - b);
+    if (sortOrder === 'week-desc') weeks.reverse();
+
+    const sections: WeekSection[] = weeks.map((week) => {
+      const key = `${course.id}:week:${week}`;
+      const bucket = byWeek.get(week) ?? { readings: [], tasks: [] };
+      return {
+        key,
+        week,
+        title: `Week ${week}`,
+        range: weekRange(semester.startDate, week),
+        readings: bucket.readings,
+        tasks: bucket.tasks,
+        count: bucket.readings.length + bucket.tasks.length,
+        open: openWeeks[key] ?? week === active,
+      };
+    });
+
+    if (noWeek.readings.length > 0 || noWeek.tasks.length > 0) {
+      const key = `${course.id}:week:none`;
+      sections.push({
+        key,
+        week: null,
+        title: 'No week',
+        range: '',
+        readings: noWeek.readings,
+        tasks: noWeek.tasks,
+        count: noWeek.readings.length + noWeek.tasks.length,
+        open: openWeeks[key] ?? true,
+      });
+    }
+    return sections;
+  }, [course, semester, sortOrder, openWeeks]);
+
   function handleSaveStudyTime(seconds: number) {
     if (!semester) return;
     const next: Semester = JSON.parse(JSON.stringify(semester));
@@ -273,6 +379,10 @@ export function useCourseDetail(
     },
     [semester, courseId, onPersist]
   );
+
+  const pickGroupMode = useCallback((mode: GroupMode) => {
+    setGroupMode(mode);
+  }, []);
 
   function toggleEditing() {
     setEditing((e) => !e);
@@ -373,8 +483,11 @@ export function useCourseDetail(
     picker,
     sortOrder,
     sortMenuOpen,
+    groupMode,
+    groupMenuOpen,
     timeEditorOpen,
     weekGroups,
+    weekSections,
     toggleWeek,
     setWeeksOpen,
     toggleEditing,
@@ -388,8 +501,10 @@ export function useCourseDetail(
     handleSaveStudyTime,
     applyStatus,
     pickSortOrder,
+    pickGroupMode,
     setPicker,
     setSortMenuOpen,
+    setGroupMenuOpen,
     setTimeEditorOpen,
   };
 }
