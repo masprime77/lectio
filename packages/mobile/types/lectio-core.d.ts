@@ -159,6 +159,15 @@ export function deleteItem(
   kind: 'reading' | 'task',
   itemId: string
 ): boolean;
+/**
+ * Move an item between `course.readings` and `course.tasks`. Returns the moved
+ * item, or null when the id is unknown or it already is that kind.
+ */
+export function convertItemKind(
+  course: Course,
+  itemId: string,
+  toKind: 'reading' | 'task'
+): PlannerItem | null;
 
 // ---------------------------------------------------------------------------
 // storage/migrate and storage/contract surfaces

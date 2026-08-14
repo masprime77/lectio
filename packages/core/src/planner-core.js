@@ -221,6 +221,37 @@
     return true;
   }
 
+  // Move an item between a course's readings and tasks — the transform behind
+  // the mobile batch "change kind" action. `toKind` is the kind the item should
+  // end up as; returns the moved item, or null when the id is unknown or the
+  // item already is that kind (both are no-ops).
+  //
+  // The id and title travel with the item, so anything holding the id (a batch
+  // selection, an export) still points at it. The tag cannot travel: reading
+  // tags and task tags are separate lists, so the item lands on the destination
+  // kind's pending tag and any ghost marker goes with the tag it belonged to.
+  // dueDate is task-only: a reading becoming a task starts with an empty one
+  // (like addItem), a task becoming a reading drops it.
+  function convertItemKind(course, itemId, toKind) {
+    const from = (toKind === 'reading' ? course.tasks : course.readings) || [];
+    const idx = from.findIndex((it) => it.id === itemId);
+    if (idx === -1) return null;
+    const [item] = from.splice(idx, 1);
+    if (toKind === 'reading') {
+      if (!Array.isArray(course.readings)) course.readings = [];
+      delete item.dueDate;
+      item.status = 'r-pending';
+      course.readings.push(item);
+    } else {
+      if (!Array.isArray(course.tasks)) course.tasks = [];
+      item.dueDate = typeof item.dueDate === 'string' ? item.dueDate : '';
+      item.status = 't-pending';
+      course.tasks.push(item);
+    }
+    delete item._ghostSection;
+    return item;
+  }
+
   // Add a custom tag to a semester's tag list (`type` is 'reading' or 'task').
   // Returns the new tag with a generated unique id.
   function addTag(semester, type, { name, color, section }) {
@@ -304,5 +335,6 @@
     addItem,
     editItem,
     deleteItem,
+    convertItemKind,
   };
 });
