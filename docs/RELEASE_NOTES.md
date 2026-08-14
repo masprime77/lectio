@@ -1,5 +1,15 @@
 ## Unreleased
 
+- Fixed (desktop): the view no longer jumps when you edit an item. Changing a
+  tag, renaming an item, editing a due date, deleting an item, adding one, or
+  editing studied time rebuilt the whole planner and threw you back to the top.
+  Those edits now hold their place, and scroll is restored for all three
+  scrollers — the page, the All Courses board's horizontal scroll, and each
+  course column's own scroll — not just the page. Expanded weeks are unaffected
+  either way.
+- Changed (desktop): changing an item's tag, renaming it, or editing its due
+  date now updates just that item instead of re-rendering the planner, so the
+  edit lands without the surrounding view flickering.
 - Changed (desktop): each week in the Moodle import dialog now picks
   **Skip / Reading / Task** with three segmented buttons instead of a
   drop-down, matching the mobile import screen. The choice is readable without
