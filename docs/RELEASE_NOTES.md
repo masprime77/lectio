@@ -87,6 +87,15 @@
   silently. The Supabase adapter refuses to be constructed without
   `window.PlannerConflict`, and the Moodle entry points check for the Moodle
   globals up front and show a readable message rather than a `TypeError`.
+- Changed (mobile): the study timer and its study-time button moved to the
+  bottom-**left** corner, leaving the bottom-right "+" on its own. The timer now
+  sits level with the "+" instead of stacked above it, with study time above the
+  timer, and the running pill grows rightwards into the empty middle of the
+  screen rather than off the left edge. The column follows the safe area in
+  landscape, so nothing is clipped by a notch or the home indicator.
+- Changed (mobile): the semester and course screens shed the extra bottom
+  padding the old two-high stack needed, so their lists end closer to the
+  bottom of the screen.
 
 ## 1.1.1 — 2026-08-11
 
