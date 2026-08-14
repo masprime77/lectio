@@ -65,6 +65,22 @@ export function sortedItems(items: PlannerItem[], order: SortOrder): PlannerItem
 // core has no week/date helper to share, and these are three lines each.
 // ---------------------------------------------------------------------------
 
+/**
+ * Where a dragged item should end up. A By Week section knows only the week
+ * (its rows keep whatever kind they are); a By Type week group knows both,
+ * since the section it belongs to *is* the kind.
+ */
+export interface DropTarget {
+  /**
+   * Destination week: a number, null for the trailing "No week" section, or
+   * undefined to keep the item's own — what an empty Readings/Tasks section
+   * offers, since it stands for a kind and no particular week.
+   */
+  week?: number | null;
+  /** Destination kind, or null to keep the item's own. */
+  kind: Kind | null;
+}
+
 /** The part of a section the expand/collapse handlers need. */
 export interface CollapsibleSection {
   /** Stable per (course, section) — also the persistence key. */
@@ -183,6 +199,8 @@ export interface UseCourseDetailResult {
   applyBatchWeek: (week: number) => void;
   /** Ask which kind the selection should become, then convert it in one save. */
   showBatchKindActions: () => void;
+  /** Move one dragged item into another section, in one save. */
+  moveItem: (from: Kind, itemId: string, target: DropTarget) => void;
   handleExportCourse: () => void;
   handleSaveStudyTime: (seconds: number) => void;
   applyStatus: (kind: Kind, itemId: string | undefined, tagId: string) => void;
@@ -587,6 +605,53 @@ export function useCourseDetail(
     );
   }, [applyBatchKind, selected]);
 
+  // Drop a dragged item into another section: it takes that section's week, and
+  // its kind too when the section is a kind (By Type). Same semantics as the
+  // desktop board's drag and drop, and the same one-save-per-drop rule as the
+  // batch actions — the drop is a single onPersist, so one cloud write.
+  const moveItem = useCallback(
+    (from: Kind, itemId: string, target: DropTarget) => {
+      if (!semester || !course || !itemId) return;
+      const toKind = target.kind ?? from;
+      const current = (from === 'reading' ? course.readings : course.tasks).find(
+        (it) => it.id === itemId
+      );
+      if (!current) return;
+      const fromWeek = typeof current.week === 'number' ? current.week : null;
+      const toWeek = target.week === undefined ? fromWeek : target.week;
+      // Dropping an item back into the section it came from is not a save.
+      if (toKind === from && fromWeek === toWeek) return;
+
+      const next: Semester = JSON.parse(JSON.stringify(semester));
+      const c = getCourses(next).find((x) => x.id === courseId);
+      if (!c) return;
+      const item = (from === 'reading' ? c.readings : c.tasks).find((it) => it.id === itemId);
+      if (!item) return;
+      // The week goes on first: convertItemKind keeps the item object (and its
+      // id) as it moves between the two arrays, so the new week travels with it.
+      if (toWeek === null) delete item.week;
+      else item.week = toWeek;
+      if (toKind !== from) convertItemKind(c, itemId, toKind);
+
+      // Open the section the item just landed in. A collapsed section is a
+      // perfectly good target — its header is all there is to aim at — and the
+      // week the item lands in may not have been on screen at all. The key
+      // shapes are the ones weekSections()/weekGroups() build.
+      const destKey =
+        groupMode === 'week'
+          ? `${courseId}:week:${toWeek ?? 'none'}`
+          : `${courseId}:${toKind}:${toWeek ?? 'none'}`;
+      setOpenWeeks((prev) => {
+        const nextOpen = { ...prev, [destKey]: true };
+        void prefs.setOpenCourseWeeks(JSON.stringify(nextOpen));
+        return nextOpen;
+      });
+
+      onPersist(next);
+    },
+    [semester, course, courseId, groupMode, onPersist]
+  );
+
   // Export this course via the system share sheet (fresh ids are assigned on
   // import, so the exported ids are just a snapshot).
   function handleExportCourse() {
@@ -628,6 +693,7 @@ export function useCourseDetail(
     applyBatchTag,
     applyBatchWeek,
     showBatchKindActions,
+    moveItem,
     handleExportCourse,
     handleSaveStudyTime,
     applyStatus,
