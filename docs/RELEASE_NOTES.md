@@ -1,5 +1,14 @@
 ## Unreleased
 
+- New (mobile): items can be **dragged between sections** on the course screen.
+  In editing mode, long-press a row to lift it and drag it onto another
+  section: By Week that moves it to that week, By Type it moves it to that week
+  *and* converts it between reading and task, since the section it lands under
+  is the kind. An empty Readings or Tasks section accepts a drop too (the item
+  keeps its week), the section under the finger is outlined, the list
+  auto-scrolls when the drag nears an edge, and the destination is expanded on
+  arrival. Tapping to select, the batch bar and swipe-to-edit/delete are all
+  unchanged.
 - New (desktop): a **select** button in the header puts the course board into
   multi-select mode. Clicking a row selects it, Cmd/Ctrl-click toggles one, and
   Shift-click takes a range within a list; Escape (or the button again) leaves
