@@ -1,5 +1,6 @@
-// Device-local UI preferences (last-opened semester, sort order,
-// tutorial-seen, pomodoro durations + live session) backed by AsyncStorage. Mirrors the desktop renderer's
+// Device-local UI preferences (last-opened semester, sort order, course
+// grouping, tutorial-seen, pomodoro durations + live session) backed by
+// AsyncStorage. Mirrors the desktop renderer's
 // readPref/writePref semantics: reads never throw (fallback on error) and
 // writes fail silently. This is UI state only — it must never be written into
 // the semester JSON or Supabase.
@@ -12,6 +13,7 @@ const K = {
   pomodoroSettings: 'lectio:pref:pomodoroSettings',
   pomodoroSession: 'lectio:pref:pomodoroSession',
   openCourseWeeks: 'lectio:pref:openCourseWeeks',
+  courseGrouping: 'lectio:pref:courseGrouping',
 } as const;
 
 async function getString(key: string): Promise<string | null> {
@@ -66,4 +68,10 @@ export const prefs = {
   // (the current week open). Parsed defensively by the caller.
   getOpenCourseWeeks: () => getString(K.openCourseWeeks),
   setOpenCourseWeeks: (json: string) => setString(K.openCourseWeeks, json),
+
+  // How the course detail screen groups its items ('week' | 'type'), validated
+  // by the caller like the sort order is. One choice for every course, matching
+  // the desktop's single persisted grouping mode.
+  getCourseGrouping: () => getString(K.courseGrouping),
+  setCourseGrouping: (mode: string) => setString(K.courseGrouping, mode),
 };

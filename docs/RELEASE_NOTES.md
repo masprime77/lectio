@@ -1,5 +1,18 @@
 ## Unreleased
 
+- New (mobile): the course screen groups its readings and tasks **By Week** or
+  **By Type**, the same two groupings the desktop board offers, picked from a
+  header button next to the sort control. By Type is what the screen always
+  showed — a Readings section and a Tasks section, split into weeks. By Week
+  puts one "Week N · date range" section at the top level holding that week's
+  readings and then its tasks, with anything that has no week in a trailing
+  "No week" section. Selecting, swiping, tag-setting and adding items work the
+  same in both.
+- New (mobile): each grouping remembers which of its sections you had open, so
+  switching between them doesn't disturb the other one, and expand/collapse all
+  applies to whichever sections are on screen.
+- New (mobile): the chosen grouping is remembered on the device and restored
+  when you come back to a course or relaunch the app.
 - Changed (desktop): the header toggle now reads **By Week** / **By Type** and
   chooses how each course column is grouped, instead of swapping between two
   different layouts. The course-column board — with its per-course header,
