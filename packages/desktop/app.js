@@ -7,6 +7,7 @@ const state = {
   semesterId: null,   // current semester file id (filename without .json)
   semester: null,     // loaded semester object
   openCourseWeeks: {}, // "courseId-week" -> true when that week section is expanded
+  openCourseTypes: {}, // "courseId-reading|task" -> true when that type section is expanded
   editingId: null,    // semester id being edited in the modal (null = create mode)
   editingSemester: null, // semester object the modal's Tags tab edits (live or draft)
   view: restoreView(), // 'week' | 'course' — restored from last session
@@ -842,23 +843,36 @@ function renderPlanner() {
 // The active grouping mode, normalised. Anything that isn't a known mode falls
 // back to weeks, so a stale persisted value can never break a render.
 function groupMode() {
-  return 'week';
+  return state.view === 'type' ? 'type' : 'week';
 }
 
 // ---------------------------------------------------------------------------
-// Bulk expand/collapse for the sections inside every course column.
+// Bulk expand/collapse for the sections inside every course column. Each mode
+// has its own open/closed map, so switching back and forth is stable.
 // ---------------------------------------------------------------------------
 function setAllWeeksOpen(mode) {
   const sem = state.semester;
   if (!sem) return;
-  const cw = currentWeek(sem);
 
-  sem.courses.forEach((course) => {
-    for (let w = 1; w <= sem.weeks; w++) {
-      const open = mode === 'all' || (mode === 'current' && w === cw);
-      state.openCourseWeeks[course.id + '-' + w] = open;
-    }
-  });
+  if (groupMode() === 'type') {
+    // "Current week only" has no meaning when the sections are types rather
+    // than weeks — the control is disabled in this mode, so ignore it here.
+    if (mode === 'current') return;
+    const open = mode === 'all';
+    sem.courses.forEach((course) => {
+      ITEM_TYPES.forEach(({ type }) => {
+        state.openCourseTypes[course.id + '-' + type] = open;
+      });
+    });
+  } else {
+    const cw = currentWeek(sem);
+    sem.courses.forEach((course) => {
+      for (let w = 1; w <= sem.weeks; w++) {
+        const open = mode === 'all' || (mode === 'current' && w === cw);
+        state.openCourseWeeks[course.id + '-' + w] = open;
+      }
+    });
+  }
   renderPlanner();
 }
 
@@ -988,7 +1002,8 @@ function renderCourseBoard() {
 
     const body = document.createElement('div');
     body.className = 'course-column-body';
-    fillColumnByWeek(body, course, sem);
+    if (groupMode() === 'type') fillColumnByType(body, course, sem);
+    else fillColumnByWeek(body, course, sem);
 
     col.appendChild(body);
     board.appendChild(col);
@@ -1058,6 +1073,55 @@ function fillColumnByWeek(body, course, sem) {
   body.appendChild(addToWeekControl(course, sem));
 }
 
+// The two kinds of item a course holds, in the order the type grouping shows
+// them. `key` is the course array each type lives in.
+const ITEM_TYPES = [
+  { type: 'reading', key: 'readings', label: 'Readings' },
+  { type: 'task', key: 'tasks', label: 'Tasks' },
+];
+
+// "By Type" grouping: two collapsible sections per column — every reading, then
+// every task, across the whole semester. The sections aren't weeks, so each row
+// carries its own week number and the rows are ordered by week (descending for
+// the week-desc sort, ascending otherwise).
+function fillColumnByType(body, course, sem) {
+  const byWeek = state.sortOrder === 'week-desc'
+    ? (a, b) => b.week - a.week
+    : (a, b) => a.week - b.week;
+
+  ITEM_TYPES.forEach(({ type, key, label }) => {
+    const items = [...course[key]].sort(byWeek);
+    const stateKey = course.id + '-' + type;
+    // Both sections start expanded: unlike weeks, there's no "current" one to
+    // single out, and a course's whole list is the point of this grouping.
+    const isOpen = stateKey in state.openCourseTypes
+      ? state.openCourseTypes[stateKey]
+      : true;
+    state.openCourseTypes[stateKey] = isOpen;
+
+    const header = document.createElement('div');
+    header.className = 'course-week-header' + (isOpen ? ' open' : '');
+    header.innerHTML = `<span class="course-week-chevron">${icon('chevron-right')}</span>
+      <span class="week-divider-label">${label}</span>
+      <span class="week-divider-dates">${items.length}</span>`;
+    header.addEventListener('click', () => {
+      state.openCourseTypes[stateKey] = !state.openCourseTypes[stateKey];
+      renderPlanner();
+    });
+
+    const section = document.createElement('div');
+    section.className = 'course-week-body' + (isOpen ? ' open' : '');
+    section.appendChild(renderItemList(items, type, course, { showWeek: true }));
+
+    body.appendChild(header);
+    body.appendChild(section);
+  });
+
+  // Per-week "+ Reading/+ Task" buttons don't apply here, so the week-picking
+  // control is the only way to add an item in this mode.
+  body.appendChild(addToWeekControl(course, sem));
+}
+
 // A dashed "add course" column placed at the end of the course board.
 function addCourseColumn() {
   const col = document.createElement('div');
@@ -1088,6 +1152,14 @@ function renderItemList(items, type, course, options = {}) {
   items.forEach((item) => {
     const li = document.createElement('li');
     li.className = 'item';
+
+    if (options.showWeek) {
+      const weekSpan = document.createElement('span');
+      weekSpan.className = 'item-week';
+      weekSpan.textContent = 'W' + item.week;
+      weekSpan.title = 'Week ' + item.week;
+      li.appendChild(weekSpan);
+    }
 
     const titleSpan = document.createElement('span');
     titleSpan.className = 'item-title';
@@ -1976,6 +2048,17 @@ function updateViewToggle() {
     btn.classList.toggle('active', btn.dataset.view === state.view);
   });
   document.getElementById('sort-select').value = state.sortOrder;
+
+  // The sections of the type grouping aren't weeks, so "expand current week
+  // only" has nothing to act on there — disable it rather than guess.
+  const currentBtn = document.getElementById('expand-current-btn');
+  if (currentBtn) {
+    const byType = groupMode() === 'type';
+    currentBtn.disabled = byType;
+    currentBtn.title = byType
+      ? 'Expand current week only (available when grouping by week)'
+      : 'Expand current week only';
+  }
 }
 
 // Course sort control (Progress / Alpha / Week), persisted to localStorage.
@@ -4992,6 +5075,7 @@ function clearPlannerState() {
   state.semester = null;
   state.focusedCourseId = null;
   state.openCourseWeeks = {};
+  state.openCourseTypes = {};
   markDirty(false);
   setStorageOnline(true); // fs fallback is always "online"; clear any notice
   const sel = document.getElementById('semester-select');

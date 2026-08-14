@@ -627,6 +627,8 @@ body.electron-app .header-inner { padding-left: 80px; }
 }
 .collapse-btn + .collapse-btn { border-left: 1px solid var(--border); }
 .collapse-btn:hover { background: var(--hover); color: var(--text); }
+.collapse-btn:disabled { opacity: 0.4; cursor: default; }
+.collapse-btn:disabled:hover { background: var(--surface); color: var(--muted); }
 .collapse-btn .ti { width: 16px; height: 16px; }
 .btn-danger { color: var(--danger); border: none; background: none; }
 .btn-danger:hover { background: var(--danger-bg); }
@@ -822,6 +824,18 @@ body.electron-app .header-inner { padding-left: 80px; }
 }
 .item:last-child { border-bottom: none; }
 .item-title { flex: 1; font-size: 0.9rem; }
+/* Week number on a row, shown when the section itself isn't a week (By Type) */
+.item-week {
+  flex: none;
+  min-width: 1.9rem;
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--hover);
+  border-radius: 4px;
+  padding: 0.05rem 0.3rem;
+}
 /* Due date on tasks */
 .item-due {
   font-size: 0.75rem;
