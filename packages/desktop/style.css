@@ -232,7 +232,6 @@ body.electron-app .header-inner { padding-left: 80px; }
 .logo,
 .dashboard h2,
 .modal h2,
-.course-card h4,
 .course-column-header {
   font-family: var(--font-heading);
   letter-spacing: -0.01em;
@@ -628,6 +627,8 @@ body.electron-app .header-inner { padding-left: 80px; }
 }
 .collapse-btn + .collapse-btn { border-left: 1px solid var(--border); }
 .collapse-btn:hover { background: var(--hover); color: var(--text); }
+.collapse-btn:disabled { opacity: 0.4; cursor: default; }
+.collapse-btn:disabled:hover { background: var(--surface); color: var(--muted); }
 .collapse-btn .ti { width: 16px; height: 16px; }
 .btn-danger { color: var(--danger); border: none; background: none; }
 .btn-danger:hover { background: var(--danger-bg); }
@@ -803,56 +804,9 @@ body.electron-app .header-inner { padding-left: 80px; }
 }
 .bd-summary .bd-pct { color: var(--text); }
 
-/* Weeks */
-.week {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  margin-bottom: 0.6rem;
-  overflow: hidden;
-  box-shadow: var(--shadow);
-}
-.week-header {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.75rem 1rem;
-  cursor: pointer;
-  user-select: none;
-}
-.week-header:hover { background: var(--hover); }
-.week-header .chevron {
-  transition: transform 0.2s;
-  color: var(--muted);
-  display: inline-flex;
-  align-items: center;
-}
-.week-header .chevron .ti { width: 18px; height: 18px; }
-.week.open .week-header .chevron { transform: rotate(90deg); }
-.week-title { font-weight: 600; font-size: 0.95rem; }
-.week-dates { color: var(--muted); font-size: 0.8rem; }
-.week-badge {
-  margin-left: auto;
-  font-size: 0.72rem;
-  background: var(--primary);
-  color: var(--on-accent);
-  padding: 0.1rem 0.5rem;
-  border-radius: 20px;
-}
-.week-body { padding: 0 1rem 1rem; display: none; }
-.week.open .week-body { display: block; }
+/* Empty-state line shared by the dashboard, columns and item lists */
 .week-empty { color: var(--muted); font-size: 0.85rem; padding: 0.5rem 0; }
 
-/* Course cards */
-.course-card {
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--primary);
-  border-radius: 8px;
-  padding: 0.75rem 0.9rem;
-  margin-top: 0.75rem;
-  background: var(--surface);
-}
-.course-card h4 { margin: 0 0 0.5rem; font-size: 0.95rem; }
 .card-section-title {
   font-size: 0.72rem;
   text-transform: uppercase;
@@ -870,6 +824,18 @@ body.electron-app .header-inner { padding-left: 80px; }
 }
 .item:last-child { border-bottom: none; }
 .item-title { flex: 1; font-size: 0.9rem; }
+/* Week number on a row, shown when the section itself isn't a week (By Type) */
+.item-week {
+  flex: none;
+  min-width: 1.9rem;
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--hover);
+  border-radius: 4px;
+  padding: 0.05rem 0.3rem;
+}
 /* Due date on tasks */
 .item-due {
   font-size: 0.75rem;
@@ -1111,20 +1077,11 @@ body.electron-app .header-inner { padding-left: 80px; }
   padding: 0 0.9rem 0.9rem;
   overflow-y: auto;
 }
-.week-divider {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  margin-top: 0.9rem;
-  padding-top: 0.6rem;
-  border-top: 1px solid var(--border);
-}
-.week-divider:first-child { border-top: none; }
+/* Section labels inside course columns (week number / type name) */
 .week-divider-label { font-weight: 600; font-size: 0.85rem; }
 .week-divider-dates { font-size: 0.75rem; color: var(--muted); }
-.week-divider.current .week-divider-label { color: var(--primary); }
 
-/* Collapsible week sections inside course columns */
+/* Collapsible sections inside course columns */
 .course-week-header {
   cursor: pointer;
   user-select: none;
