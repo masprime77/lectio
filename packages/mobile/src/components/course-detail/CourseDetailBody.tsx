@@ -329,7 +329,9 @@ function Chevron({ open, color }: { open: boolean; color: string }) {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  content: { padding: 16, paddingBottom: 180 },
+  // Clears the tallest floating column: the bottom-left timer stack, 24 + 56
+  // (timer) + 10 + 44 (study time) above the safe area, plus a little air.
+  content: { padding: 16, paddingBottom: 150 },
   studyTime: { fontSize: 13 },
   summary: {
     padding: 16,

@@ -419,7 +419,9 @@ export default function CoursesScreen() {
 }
 
 const styles = StyleSheet.create({
-  list: { padding: 16, gap: 12, paddingBottom: 180 },
+  // Clears the tallest floating column: the bottom-left timer stack, 24 + 56
+  // (timer) + 10 + 44 (study time) above the safe area, plus a little air.
+  list: { padding: 16, gap: 12, paddingBottom: 150 },
   emptyWrap: { alignItems: 'center', gap: 12, marginTop: 32 },
   emptyBtn: {
     height: 48,
