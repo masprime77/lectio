@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Alert } from 'react-native';
 import {
+  convertItemKind,
   courseProgress,
   deleteItem,
+  editItem as editItemFields,
   getCourses,
   getReadingTags,
   getTaskTags,
@@ -147,7 +149,15 @@ export interface UseCourseDetailResult {
   hasItems: boolean;
   editing: boolean;
   selected: Set<string>;
+  /**
+   * The one kind the selection is made of, or null when it is empty or mixed —
+   * what gates the batch "Tag" action (see selectionKind below).
+   */
+  selectionKind: Kind | null;
   picker: { kind: Kind; item: PlannerItem } | null;
+  /** Which tag list the batch tag sheet is showing; null when it is closed. */
+  batchTagKind: Kind | null;
+  weekEditorOpen: boolean;
   sortOrder: SortOrder;
   sortMenuOpen: boolean;
   groupMode: GroupMode;
@@ -167,12 +177,20 @@ export interface UseCourseDetailResult {
   editItem: (kind: Kind, item: PlannerItem) => void;
   pushAddItem: (kind: Kind) => void;
   batchDelete: () => void;
+  /** Tag every selected item (single-kind selections only), in one save. */
+  applyBatchTag: (tagId: string) => void;
+  /** Move every selected item into `week`, in one save. */
+  applyBatchWeek: (week: number) => void;
+  /** Ask which kind the selection should become, then convert it in one save. */
+  showBatchKindActions: () => void;
   handleExportCourse: () => void;
   handleSaveStudyTime: (seconds: number) => void;
   applyStatus: (kind: Kind, itemId: string | undefined, tagId: string) => void;
   pickSortOrder: (order: SortOrder) => void;
   pickGroupMode: (mode: GroupMode) => void;
   setPicker: (p: { kind: Kind; item: PlannerItem } | null) => void;
+  setBatchTagKind: (kind: Kind | null) => void;
+  setWeekEditorOpen: (open: boolean) => void;
   setSortMenuOpen: (open: boolean) => void;
   setGroupMenuOpen: (open: boolean) => void;
   setTimeEditorOpen: (open: boolean) => void;
@@ -187,6 +205,10 @@ export function useCourseDetail(
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [picker, setPicker] = useState<{ kind: Kind; item: PlannerItem } | null>(null);
+  // The batch editors: the tag sheet reuses TagPickerSheet with the whole
+  // selection behind it, the week editor is a numeric prompt.
+  const [batchTagKind, setBatchTagKind] = useState<Kind | null>(null);
+  const [weekEditorOpen, setWeekEditorOpen] = useState(false);
   const [sortOrder, pickSortOrder] = useSortOrder();
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const [groupMode, setGroupMode] = useState<GroupMode>(DEFAULT_GROUP_MODE);
@@ -243,6 +265,23 @@ export function useCourseDetail(
   const taskTags = semester ? getTaskTags(semester) : [];
   const progress = course && semester ? courseProgress(course, semester) : 0;
   const hasItems = !!course && (course.readings.length > 0 || course.tasks.length > 0);
+
+  // How the selection splits across the two sections. Selected ids that no
+  // longer exist (deleted from another device mid-edit) simply don't count.
+  const selectionKind = useMemo<Kind | null>(() => {
+    if (!course || selected.size === 0) return null;
+    const readings = course.readings.some((it) => !!it.id && selected.has(it.id));
+    const tasks = course.tasks.some((it) => !!it.id && selected.has(it.id));
+    // Batch "Tag" is offered only while the selection is all readings or all
+    // tasks: reading tags and task tags are two independent lists, so a mixed
+    // selection has no single list to pick from — merging both into one sheet
+    // would let a reading tag land on a task, which the data model doesn't
+    // allow. Deselecting one kind is a cheap way out for the user, so the
+    // action is simply disabled until the selection is one kind. Week and kind
+    // changes have no such constraint and stay available for mixed selections.
+    if (readings && tasks) return null;
+    return readings ? 'reading' : tasks ? 'task' : null;
+  }, [course, selected]);
 
   // Split a section's items into week groups, in the order they should be
   // listed: ascending by week, reversed for the week-desc sort order (the
@@ -400,6 +439,10 @@ export function useCourseDetail(
   function toggleEditing() {
     setEditing((e) => !e);
     setSelected(new Set());
+    // Leaving editing mode takes the batch editors with it — they act on a
+    // selection that no longer exists.
+    setBatchTagKind(null);
+    setWeekEditorOpen(false);
   }
 
   function toggleSelect(itemId: string) {
@@ -475,6 +518,75 @@ export function useCourseDetail(
     );
   }
 
+  // Every batch action runs over one clone of the semester and persists once:
+  // the selection can be dozens of items, and one write per item would be dozens
+  // of cloud round-trips (and dozens of chances to hit a write conflict).
+  // Editing mode and the selection stay as they are afterwards, so several
+  // batch edits can be chained on the same items.
+  const mutateSelection = useCallback(
+    (apply: (course: Course, itemIds: string[]) => void) => {
+      if (!semester || selected.size === 0) return;
+      const next: Semester = JSON.parse(JSON.stringify(semester));
+      const c = getCourses(next).find((x) => x.id === courseId);
+      if (!c) return;
+      apply(c, [...selected]);
+      onPersist(next);
+    },
+    [semester, selected, courseId, onPersist]
+  );
+
+  const applyBatchTag = useCallback(
+    (tagId: string) => {
+      const kind = selectionKind;
+      if (!kind) return;
+      mutateSelection((c, ids) => ids.forEach((id) => setItemStatus(c, kind, id, tagId)));
+      setBatchTagKind(null);
+    },
+    [mutateSelection, selectionKind]
+  );
+
+  const applyBatchWeek = useCallback(
+    (week: number) => {
+      // The id lives in exactly one of the two arrays, so the miss is a no-op —
+      // cheaper than working out each item's kind first.
+      mutateSelection((c, ids) =>
+        ids.forEach((id) => {
+          editItemFields(c, 'reading', id, { week });
+          editItemFields(c, 'task', id, { week });
+        })
+      );
+      setWeekEditorOpen(false);
+    },
+    [mutateSelection]
+  );
+
+  const applyBatchKind = useCallback(
+    (toKind: Kind) => {
+      // convertItemKind ignores the items already of that kind, so a mixed
+      // selection converges on `toKind` rather than flipping every item.
+      mutateSelection((c, ids) => ids.forEach((id) => convertItemKind(c, id, toKind)));
+    },
+    [mutateSelection]
+  );
+
+  // Two options plus Cancel — the most an Android alert can show, and the same
+  // shape as showItemActions. The message warns about the tag because the two
+  // tag lists are separate: a converted item restarts at the target kind's
+  // pending tag (see convertItemKind).
+  const showBatchKindActions = useCallback(() => {
+    const count = selected.size;
+    if (count === 0) return;
+    Alert.alert(
+      `Change kind of ${count} ${count === 1 ? 'item' : 'items'}`,
+      'Converted items go back to the pending tag of their new kind.',
+      [
+        { text: 'Make readings', onPress: () => applyBatchKind('reading') },
+        { text: 'Make tasks', onPress: () => applyBatchKind('task') },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  }, [applyBatchKind, selected]);
+
   // Export this course via the system share sheet (fresh ids are assigned on
   // import, so the exported ids are just a snapshot).
   function handleExportCourse() {
@@ -493,7 +605,10 @@ export function useCourseDetail(
     hasItems,
     editing,
     selected,
+    selectionKind,
     picker,
+    batchTagKind,
+    weekEditorOpen,
     sortOrder,
     sortMenuOpen,
     groupMode,
@@ -510,12 +625,17 @@ export function useCourseDetail(
     editItem,
     pushAddItem,
     batchDelete,
+    applyBatchTag,
+    applyBatchWeek,
+    showBatchKindActions,
     handleExportCourse,
     handleSaveStudyTime,
     applyStatus,
     pickSortOrder,
     pickGroupMode,
     setPicker,
+    setBatchTagKind,
+    setWeekEditorOpen,
     setSortMenuOpen,
     setGroupMenuOpen,
     setTimeEditorOpen,
