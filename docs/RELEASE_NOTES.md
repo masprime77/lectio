@@ -1,5 +1,11 @@
 ## Unreleased
 
+- New (mobile): editing mode on the course screen can now change the selected
+  items, not just delete them. A bar at the bottom sets a **tag**, moves
+  everything to a **week**, or converts the selection between **readings and
+  tasks**, all in one save. Selections may span both sections and both
+  groupings; setting a tag waits until the selection is all readings or all
+  tasks, since the two tag lists are separate.
 - New (mobile): the course screen groups its readings and tasks **By Week** or
   **By Type**, the same two groupings the desktop board offers, picked from a
   header button next to the sort control. By Type is what the screen always
