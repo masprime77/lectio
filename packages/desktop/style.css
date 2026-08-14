@@ -833,6 +833,23 @@ body.electron-app .header-inner { padding-left: 80px; }
 .item-title { flex: 1; font-size: 0.9rem; }
 
 /* -------------------------------------------------------------------------
+   Drag and drop: a row can be dragged onto another week, kind or course. The
+   grab cursor only shows on the row's own surface — its title, due date and
+   buttons keep the cursors their own interactions need.
+   ------------------------------------------------------------------------- */
+.item--draggable { cursor: grab; }
+.item--draggable:active { cursor: grabbing; }
+.item--dragging { opacity: 0.4; }
+/* The section under the pointer, drawn as an outline so nothing shifts while
+   the drag passes over it. */
+.drop-zone--over {
+  outline: 2px dashed var(--primary);
+  outline-offset: 2px;
+  border-radius: 6px;
+  background: var(--select-bg);
+}
+
+/* -------------------------------------------------------------------------
    Multi-select mode: a row is one selection target, so its own controls stop
    responding and the whole row lights up instead.
    ------------------------------------------------------------------------- */
