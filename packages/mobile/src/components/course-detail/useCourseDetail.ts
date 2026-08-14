@@ -31,6 +31,13 @@ export type GroupMode = 'week' | 'type';
 // screen aren't the same amount of room.)
 export const DEFAULT_GROUP_MODE: GroupMode = 'type';
 
+const GROUP_MODES: readonly string[] = ['week', 'type'];
+
+/** A saved grouping mode, or the default for anything missing/unrecognised. */
+function parseGroupMode(raw: string | null): GroupMode {
+  return raw && GROUP_MODES.includes(raw) ? (raw as GroupMode) : DEFAULT_GROUP_MODE;
+}
+
 // Week orders sort the readings/tasks by their week (display-only: returns a
 // new array, the on-disk item order is untouched). The other orders affect
 // the courses list, not item ordering, so items keep their stored order.
@@ -196,6 +203,11 @@ export function useCourseDetail(
     let active = true;
     prefs.getOpenCourseWeeks().then((raw) => {
       if (active) setOpenWeeks(parseOpenWeeks(raw));
+    });
+    // The grouping is device-local UI state, like the sort order: restored once
+    // per mount so a relaunch opens the course the way the user left it.
+    prefs.getCourseGrouping().then((raw) => {
+      if (active) setGroupMode(parseGroupMode(raw));
     });
     return () => {
       active = false;
@@ -382,6 +394,7 @@ export function useCourseDetail(
 
   const pickGroupMode = useCallback((mode: GroupMode) => {
     setGroupMode(mode);
+    void prefs.setCourseGrouping(mode);
   }, []);
 
   function toggleEditing() {
