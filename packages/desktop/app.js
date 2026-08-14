@@ -544,14 +544,55 @@ function render() {
   renderPlanner();
 }
 
-// Run a re-render while preserving the scroll position of the main content
-// area. Used by in-place mutations (e.g. adding an item) so the user isn't
-// yanked back to the top when the planner subtree is rebuilt.
+// Snapshot the scroll offset of every scroller a re-render can disturb. The
+// page itself is the outer scroller (`main.main` has no overflow of its own,
+// so the document scrolls); the Course view adds `.course-board` (horizontal)
+// and one `.course-column-body` per column (vertical, max-height: 75vh).
+// Columns are keyed by course id because the rebuilt elements are new nodes.
+function captureScroll() {
+  const doc = document.scrollingElement || document.documentElement;
+  const board = document.querySelector('.course-board');
+  const columns = {};
+  document.querySelectorAll('.course-column-body').forEach((body) => {
+    const id = body.parentElement && body.parentElement.dataset.courseId;
+    if (id) columns[id] = body.scrollTop;
+  });
+  return {
+    docTop: doc ? doc.scrollTop : 0,
+    docLeft: doc ? doc.scrollLeft : 0,
+    boardLeft: board ? board.scrollLeft : 0,
+    boardTop: board ? board.scrollTop : 0,
+    columns,
+  };
+}
+
+// Put back what captureScroll() recorded. Offsets that no longer exist (the
+// content shrank, a course was removed) are clamped by the browser.
+function restoreScroll(snap) {
+  if (!snap) return;
+  const doc = document.scrollingElement || document.documentElement;
+  if (doc) {
+    doc.scrollTop = snap.docTop;
+    doc.scrollLeft = snap.docLeft;
+  }
+  const board = document.querySelector('.course-board');
+  if (board) {
+    board.scrollLeft = snap.boardLeft;
+    board.scrollTop = snap.boardTop;
+  }
+  document.querySelectorAll('.course-column-body').forEach((body) => {
+    const id = body.parentElement && body.parentElement.dataset.courseId;
+    if (id && id in snap.columns) body.scrollTop = snap.columns[id];
+  });
+}
+
+// Run a re-render while preserving every scroll position. Used by in-place
+// mutations (adding or deleting an item, editing studied time) so the user
+// isn't yanked back to the top when the planner subtree is rebuilt.
 function renderPreservingScroll() {
-  const main = document.querySelector('main.main');
-  const top = main ? main.scrollTop : 0;
+  const snap = captureScroll();
   render();
-  if (main) main.scrollTop = top;
+  restoreScroll(snap);
 }
 
 // Return a sorted copy of `courses` per state.sortOrder. Pure: never mutates
@@ -937,6 +978,9 @@ function renderCourseView() {
   courses.forEach((course) => {
     const col = document.createElement('div');
     col.className = focused ? 'course-column--focused' : 'course-column';
+    // Lets captureScroll()/restoreScroll() match a column to its replacement
+    // across a re-render.
+    col.dataset.courseId = course.id;
     col.style.borderTopColor = course.color;
 
     const header = document.createElement('div');
@@ -1157,26 +1201,7 @@ function renderItemList(items, type, course, week) {
     titleSpan.addEventListener('click', () => editItemTitle(titleSpan, item));
     li.appendChild(titleSpan);
 
-    if (type === 'task') {
-      if (item.dueDate) {
-        // Existing due date — clickable to edit.
-        const due = document.createElement('span');
-        due.className = 'item-due';
-        due.textContent = 'due ' + item.dueDate;
-        due.title = 'Click to edit due date';
-        due.style.cursor = 'pointer';
-        due.addEventListener('click', () => editItemDueDate(due, item));
-        li.appendChild(due);
-      } else {
-        // No due date — show a hover affordance to add one.
-        const addDue = document.createElement('span');
-        addDue.className = 'item-add-due';
-        addDue.textContent = '＋ date';
-        addDue.title = 'Add due date';
-        addDue.addEventListener('click', () => editItemDueDate(addDue, item));
-        li.appendChild(addDue);
-      }
-    }
+    if (type === 'task') li.appendChild(dueElement(item));
 
     const wrapper = document.createElement('div');
     wrapper.className = 'tag-dropdown-wrapper';
@@ -1212,9 +1237,20 @@ function renderItemList(items, type, course, week) {
         opt.style.setProperty('--tag-color', tag.color);
         opt.addEventListener('click', (e) => {
           e.stopPropagation();
-          item.status = tag.id;
-          persist();
-          render();
+          if (item.status !== tag.id) {
+            item.status = tag.id;
+            persist();
+            // Only this badge and the dashboard's progress depend on an item's
+            // tag, so update them directly. Rebuilding the planner would reset
+            // the page, board and column scroll offsets for a one-word change.
+            trigger.textContent = tag.name;
+            trigger.style.setProperty('--tag-color', tag.color);
+            menu.querySelectorAll('.tag-menu-option').forEach((o) => {
+              o.classList.toggle('active', o === opt);
+            });
+            renderDashboard();
+          }
+          menu.classList.add('hidden');
         });
         menu.appendChild(opt);
       });
@@ -1241,7 +1277,9 @@ function renderItemList(items, type, course, week) {
       const idx = arr.indexOf(item);
       if (idx > -1) arr.splice(idx, 1);
       persist();
-      render();
+      // A full re-render: emptying a week removes its whole section in the
+      // Course view, so the subtree really does have to be rebuilt.
+      renderPreservingScroll();
     });
     li.appendChild(del);
 
@@ -1250,30 +1288,62 @@ function renderItemList(items, type, course, week) {
   return ul;
 }
 
-// Replace a title span with an input for inline renaming.
+// Replace a title span with an input for inline renaming. Nothing outside the
+// span depends on an item's title, so committing swaps the same span back in
+// instead of re-rendering — the surrounding scroll positions never move.
 function editItemTitle(span, item) {
   const input = document.createElement('input');
   input.type = 'text';
   input.value = item.title;
   input.className = 'item-title';
+  const restore = () => {
+    span.textContent = item.title;
+    input.replaceWith(span); // the span kept its click handler while detached
+  };
   const commit = () => {
     const v = input.value.trim();
-    if (v) item.title = v;
-    persist();
-    render();
+    if (v && v !== item.title) {
+      item.title = v;
+      persist();
+    }
+    restore();
   };
   input.addEventListener('blur', commit);
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') input.blur();
-    if (e.key === 'Escape') render();
+    if (e.key === 'Escape') {
+      // Remove the blur listener so it does not fire after replaceWith.
+      input.removeEventListener('blur', commit);
+      restore();
+    }
   });
   span.replaceWith(input);
   input.focus();
   input.select();
 }
 
+// The due-date label for a task: the date itself when set, or a low-weight
+// affordance to add one. Both open the inline editor on click.
+function dueElement(item) {
+  const el = document.createElement('span');
+  if (item.dueDate) {
+    el.className = 'item-due';
+    el.textContent = 'due ' + item.dueDate;
+    el.title = 'Click to edit due date';
+    el.style.cursor = 'pointer';
+  } else {
+    el.className = 'item-add-due';
+    el.textContent = '＋ date';
+    el.title = 'Add due date';
+  }
+  el.addEventListener('click', () => editItemDueDate(el, item));
+  return el;
+}
+
 // Replace the due-date span (or add-due affordance) with an inline
-// date input. originalSpan is the element to swap back on Escape.
+// date input. originalSpan is the element to swap back on Escape; committing
+// swaps in a freshly built label, since clearing a date changes which of the
+// two variants applies.
 function editItemDueDate(originalSpan, item) {
   const input = document.createElement('input');
   input.type = 'date';
@@ -1282,9 +1352,11 @@ function editItemDueDate(originalSpan, item) {
 
   const commit = () => {
     const v = input.value.trim();
-    item.dueDate = v || '';
-    persist();
-    render();
+    if (v !== (item.dueDate || '')) {
+      item.dueDate = v;
+      persist();
+    }
+    input.replaceWith(dueElement(item));
   };
   const cancel = () => {
     input.replaceWith(originalSpan);
@@ -2715,7 +2787,9 @@ function editStudyTimeInline(labelEl, courseId) {
     }
     setStudyTime(course, seconds);
     persist();
-    render();
+    // Studied time shows in the dashboard and in the course-column header, so
+    // a full render is the honest refresh — just not one that moves the view.
+    renderPreservingScroll();
   };
 
   const cancel = () => {
@@ -3327,7 +3401,7 @@ function submitItemFromModal() {
   const dueDate = kind === 'task' ? document.getElementById('ni-due').value || '' : undefined;
   addItem(course, kind, { title, week, dueDate });
   persist();
-  render();
+  renderPreservingScroll();
   closeModal();
 }
 
@@ -4638,7 +4712,7 @@ function openMoodleTriageModal(targetCourse, mapped, accountBaseUrl) {
       // that work when the user submits the form.
       if (!isDraft) {
         persist();
-        render();
+        renderPreservingScroll();
       }
       closeMoodleTriageModal();
       // Importing several courses in a row is the common case, so offer to go
