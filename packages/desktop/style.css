@@ -24,6 +24,9 @@
   --track: #eceff2;
   --danger: #c0392b;
   --danger-bg: #fdecea;
+  /* Multi-select: the tint of a selected item row and of the batch action bar */
+  --select-bg: #e7f0fb;
+  --select-border: #b7d4f0;
   --overlay: rgba(0, 0, 0, 0.45);
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 
@@ -65,6 +68,8 @@
   --track: #2a3138;
   --danger: #e57368;
   --danger-bg: #3a2522;
+  --select-bg: #22344a;
+  --select-border: #3d5b7d;
   --overlay: rgba(0, 0, 0, 0.6);
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 
@@ -93,6 +98,8 @@
     --track: #2a3138;
     --danger: #e57368;
     --danger-bg: #3a2522;
+    --select-bg: #22344a;
+    --select-border: #3d5b7d;
     --overlay: rgba(0, 0, 0, 0.6);
     --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 
@@ -824,6 +831,83 @@ body.electron-app .header-inner { padding-left: 80px; }
 }
 .item:last-child { border-bottom: none; }
 .item-title { flex: 1; font-size: 0.9rem; }
+
+/* -------------------------------------------------------------------------
+   Multi-select mode: a row is one selection target, so its own controls stop
+   responding and the whole row lights up instead.
+   ------------------------------------------------------------------------- */
+.item--selectable {
+  cursor: pointer;
+  padding-left: 0.35rem;
+  padding-right: 0.35rem;
+  border-radius: 6px;
+}
+.item--selectable:hover { background: var(--hover); }
+.item--selectable .item-title,
+.item--selectable .item-due,
+.item--selectable .item-add-due,
+.item--selectable .tag-dropdown-wrapper,
+.item--selectable .icon-btn {
+  pointer-events: none;
+}
+/* The row's own edit affordances read as unavailable while selecting; the tag
+   badge keeps its full weight, since it's what a batch tag change is aimed at. */
+.item--selectable .item-title { cursor: pointer; }
+.item--selectable .icon-btn { opacity: 0.35; }
+.item--selected,
+.item--selected:hover {
+  background: var(--select-bg);
+  box-shadow: inset 0 0 0 1px var(--select-border);
+}
+.item-select-box {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--muted);
+  border-radius: 4px;
+  background: var(--surface);
+  position: relative;
+}
+.item--selected .item-select-box {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+/* The tick: two borders of an empty box, rotated. */
+.item--selected .item-select-box::after {
+  content: "";
+  position: absolute;
+  left: 3.5px;
+  top: 0.5px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--on-accent);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* The batch action bar, pinned under the header controls while a selection
+   exists. */
+.selection-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--select-bg);
+  border-top: 1px solid var(--select-border);
+}
+.selection-count {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-right: 0.25rem;
+}
+.selection-bar .btn { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+/* The header toggle, lit while the mode is on. The :hover pair is needed
+   because .icon-btn:hover is defined further down the file and would otherwise
+   win at equal specificity. */
+.select-mode-btn.active { background: var(--primary); color: var(--on-accent); }
+.select-mode-btn.active:hover { background: var(--primary-hover); color: var(--on-accent); }
 /* Week number on a row, shown when the section itself isn't a week (By Type) */
 .item-week {
   flex: none;
