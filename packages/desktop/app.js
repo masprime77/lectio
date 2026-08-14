@@ -10,7 +10,7 @@ const state = {
   openCourseTypes: {}, // "courseId-reading|task" -> true when that type section is expanded
   editingId: null,    // semester id being edited in the modal (null = create mode)
   editingSemester: null, // semester object the modal's Tags tab edits (live or draft)
-  view: restoreView(), // 'week' | 'course' — restored from last session
+  view: restoreView(), // grouping inside a course column: 'week' | 'type'
   focusedCourseId: null, // null = the full course board; course id = focused mode
   sortOrder: restoreSort(), // course sort order — restored from last session
   breakdownOpen: false, // progress breakdown panel visibility
@@ -49,10 +49,13 @@ function writePref(key, value) {
   }
 }
 
-// Restore the saved view, defaulting to "week" for missing/invalid values.
+// Restore the saved grouping mode, defaulting to "week" for missing/invalid
+// values. Pre-grouping releases stored a layout here instead ('week' for the
+// old Weekly view, 'course' for All Courses); both land on the week grouping,
+// which is what the course board showed either way.
 function restoreView() {
   const v = readPref('lastActiveView');
-  return v === 'week' || v === 'course' ? v : 'week';
+  return v === 'type' ? 'type' : 'week';
 }
 
 // Restore the saved course sort order, defaulting to "progress-desc".
@@ -1520,9 +1523,9 @@ const TUTORIAL_STEPS = [
   },
   {
     id: 'views',
-    title: 'Two views',
+    title: 'Two groupings',
     description:
-      'Switch between Weekly view (readings and tasks grouped by week) and All Courses view (a column per course). Use the buttons in the header.',
+      'Every course gets its own column. The header buttons choose how a column is grouped: By Week shows one section per week, By Type shows all readings and then all tasks, with the week number on each row.',
     targetSelector: '.view-toggle',
     setup: null,
   },
@@ -2030,7 +2033,7 @@ function setupTheme() {
   // Note: the click listener is on the segmented control in the Settings modal.
 }
 
-// View toggle (Week / Course), persisted to localStorage.
+// Grouping toggle (By Week / By Type), persisted to localStorage.
 function setupViewToggle() {
   document.querySelectorAll('.view-btn').forEach((btn) => {
     btn.addEventListener('click', () => {

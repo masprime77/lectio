@@ -1,5 +1,20 @@
 ## Unreleased
 
+- Changed (desktop): the header toggle now reads **By Week** / **By Type** and
+  chooses how each course column is grouped, instead of swapping between two
+  different layouts. The course-column board — with its per-course header,
+  focus mode, sort order and "+ Add course" column — is now the only layout;
+  By Week is exactly what All Courses showed before. The old Weekly view (one
+  card per course inside each week) is gone.
+- New (desktop): **By Type** groups a course column into two collapsible
+  sections, Readings and Tasks, each listing every item of that type across the
+  whole semester with its week number on the row. Rows follow the week sort, so
+  "Weeks: high to low" reads the list newest-first. Each grouping remembers
+  which of its sections you had open, so switching back and forth doesn't
+  disturb the other one; "expand current week only" applies to the week
+  grouping and is disabled while grouping by type.
+- Fixed (desktop): a semester restored with the old saved view lands in a valid
+  grouping instead of erroring — both former layouts map to By Week.
 - Fixed (desktop): the view no longer jumps when you edit an item. Changing a
   tag, renaming an item, editing a due date, deleting an item, adding one, or
   editing studied time rebuilt the whole planner and threw you back to the top.
