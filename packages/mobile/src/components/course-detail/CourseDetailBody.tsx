@@ -5,11 +5,18 @@ import { useTheme } from '../../theme';
 import { Fab } from '../Fab';
 import { PomodoroFab } from '../../pomodoro/PomodoroFab';
 import { StudyTimeEditor } from '../../pomodoro/StudyTimeEditor';
+import { GroupMenu } from '../GroupMenu';
 import { ProgressBar } from '../ProgressBar';
 import { SortMenu } from '../SortMenu';
 import { SwipeableRow } from '../SwipeableRow';
 import { TagPickerSheet } from '../TagPickerSheet';
-import type { Kind, UseCourseDetailResult, WeekGroup } from './useCourseDetail';
+import type {
+  CollapsibleSection,
+  Kind,
+  UseCourseDetailResult,
+  WeekGroup,
+  WeekSection,
+} from './useCourseDetail';
 import type { PlannerItem, Tag } from '../../../types/lectio-core';
 
 export interface CourseDetailBodyProps {
@@ -35,7 +42,9 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
 
   const { course, readingTags, taskTags, progress, editing, selected, picker } = result;
 
-  const renderItem = (kind: Kind, item: PlannerItem, tags: Tag[]) => {
+  // `showWeek` is off inside a By Week section, where the week is already the
+  // header the row hangs under and repeating it on every row is just noise.
+  const renderItem = (kind: Kind, item: PlannerItem, tags: Tag[], showWeek = true) => {
     const tag = tags.find((t) => t.id === item.status);
     return (
       <SwipeableRow
@@ -68,7 +77,7 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
           )}
           <View style={styles.itemMain}>
             <Text style={[styles.itemTitle, { color: theme.text }]}>{item.title}</Text>
-            {typeof item.week === 'number' && (
+            {showWeek && typeof item.week === 'number' && (
               <Text style={[styles.itemWeek, { color: theme.muted }]}>Week {item.week}</Text>
             )}
             {kind === 'task' && typeof item.dueDate === 'string' && item.dueDate !== '' && (
@@ -86,39 +95,72 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
     );
   };
 
-  // A "Week N · Apr 7 – Apr 13" header with a chevron, and its items when open.
-  // Same idea as the desktop course view's collapsible .course-week-header.
+  // A "Week N · Apr 7 – Apr 13" header with a chevron. Same idea as the desktop
+  // course view's collapsible .course-week-header, and shared by both groupings
+  // — only what hangs under it differs.
+  const renderSectionHeader = (
+    section: CollapsibleSection & { title: string; range: string },
+    count: number
+  ) => (
+    <Pressable
+      onPress={() => result.toggleWeek(section)}
+      accessibilityRole="button"
+      accessibilityState={{ expanded: section.open }}
+      accessibilityLabel={`${section.title}, ${count} ${count === 1 ? 'item' : 'items'}`}
+      accessibilityHint={section.open ? 'Collapses this week' : 'Expands this week'}
+      style={({ pressed }) => [
+        styles.weekHeader,
+        { borderBottomColor: theme.border },
+        pressed && { opacity: 0.6 },
+      ]}
+    >
+      <Chevron open={section.open} color={theme.muted} />
+      <Text style={[styles.weekTitle, { color: theme.text }]}>{section.title}</Text>
+      {/* Always rendered: it doubles as the flexible spacer that pushes the
+          count to the right, and the no-week section has no date range. */}
+      <Text style={[styles.weekRange, { color: theme.muted }]}>{section.range}</Text>
+      <Text style={[styles.weekCount, { color: theme.muted }]}>{count}</Text>
+    </Pressable>
+  );
+
+  // By Type: one week of a single section (Readings or Tasks) and its items.
   const renderWeekGroup = (kind: Kind, group: WeekGroup, tags: Tag[]) => (
     <View key={group.key}>
-      <Pressable
-        onPress={() => result.toggleWeek(group)}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: group.open }}
-        accessibilityLabel={`${group.title}, ${group.items.length} ${
-          group.items.length === 1 ? 'item' : 'items'
-        }`}
-        accessibilityHint={group.open ? 'Collapses this week' : 'Expands this week'}
-        style={({ pressed }) => [
-          styles.weekHeader,
-          { borderBottomColor: theme.border },
-          pressed && { opacity: 0.6 },
-        ]}
-      >
-        <Chevron open={group.open} color={theme.muted} />
-        <Text style={[styles.weekTitle, { color: theme.text }]}>{group.title}</Text>
-        {/* Always rendered: it doubles as the flexible spacer that pushes the
-            count to the right, and the no-week group has no date range. */}
-        <Text style={[styles.weekRange, { color: theme.muted }]}>{group.range}</Text>
-        <Text style={[styles.weekCount, { color: theme.muted }]}>{group.items.length}</Text>
-      </Pressable>
+      {renderSectionHeader(group, group.items.length)}
       {group.open && group.items.map((item) => renderItem(kind, item, tags))}
+    </View>
+  );
+
+  // By Week: one week of the course, its readings then its tasks. The kind
+  // labels are the desktop week body's "Readings"/"Tasks" section titles; an
+  // empty one is dropped rather than shown as a placeholder — a phone week
+  // section is usually short and the label alone would be noise.
+  const renderWeekSection = (section: WeekSection) => (
+    <View key={section.key}>
+      {renderSectionHeader(section, section.count)}
+      {section.open && (
+        <>
+          {section.readings.length > 0 && (
+            <>
+              <Text style={[styles.kindLabel, { color: theme.muted }]}>Readings</Text>
+              {section.readings.map((item) => renderItem('reading', item, readingTags, false))}
+            </>
+          )}
+          {section.tasks.length > 0 && (
+            <>
+              <Text style={[styles.kindLabel, { color: theme.muted }]}>Tasks</Text>
+              {section.tasks.map((item) => renderItem('task', item, taskTags, false))}
+            </>
+          )}
+        </>
+      )}
     </View>
   );
 
   // "Expand all" / "Collapse all" for one section's week headers — the mobile
   // equivalent of the desktop header's chevrons-down/up buttons. Hidden when
   // there is at most one week to toggle.
-  const renderCollapseAll = (groups: WeekGroup[]) => {
+  const renderCollapseAll = (groups: CollapsibleSection[]) => {
     if (groups.length < 2) return null;
     const allOpen = groups.every((g) => g.open);
     return (
@@ -136,8 +178,80 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
     );
   };
 
-  const readingGroups = result.weekGroups('reading');
-  const taskGroups = result.weekGroups('task');
+  const byWeek = result.groupMode === 'week';
+  const readingGroups = byWeek ? [] : result.weekGroups('reading');
+  const taskGroups = byWeek ? [] : result.weekGroups('task');
+  const weekSections = byWeek ? result.weekSections() : [];
+
+  // Top level of the By Week grouping: one "Week N · date range" section per
+  // week that has anything in it, with the per-kind add buttons alongside the
+  // expand/collapse-all control (there are no per-kind sections to hang them
+  // off in this mode).
+  const renderByWeek = () => (
+    <>
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Weeks</Text>
+        <View style={styles.sectionActions}>
+          {renderCollapseAll(weekSections)}
+          <Pressable onPress={() => result.pushAddItem('reading')}>
+            <Text style={{ color: theme.accent, fontSize: 15 }}>+ Reading</Text>
+          </Pressable>
+          <Pressable onPress={() => result.pushAddItem('task')}>
+            <Text style={{ color: theme.accent, fontSize: 15 }}>+ Task</Text>
+          </Pressable>
+        </View>
+      </View>
+      {weekSections.length === 0 ? (
+        <Pressable onPress={() => result.pushAddItem('reading')}>
+          <Text style={[styles.empty, { color: theme.muted }]}>
+            No readings or tasks yet. Tap to add one.
+          </Text>
+        </Pressable>
+      ) : (
+        weekSections.map(renderWeekSection)
+      )}
+    </>
+  );
+
+  // Top level of the By Type grouping: a Readings section and a Tasks section,
+  // each split into its own week groups.
+  const renderByType = () => (
+    <>
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Readings</Text>
+        <View style={styles.sectionActions}>
+          {renderCollapseAll(readingGroups)}
+          <Pressable onPress={() => result.pushAddItem('reading')}>
+            <Text style={{ color: theme.accent, fontSize: 15 }}>+ Add</Text>
+          </Pressable>
+        </View>
+      </View>
+      {course.readings.length === 0 ? (
+        <Pressable onPress={() => result.pushAddItem('reading')}>
+          <Text style={[styles.empty, { color: theme.muted }]}>No readings. Tap to add one.</Text>
+        </Pressable>
+      ) : (
+        readingGroups.map((g) => renderWeekGroup('reading', g, readingTags))
+      )}
+
+      <View style={[styles.sectionHeader, { marginTop: 24 }]}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Tasks</Text>
+        <View style={styles.sectionActions}>
+          {renderCollapseAll(taskGroups)}
+          <Pressable onPress={() => result.pushAddItem('task')}>
+            <Text style={{ color: theme.accent, fontSize: 15 }}>+ Add</Text>
+          </Pressable>
+        </View>
+      </View>
+      {course.tasks.length === 0 ? (
+        <Pressable onPress={() => result.pushAddItem('task')}>
+          <Text style={[styles.empty, { color: theme.muted }]}>No tasks. Tap to add one.</Text>
+        </Pressable>
+      ) : (
+        taskGroups.map((g) => renderWeekGroup('task', g, taskTags))
+      )}
+    </>
+  );
 
   return (
     <>
@@ -167,41 +281,7 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
           </Pressable>
         </View>
 
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Readings</Text>
-          <View style={styles.sectionActions}>
-            {renderCollapseAll(readingGroups)}
-            <Pressable onPress={() => result.pushAddItem('reading')}>
-              <Text style={{ color: theme.accent, fontSize: 15 }}>+ Add</Text>
-            </Pressable>
-          </View>
-        </View>
-        {course.readings.length === 0 ? (
-          <Pressable onPress={() => result.pushAddItem('reading')}>
-            <Text style={[styles.empty, { color: theme.muted }]}>
-              No readings. Tap to add one.
-            </Text>
-          </Pressable>
-        ) : (
-          readingGroups.map((g) => renderWeekGroup('reading', g, readingTags))
-        )}
-
-        <View style={[styles.sectionHeader, { marginTop: 24 }]}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Tasks</Text>
-          <View style={styles.sectionActions}>
-            {renderCollapseAll(taskGroups)}
-            <Pressable onPress={() => result.pushAddItem('task')}>
-              <Text style={{ color: theme.accent, fontSize: 15 }}>+ Add</Text>
-            </Pressable>
-          </View>
-        </View>
-        {course.tasks.length === 0 ? (
-          <Pressable onPress={() => result.pushAddItem('task')}>
-            <Text style={[styles.empty, { color: theme.muted }]}>No tasks. Tap to add one.</Text>
-          </Pressable>
-        ) : (
-          taskGroups.map((g) => renderWeekGroup('task', g, taskTags))
-        )}
+        {byWeek ? renderByWeek() : renderByType()}
       </ScrollView>
       <StudyTimeEditor
         visible={result.timeEditorOpen}
@@ -214,6 +294,12 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
       {/* The "+" opens the add-sheet on the Tags tab; readings/tasks are added
           from the per-section "+ Add" controls next to the Readings/Tasks headers. */}
       <Fab onPress={() => router.push(`/add?context=tags&id=${result.semester?.id}`)} />
+      <GroupMenu
+        visible={result.groupMenuOpen}
+        current={result.groupMode}
+        onPick={result.pickGroupMode}
+        onClose={() => result.setGroupMenuOpen(false)}
+      />
       <SortMenu
         visible={result.sortMenuOpen}
         current={result.sortOrder}
@@ -275,6 +361,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   weekTitle: { fontSize: 14, fontWeight: '600' },
+  // "Readings"/"Tasks" inside a By Week section — quieter than a week header.
+  kindLabel: { fontSize: 12, fontWeight: '600', marginBottom: 6, letterSpacing: 0.3 },
   weekRange: { fontSize: 12, flex: 1 },
   weekCount: { fontSize: 12, fontVariant: ['tabular-nums'] },
   chevron: {

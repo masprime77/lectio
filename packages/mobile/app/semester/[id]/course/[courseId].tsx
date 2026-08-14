@@ -45,10 +45,12 @@ export default function CourseDetailScreen() {
               editing={result.editing}
               selectedCount={result.selected.size}
               hasItems={result.hasItems}
+              groupMode={result.groupMode}
               onToggleEditing={result.toggleEditing}
               onBatchDelete={result.batchDelete}
               onExport={result.handleExportCourse}
               onSortPress={() => result.setSortMenuOpen(true)}
+              onGroupPress={() => result.setGroupMenuOpen(true)}
             />
           ),
         }}

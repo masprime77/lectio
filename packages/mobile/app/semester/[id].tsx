@@ -370,10 +370,12 @@ export default function CoursesScreen() {
                     editing={detail.editing}
                     selectedCount={detail.selected.size}
                     hasItems={detail.hasItems}
+                    groupMode={detail.groupMode}
                     onToggleEditing={detail.toggleEditing}
                     onBatchDelete={detail.batchDelete}
                     onExport={detail.handleExportCourse}
                     onSortPress={() => detail.setSortMenuOpen(true)}
+                    onGroupPress={() => detail.setGroupMenuOpen(true)}
                   />
                 </View>
                 <CourseDetailBody result={detail} embedded />

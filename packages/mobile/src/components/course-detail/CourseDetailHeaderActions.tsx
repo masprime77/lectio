@@ -1,26 +1,32 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../../theme';
 import { ExportIcon } from '../ExportIcon';
+import { GroupButton } from '../GroupMenu';
 import { SortButton } from '../SortMenu';
+import type { GroupMode } from './useCourseDetail';
 
 export interface CourseDetailHeaderActionsProps {
   editing: boolean;
   selectedCount: number;
   hasItems: boolean;
+  groupMode: GroupMode;
   onToggleEditing: () => void;
   onBatchDelete: () => void;
   onExport: () => void;
   onSortPress: () => void;
+  onGroupPress: () => void;
 }
 
 export function CourseDetailHeaderActions({
   editing,
   selectedCount,
   hasItems,
+  groupMode,
   onToggleEditing,
   onBatchDelete,
   onExport,
   onSortPress,
+  onGroupPress,
 }: CourseDetailHeaderActionsProps) {
   const theme = useTheme();
   return editing ? (
@@ -53,6 +59,7 @@ export function CourseDetailHeaderActions({
       </Pressable>
       {hasItems && (
         <>
+          <GroupButton mode={groupMode} onPress={onGroupPress} />
           <SortButton onPress={onSortPress} />
           <Pressable onPress={onToggleEditing}>
             <Text style={{ color: theme.accent, fontSize: 15 }}>Edit</Text>
