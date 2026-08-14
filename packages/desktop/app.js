@@ -4339,10 +4339,19 @@ function suggestWeekFromDateRange(semester, dateRange) {
   return Math.max(1, Math.min(semester.weeks, week));
 }
 
+// The three triage choices, in the order they're shown. `value` is what
+// getDecision() reports and what the modal's "All weeks" buttons pass to
+// setMode(), so it stays the same vocabulary the import step already reads.
+const MOODLE_TRIAGE_MODES = [
+  { value: 'skip', label: 'Skip' },
+  { value: 'reading', label: 'Reading' },
+  { value: 'task', label: 'Task' },
+];
+
 // One row per mapped Moodle week: a disclosure chevron, section name, item
 // count, a week-number input pre-filled from suggestWeekFromDateRange
 // (editable — the user has the final say, especially when dateRange was null
-// or the guess landed outside the semester), and a mode select
+// or the guess landed outside the semester), and a mode toggle
 // (Skip / Reading / Task). Expanding the row reveals every item in the week
 // with its own checkbox, all ticked by default so an untouched row behaves
 // exactly as it did before per-item selection existed (Part D).
@@ -4386,19 +4395,42 @@ function renderMoodleTriageRow(week, semester) {
   weekInput.value = suggested || '';
   weekInput.placeholder = 'Wk';
 
-  const modeSelect = document.createElement('select');
-  modeSelect.style.cssText =
-    'padding:0.3rem 0.4rem;border:1px solid var(--border);border-radius:6px;' +
-    'font-size:0.85rem;color:var(--text);background:var(--surface);';
-  modeSelect.innerHTML =
-    '<option value="skip">Skip</option>' +
-    '<option value="reading">Reading</option>' +
-    '<option value="task">Task</option>';
+  // Three buttons rather than a <select>: the decision is what this row is
+  // for, so it stays readable without opening a menu, and it matches the
+  // mobile triage screen. Skip is active by default, the same default the
+  // confirm step filters on.
+  const modeToggle = document.createElement('div');
+  modeToggle.className = 'moodle-mode-toggle';
+  modeToggle.setAttribute('role', 'group');
+  modeToggle.setAttribute('aria-label', 'Import this week as');
+  let mode = 'skip';
+  const modeBtns = MOODLE_TRIAGE_MODES.map((m) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'moodle-mode-btn';
+    btn.textContent = m.label;
+    btn.addEventListener('click', () => setMode(m.value));
+    modeToggle.appendChild(btn);
+    return btn;
+  });
+
+  // The only place the active button is decided, so a click, the row's
+  // default and the modal's "All weeks" buttons can't disagree about which
+  // one is lit.
+  function setMode(next) {
+    mode = next;
+    modeBtns.forEach((btn, i) => {
+      const active = MOODLE_TRIAGE_MODES[i].value === next;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-pressed', String(active));
+    });
+  }
+  setMode(mode);
 
   header.appendChild(toggle);
   header.appendChild(info);
   header.appendChild(weekInput);
-  header.appendChild(modeSelect);
+  header.appendChild(modeToggle);
   el.appendChild(header);
 
   // Per-item checkboxes, collapsed by default so a long course stays scannable.
@@ -4460,13 +4492,11 @@ function renderMoodleTriageRow(week, semester) {
     setExpanded,
     getDecision: () => ({
       week,
-      mode: modeSelect.value,
+      mode,
       targetWeek: parseInt(weekInput.value, 10),
       items: week.items.filter((_, i) => checkboxes[i].checked),
     }),
-    setMode: (mode) => {
-      modeSelect.value = mode;
-    },
+    setMode,
     getWeekValue: () => parseInt(weekInput.value, 10),
     setWeekValue: (n) => {
       weekInput.value = String(n);
