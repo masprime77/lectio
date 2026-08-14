@@ -6,12 +6,11 @@
 const state = {
   semesterId: null,   // current semester file id (filename without .json)
   semester: null,     // loaded semester object
-  openWeeks: new Set(), // weeks currently expanded
-  openCourseWeeks: {}, // "courseId-week" -> true when that course-view week is expanded
+  openCourseWeeks: {}, // "courseId-week" -> true when that week section is expanded
   editingId: null,    // semester id being edited in the modal (null = create mode)
   editingSemester: null, // semester object the modal's Tags tab edits (live or draft)
   view: restoreView(), // 'week' | 'course' — restored from last session
-  focusedCourseId: null, // null = normal All Courses layout; course id = focused mode
+  focusedCourseId: null, // null = the full course board; course id = focused mode
   sortOrder: restoreSort(), // course sort order — restored from last session
   breakdownOpen: false, // progress breakdown panel visibility
   tutorialStep: 0,   // current step index (0-based)
@@ -526,10 +525,7 @@ async function populateSelector() {
 async function loadSemester(id) {
   state.semesterId = id;
   state.semester = await api.load(id);
-  state.openWeeks = new Set();
   state.focusedCourseId = null; // focus never persists across semester switches
-  const cw = currentWeek(state.semester);
-  if (cw) state.openWeeks.add(cw); // auto-expand current week
   document.getElementById('semester-select').value = id;
   writePref('lastActiveSemesterId', id); // remember for next launch
   setSemesterActionsEnabled(true);
@@ -613,16 +609,6 @@ function sortedCourses(courses) {
   // alpha-asc, week-asc and week-desc all use alphabetical (A → Z) order.
   // Any unknown/removed order (e.g. a stale 'alpha-desc') also lands here.
   return copy.sort((a, b) => a.name.localeCompare(b.name));
-}
-
-// Course order for the Weekly view. Only week-based sorts reorder courses
-// here; progress and alpha sorts apply to the dashboard/columns only, so the
-// Weekly view keeps the original on-disk course order for them.
-function sortedCoursesForWeekView(courses) {
-  if (state.sortOrder === 'week-asc' || state.sortOrder === 'week-desc') {
-    return sortedCourses(courses);
-  }
-  return [...courses]; // preserve original order
 }
 
 // Returns { readings: {done, total}, tasks: {done, total} } for one course.
@@ -843,103 +829,40 @@ function addCourseButton(extraClass = '') {
 }
 
 // ---------------------------------------------------------------------------
-// Planner: dispatches to the selected layout
+// Planner: always the course board (one column per course). The header toggle
+// no longer swaps layouts — it only chooses how the items inside a column are
+// grouped, which is threaded down as the grouping mode.
 // ---------------------------------------------------------------------------
 function renderPlanner() {
   const root = document.getElementById('planner');
-  root.className = 'planner view-' + state.view;
-  if (state.view === 'course') renderCourseView();
-  else renderWeekView();
+  root.className = 'planner group-by-' + groupMode();
+  renderCourseBoard();
+}
+
+// The active grouping mode, normalised. Anything that isn't a known mode falls
+// back to weeks, so a stale persisted value can never break a render.
+function groupMode() {
+  return 'week';
 }
 
 // ---------------------------------------------------------------------------
-// Week view: collapsible weeks, one course card per week
-// ---------------------------------------------------------------------------
-function renderWeekView() {
-  const sem = state.semester;
-  const root = document.getElementById('planner');
-  root.innerHTML = '';
-  const cw = currentWeek(sem);
-
-  // Week display order: ascending by default, descending for week-desc.
-  let weekNumbers = Array.from({ length: sem.weeks }, (_, i) => i + 1);
-  if (state.sortOrder === 'week-desc') weekNumbers = weekNumbers.reverse();
-
-  weekNumbers.forEach((week) => {
-    const isOpen = state.openWeeks.has(week);
-    const start = weekStart(sem.startDate, week);
-    const end = weekStart(sem.startDate, week);
-    end.setDate(end.getDate() + 6);
-
-    const weekEl = document.createElement('div');
-    weekEl.className = 'week' + (isOpen ? ' open' : '');
-
-    const header = document.createElement('div');
-    header.className = 'week-header';
-    header.innerHTML = `
-      <span class="chevron">${icon('chevron-right')}</span>
-      <span class="week-title">Week ${week}</span>
-      <span class="week-dates">${formatDate(start)} – ${formatDate(end)}</span>
-      ${week === cw ? '<span class="week-badge">Current</span>' : ''}
-    `;
-    header.addEventListener('click', () => toggleWeek(week));
-    weekEl.appendChild(header);
-
-    const body = document.createElement('div');
-    body.className = 'week-body';
-
-    if (sem.courses.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'week-empty';
-      empty.textContent = 'No courses yet.';
-      body.appendChild(empty);
-      body.appendChild(addCourseButton());
-    } else {
-      sortedCoursesForWeekView(sem.courses).forEach((course) => {
-        body.appendChild(renderCourseCard(course, week));
-      });
-    }
-
-    weekEl.appendChild(body);
-    root.appendChild(weekEl);
-  });
-}
-
-function toggleWeek(week) {
-  if (state.openWeeks.has(week)) state.openWeeks.delete(week);
-  else state.openWeeks.add(week);
-  renderPlanner();
-}
-
-// ---------------------------------------------------------------------------
-// Bulk expand/collapse for the active view's week sections.
-// Operates on state.openWeeks (Weekly view) or state.openCourseWeeks
-// (All Courses view) depending on which layout is showing.
+// Bulk expand/collapse for the sections inside every course column.
 // ---------------------------------------------------------------------------
 function setAllWeeksOpen(mode) {
   const sem = state.semester;
   if (!sem) return;
   const cw = currentWeek(sem);
 
-  if (state.view === 'course') {
-    sem.courses.forEach((course) => {
-      for (let w = 1; w <= sem.weeks; w++) {
-        const open = mode === 'all' || (mode === 'current' && w === cw);
-        state.openCourseWeeks[course.id + '-' + w] = open;
-      }
-    });
-  } else {
-    state.openWeeks = new Set();
-    if (mode === 'all') {
-      for (let w = 1; w <= sem.weeks; w++) state.openWeeks.add(w);
-    } else if (mode === 'current' && cw) {
-      state.openWeeks.add(cw);
+  sem.courses.forEach((course) => {
+    for (let w = 1; w <= sem.weeks; w++) {
+      const open = mode === 'all' || (mode === 'current' && w === cw);
+      state.openCourseWeeks[course.id + '-' + w] = open;
     }
-  }
+  });
   renderPlanner();
 }
 
-// Exit focused single-course mode and return to the full All Courses layout.
+// Exit focused single-course mode and return to the full course board.
 function clearCourseFocus() {
   if (!state.focusedCourseId) return;
   state.focusedCourseId = null;
@@ -948,9 +871,11 @@ function clearCourseFocus() {
 }
 
 // ---------------------------------------------------------------------------
-// Course view: one column per course, entries grouped by week dividers
+// Course board: one column per course. The column body is filled by the
+// grouping mode's own renderer; everything around it (header actions, focused
+// mode, the "+ Add course" column) is shared by every mode.
 // ---------------------------------------------------------------------------
-function renderCourseView() {
+function renderCourseBoard() {
   const sem = state.semester;
   const root = document.getElementById('planner');
   root.innerHTML = '';
@@ -1063,59 +988,7 @@ function renderCourseView() {
 
     const body = document.createElement('div');
     body.className = 'course-column-body';
-
-    // Week display order: ascending by default, descending for week-desc.
-    let weekNumbers = Array.from({ length: sem.weeks }, (_, i) => i + 1);
-    if (state.sortOrder === 'week-desc') weekNumbers = weekNumbers.reverse();
-
-    // Weeks (in display order) that have any reading or task for this course.
-    const weeks = [];
-    weekNumbers.forEach((w) => {
-      const readings = course.readings.filter((r) => r.week === w);
-      const tasks = course.tasks.filter((t) => t.week === w);
-      if (readings.length || tasks.length) weeks.push({ w, readings, tasks });
-    });
-
-    if (weeks.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'week-empty';
-      empty.textContent = 'No readings or tasks yet.';
-      body.appendChild(empty);
-      body.appendChild(addControls(course, currentWeek(sem) || 1));
-    } else {
-      weeks.forEach(({ w, readings, tasks }) => {
-        const key = course.id + '-' + w;
-        const isOpen = key in state.openCourseWeeks
-          ? state.openCourseWeeks[key]
-          : w === currentWeek(sem);
-        state.openCourseWeeks[key] = isOpen;
-
-        const start = weekStart(sem.startDate, w);
-        const end = weekStart(sem.startDate, w);
-        end.setDate(end.getDate() + 6);
-        const weekHeader = document.createElement('div');
-        weekHeader.className = 'course-week-header' + (isOpen ? ' open' : '');
-        weekHeader.innerHTML = `<span class="course-week-chevron">${icon('chevron-right')}</span>
-          <span class="week-divider-label">Week ${w}</span>
-          <span class="week-divider-dates">${formatDate(start)} – ${formatDate(end)}</span>`;
-        weekHeader.addEventListener('click', () => {
-          state.openCourseWeeks[key] = !state.openCourseWeeks[key];
-          renderCourseView();
-        });
-
-        const weekBody = document.createElement('div');
-        weekBody.className = 'course-week-body' + (isOpen ? ' open' : '');
-        weekBody.appendChild(sectionTitle('Readings'));
-        weekBody.appendChild(renderItemList(readings, 'reading', course, w));
-        weekBody.appendChild(sectionTitle('Tasks'));
-        weekBody.appendChild(renderItemList(tasks, 'task', course, w));
-        weekBody.appendChild(addControls(course, w));
-
-        body.appendChild(weekHeader);
-        body.appendChild(weekBody);
-      });
-      body.appendChild(addToWeekControl(course, sem));
-    }
+    fillColumnByWeek(body, course, sem);
 
     col.appendChild(body);
     board.appendChild(col);
@@ -1127,48 +1000,70 @@ function renderCourseView() {
   root.appendChild(board);
 }
 
+// "By Week" grouping: one collapsible "Week N · date range" section per week
+// that has any item, each listing that week's readings and tasks.
+function fillColumnByWeek(body, course, sem) {
+  // Week display order: ascending by default, descending for week-desc.
+  let weekNumbers = Array.from({ length: sem.weeks }, (_, i) => i + 1);
+  if (state.sortOrder === 'week-desc') weekNumbers = weekNumbers.reverse();
+
+  // Weeks (in display order) that have any reading or task for this course.
+  const weeks = [];
+  weekNumbers.forEach((w) => {
+    const readings = course.readings.filter((r) => r.week === w);
+    const tasks = course.tasks.filter((t) => t.week === w);
+    if (readings.length || tasks.length) weeks.push({ w, readings, tasks });
+  });
+
+  if (weeks.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'week-empty';
+    empty.textContent = 'No readings or tasks yet.';
+    body.appendChild(empty);
+    body.appendChild(addControls(course, currentWeek(sem) || 1));
+    return;
+  }
+
+  weeks.forEach(({ w, readings, tasks }) => {
+    const key = course.id + '-' + w;
+    const isOpen = key in state.openCourseWeeks
+      ? state.openCourseWeeks[key]
+      : w === currentWeek(sem);
+    state.openCourseWeeks[key] = isOpen;
+
+    const start = weekStart(sem.startDate, w);
+    const end = weekStart(sem.startDate, w);
+    end.setDate(end.getDate() + 6);
+    const weekHeader = document.createElement('div');
+    weekHeader.className = 'course-week-header' + (isOpen ? ' open' : '');
+    weekHeader.innerHTML = `<span class="course-week-chevron">${icon('chevron-right')}</span>
+      <span class="week-divider-label">Week ${w}</span>
+      <span class="week-divider-dates">${formatDate(start)} – ${formatDate(end)}</span>`;
+    weekHeader.addEventListener('click', () => {
+      state.openCourseWeeks[key] = !state.openCourseWeeks[key];
+      renderPlanner();
+    });
+
+    const weekBody = document.createElement('div');
+    weekBody.className = 'course-week-body' + (isOpen ? ' open' : '');
+    weekBody.appendChild(sectionTitle('Readings'));
+    weekBody.appendChild(renderItemList(readings, 'reading', course));
+    weekBody.appendChild(sectionTitle('Tasks'));
+    weekBody.appendChild(renderItemList(tasks, 'task', course));
+    weekBody.appendChild(addControls(course, w));
+
+    body.appendChild(weekHeader);
+    body.appendChild(weekBody);
+  });
+  body.appendChild(addToWeekControl(course, sem));
+}
+
 // A dashed "add course" column placed at the end of the course board.
 function addCourseColumn() {
   const col = document.createElement('div');
   col.className = 'course-add-column';
   col.appendChild(addCourseButton('course-add-btn'));
   return col;
-}
-
-// Horizontal divider with the week label and date range.
-function weekDivider(sem, week) {
-  const start = weekStart(sem.startDate, week);
-  const end = weekStart(sem.startDate, week);
-  end.setDate(end.getDate() + 6);
-  const el = document.createElement('div');
-  el.className = 'week-divider' + (week === currentWeek(sem) ? ' current' : '');
-  el.innerHTML = `<span class="week-divider-label">Week ${week}</span>
-    <span class="week-divider-dates">${formatDate(start)} – ${formatDate(end)}</span>`;
-  return el;
-}
-
-function renderCourseCard(course, week) {
-  const card = document.createElement('div');
-  card.className = 'course-card';
-  card.style.borderLeftColor = course.color;
-
-  const title = document.createElement('h4');
-  title.textContent = course.name;
-  title.style.color = course.color;
-  card.appendChild(title);
-
-  const readings = course.readings.filter((r) => r.week === week);
-  const tasks = course.tasks.filter((t) => t.week === week);
-
-  card.appendChild(sectionTitle('Readings'));
-  card.appendChild(renderItemList(readings, 'reading', course, week));
-  card.appendChild(addRow('reading', course, week));
-
-  card.appendChild(sectionTitle('Tasks'));
-  card.appendChild(renderItemList(tasks, 'task', course, week));
-  card.appendChild(addRow('task', course, week));
-
-  return card;
 }
 
 function sectionTitle(text) {
@@ -1178,7 +1073,9 @@ function sectionTitle(text) {
   return el;
 }
 
-function renderItemList(items, type, course, week) {
+// One <ul> of readings or tasks. `options.showWeek` prefixes each row with its
+// week number — needed by groupings whose sections aren't weeks themselves.
+function renderItemList(items, type, course, options = {}) {
   const ul = document.createElement('ul');
   ul.className = 'item-list';
   if (items.length === 0) {
@@ -2402,7 +2299,11 @@ function creditStudySeconds(session, seconds) {
   persist();
   renderDashboard();
   renderStudyTimePanel();
-  if (state.view === 'course') renderPlanner();
+  // The column headers show studied time, so the board has to be rebuilt —
+  // without yanking the user's scroll position mid-session.
+  const snap = captureScroll();
+  renderPlanner();
+  restoreScroll(snap);
 }
 
 // Stop the session. `creditPartial` is true for the user-facing stop button so
@@ -5090,7 +4991,6 @@ function clearPlannerState() {
   state.semesterId = null;
   state.semester = null;
   state.focusedCourseId = null;
-  state.openWeeks = new Set();
   state.openCourseWeeks = {};
   markDirty(false);
   setStorageOnline(true); // fs fallback is always "online"; clear any notice
