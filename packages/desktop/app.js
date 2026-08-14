@@ -409,6 +409,7 @@ const {
   getReadingTags, getTaskTags,
   isProtectedTag, addTag, deleteTag, editTag, reorderTags,
   courseProgress, uid, addCourse, deleteCourse, addItem,
+  setItemStatus, convertItemKind,
 } = window.PlannerCore;
 
 // Pomodoro timer + study time. `isRunning`/`isPaused` are aliased because
@@ -1392,15 +1393,65 @@ function selectedEntries() {
   return out;
 }
 
-// The contextual bar that tracks the selection. It appears with the first
-// selected row and leaves with the last one, so the header doesn't carry a
-// permanent toolbar; the actions it offers are added on top of this.
+// One save per batch, not one per item: persist() is debounced, so a single
+// call after the whole selection has been changed is one save cycle in the
+// header indicator.
+function commitBatch() {
+  persist();
+  renderPreservingScroll();
+}
+
+function batchSetTag(tagId) {
+  const entries = selectedEntries();
+  if (!tagId || entries.length === 0) return;
+  entries.forEach(({ course, type, item }) => setItemStatus(course, type, item.id, tagId));
+  commitBatch();
+}
+
+function batchSetWeek(week) {
+  const entries = selectedEntries();
+  if (!week || entries.length === 0) return;
+  entries.forEach(({ item }) => {
+    item.week = week;
+  });
+  commitBatch();
+}
+
+// Kind changes go through core's convertItemKind, which moves the item between
+// the two arrays and preserves its id — so the selection still points at the
+// same items afterwards and can be edited again.
+function batchSetKind(toKind) {
+  const entries = selectedEntries();
+  if (entries.length === 0) return;
+  entries.forEach(({ course, item }) => convertItemKind(course, item.id, toKind));
+  commitBatch();
+}
+
+function batchDeleteSelected() {
+  const entries = selectedEntries();
+  if (entries.length === 0) return;
+  const n = entries.length;
+  if (!confirm(`Delete ${n} selected ${n === 1 ? 'item' : 'items'}?`)) return;
+  entries.forEach(({ course, type, item }) => {
+    const arr = type === 'reading' ? course.readings : course.tasks;
+    const idx = arr.indexOf(item);
+    if (idx > -1) arr.splice(idx, 1);
+  });
+  state.selection.clear();
+  state.selectionAnchor = null;
+  commitBatch();
+}
+
+// The contextual action bar. Rebuilt on every render because its contents
+// depend on the selection (how many, which kinds) and on the semester (its tag
+// lists and week count).
 function renderSelectionBar() {
   const bar = document.getElementById('selection-bar');
   if (!bar) return;
+  const sem = state.semester;
   const entries = selectedEntries();
   bar.innerHTML = '';
-  if (!state.selecting || !state.semester || entries.length === 0) {
+  if (!state.selecting || !sem || entries.length === 0) {
     bar.classList.add('hidden');
     return;
   }
@@ -1410,6 +1461,63 @@ function renderSelectionBar() {
   count.className = 'selection-count';
   count.textContent = `${entries.length} selected`;
   bar.appendChild(count);
+
+  // Reading tags and task tags are two separate lists, so a selection that
+  // mixes readings and tasks has no single list to offer — merging them would
+  // let a reading tag land on a task. The control is disabled until the
+  // selection is one kind rather than guessing; deselecting the odd rows (or
+  // converting them first) is the way through.
+  const kinds = new Set(entries.map((e) => e.type));
+  const oneKind = kinds.size === 1 ? entries[0].type : null;
+
+  const tagSel = document.createElement('select');
+  tagSel.className = 'selection-select';
+  tagSel.appendChild(new Option('Set tag…', ''));
+  if (oneKind) {
+    const tags = oneKind === 'reading' ? getReadingTags(sem) : getTaskTags(sem);
+    ['pending', 'done'].forEach((section) => {
+      const sectionTags = tags.filter((t) => t.section === section);
+      if (sectionTags.length === 0) return;
+      const group = document.createElement('optgroup');
+      group.label = section === 'pending' ? 'Pending' : 'Done';
+      sectionTags.forEach((tag) => group.appendChild(new Option(tag.name, tag.id)));
+      tagSel.appendChild(group);
+    });
+    tagSel.title = 'Set the tag of every selected item';
+  } else {
+    tagSel.disabled = true;
+    tagSel.title = 'Select only readings or only tasks to set a tag — the two have different tags';
+  }
+  tagSel.addEventListener('change', () => batchSetTag(tagSel.value));
+  bar.appendChild(tagSel);
+
+  const weekSel = document.createElement('select');
+  weekSel.className = 'selection-select';
+  weekSel.title = 'Move every selected item to a week';
+  weekSel.appendChild(new Option('Move to week…', ''));
+  for (let w = 1; w <= sem.weeks; w++) weekSel.appendChild(new Option('Week ' + w, String(w)));
+  weekSel.addEventListener('change', () => batchSetWeek(parseInt(weekSel.value, 10)));
+  bar.appendChild(weekSel);
+
+  const kindBtn = (toKind, label) => {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-small';
+    btn.textContent = label;
+    // Nothing to do when everything selected already is that kind.
+    btn.disabled = oneKind === toKind;
+    btn.title = `Turn every selected item into a ${toKind} (its tag resets to pending)`;
+    btn.addEventListener('click', () => batchSetKind(toKind));
+    return btn;
+  };
+  bar.appendChild(kindBtn('reading', 'Make readings'));
+  bar.appendChild(kindBtn('task', 'Make tasks'));
+
+  const del = document.createElement('button');
+  del.className = 'btn btn-small selection-delete';
+  del.textContent = 'Delete';
+  del.title = 'Delete every selected item';
+  del.addEventListener('click', batchDeleteSelected);
+  bar.appendChild(del);
 
   const clear = document.createElement('button');
   clear.className = 'btn btn-small selection-clear';
