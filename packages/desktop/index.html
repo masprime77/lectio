@@ -124,6 +124,8 @@
           <button type="button" id="collapse-all-btn" class="collapse-btn" title="Collapse all sections" aria-label="Collapse all sections"></button>
           <button type="button" id="expand-current-btn" class="collapse-btn" title="Expand current week only" aria-label="Expand current week only"></button>
         </div>
+        <button type="button" id="select-mode-btn" class="icon-btn select-mode-btn"
+                title="Select items (Esc to leave)" aria-label="Select items" aria-pressed="false"></button>
         <select id="sort-select" title="Sort courses" aria-label="Sort courses">
           <option value="week-desc">Weeks: high to low</option>
           <option value="week-asc">Weeks: low to high</option>
@@ -135,6 +137,13 @@
         <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings"></button>
       </div>
     </div>
+
+    <!-- Batch actions for the course board's multi-select mode. Inside the
+         header so it stays put while the board scrolls; app.js builds its
+         contents (the tag list and the week numbers come from the semester)
+         and shows it only while something is selected. -->
+    <div id="selection-bar" class="selection-bar hidden" role="toolbar"
+         aria-label="Actions for the selected items"></div>
   </header>
 
   <!-- Offline notice: shown when a signed-in Supabase call hits a connectivity
