@@ -1057,6 +1057,9 @@ function fillColumnByWeek(body, course, sem) {
     empty.textContent = 'No readings or tasks yet.';
     body.appendChild(empty);
     body.appendChild(addControls(course, currentWeek(sem) || 1));
+    // A course with no items has no week sections, so the whole (empty) column
+    // body is the drop zone — it is the only way to drag the first item in.
+    markDropZone(body, course, { week: currentWeek(sem) || 1 });
     return;
   }
 
@@ -1083,10 +1086,20 @@ function fillColumnByWeek(body, course, sem) {
     const weekBody = document.createElement('div');
     weekBody.className = 'course-week-body' + (isOpen ? ' open' : '');
     weekBody.appendChild(sectionTitle('Readings'));
-    weekBody.appendChild(renderItemList(readings, 'reading', course));
+    weekBody.appendChild(
+      markDropZone(renderItemList(readings, 'reading', course), course, { week: w, kind: 'reading' })
+    );
     weekBody.appendChild(sectionTitle('Tasks'));
-    weekBody.appendChild(renderItemList(tasks, 'task', course));
+    weekBody.appendChild(
+      markDropZone(renderItemList(tasks, 'task', course), course, { week: w, kind: 'task' })
+    );
     weekBody.appendChild(addControls(course, w));
+
+    // Three nested zones per week: either item list moves the item to that week
+    // AND that kind, the body around them keeps the kind, and the header is the
+    // only target a collapsed week has (its body is display:none).
+    markDropZone(weekHeader, course, { week: w });
+    markDropZone(weekBody, course, { week: w });
 
     body.appendChild(weekHeader);
     body.appendChild(weekBody);
@@ -1133,6 +1146,11 @@ function fillColumnByType(body, course, sem) {
     const section = document.createElement('div');
     section.className = 'course-week-body' + (isOpen ? ' open' : '');
     section.appendChild(renderItemList(items, type, course, { showWeek: true }));
+
+    // The sections are kinds here, so a drop converts the item and leaves its
+    // week alone. The header covers the section while it is collapsed.
+    markDropZone(header, course, { kind: type });
+    markDropZone(section, course, { kind: type });
 
     body.appendChild(header);
     body.appendChild(section);
@@ -1188,6 +1206,17 @@ function renderItemList(items, type, course, options = {}) {
       box.setAttribute('aria-hidden', 'true');
       li.appendChild(box);
       li.addEventListener('click', (e) => onSelectRowClick(e, li, item));
+    }
+
+    // Rows are draggable outside selection mode only: there a row is a
+    // selection target, and the batch bar already moves items between weeks,
+    // kinds and (through the tag list) whole groups.
+    if (!state.selecting && item.id) {
+      li.draggable = true;
+      li.classList.add('item--draggable');
+      li.dataset.dragItemId = item.id;
+      li.dataset.dragKind = type;
+      li.dataset.dragCourseId = course.id;
     }
 
     if (options.showWeek) {
@@ -1527,6 +1556,157 @@ function renderSelectionBar() {
   bar.appendChild(clear);
 }
 
+// ---------------------------------------------------------------------------
+// Item drag and drop: drag a row onto a section to move it there. What a drop
+// changes depends on what the section is — a week (By Week) sets the week, a
+// type section (By Type) sets the kind, and the column it belongs to sets the
+// course — so the same gesture covers all three moves in either grouping.
+//
+// The drag carries a private dataTransfer type. That is what keeps it apart
+// from the window-wide file drop in setupDragAndDrop(): that handler bails on
+// anything wearing this type, and this one only ever acts on drags that do.
+// ---------------------------------------------------------------------------
+const ITEM_DND_TYPE = 'application/x-lectio-item';
+
+// The row in flight ({ courseId, itemId, kind }), and the zone currently lit up
+// under the pointer. Both are cleared by clearItemDrag() on every exit path —
+// a drop, an Escape, or a release outside any zone.
+let itemDrag = null;
+let itemDropZone = null;
+
+// True for our own item drags. `types` is readable during dragover, where
+// getData() is not, so the type doubles as the "this is internal" marker.
+function isItemDrag(e) {
+  return !!e.dataTransfer && [...e.dataTransfer.types].includes(ITEM_DND_TYPE);
+}
+
+// Tag an element as a place items can be dropped. A missing week or kind means
+// "whatever the dragged item already has", which is how a By Week section
+// leaves the kind alone and a By Type section leaves the week alone.
+function markDropZone(el, course, { week = null, kind = null } = {}) {
+  el.dataset.dropZone = '1';
+  el.dataset.dropCourseId = course.id;
+  if (week != null) el.dataset.dropWeek = String(week);
+  if (kind) el.dataset.dropKind = kind;
+  return el;
+}
+
+function setItemDropZone(el) {
+  if (itemDropZone === el) return;
+  if (itemDropZone) itemDropZone.classList.remove('drop-zone--over');
+  itemDropZone = el;
+  if (itemDropZone) itemDropZone.classList.add('drop-zone--over');
+}
+
+// The single exit path: no drag state and no leftover highlight survive it, so
+// an aborted drag (Escape, or a release over nothing) leaves the board clean.
+function clearItemDrag() {
+  setItemDropZone(null);
+  document
+    .querySelectorAll('.item--dragging')
+    .forEach((li) => li.classList.remove('item--dragging'));
+  itemDrag = null;
+}
+
+// Resolve a zone into the move dropping there would make, or null when there
+// is nothing to do — the zone belongs to a course or item that no longer
+// exists, or it is the group the item already sits in.
+function plannedItemMove(zone) {
+  const sem = state.semester;
+  if (!itemDrag || !sem || !zone) return null;
+  const fromCourse = sem.courses.find((c) => c.id === itemDrag.courseId);
+  const toCourse = sem.courses.find((c) => c.id === zone.dataset.dropCourseId);
+  if (!fromCourse || !toCourse) return null;
+  const fromKind = itemDrag.kind;
+  const fromArr = (fromKind === 'reading' ? fromCourse.readings : fromCourse.tasks) || [];
+  const item = fromArr.find((it) => it.id === itemDrag.itemId);
+  if (!item) return null;
+  const kind = zone.dataset.dropKind || fromKind;
+  const week = zone.dataset.dropWeek ? Number(zone.dataset.dropWeek) : item.week;
+  if (toCourse === fromCourse && kind === fromKind && week === item.week) return null;
+  return { fromCourse, toCourse, item, fromKind, kind, week };
+}
+
+// Apply a resolved move. The item leaves its source array and lands in the
+// destination course's list for the kind it still is; only then can
+// convertItemKind() change the kind, since it looks the item up inside the
+// course that owns it. One persist(), one re-render.
+function applyItemMove({ fromCourse, toCourse, item, fromKind, kind, week }) {
+  const fromArr = fromKind === 'reading' ? fromCourse.readings : fromCourse.tasks;
+  const idx = fromArr.indexOf(item);
+  if (idx === -1) return;
+  fromArr.splice(idx, 1);
+  const key = fromKind === 'reading' ? 'readings' : 'tasks';
+  if (!Array.isArray(toCourse[key])) toCourse[key] = [];
+  toCourse[key].push(item);
+  item.week = week;
+  if (kind !== fromKind) convertItemKind(toCourse, item.id, kind);
+
+  // Open the section the item just landed in — dropping onto a collapsed week
+  // header is a normal move, and the item would otherwise vanish from view.
+  state.openCourseWeeks[toCourse.id + '-' + week] = true;
+  state.openCourseTypes[toCourse.id + '-' + kind] = true;
+
+  persist();
+  renderPreservingScroll();
+}
+
+// Delegated on #planner (which outlives every board rebuild) so nothing has to
+// be rewired per render; the rows and zones only carry data attributes.
+function setupItemDragDrop() {
+  const root = document.getElementById('planner');
+  if (!root) return;
+
+  root.addEventListener('dragstart', (e) => {
+    const li = e.target.closest && e.target.closest('li.item[data-drag-item-id]');
+    if (!li) return;
+    itemDrag = {
+      courseId: li.dataset.dragCourseId,
+      itemId: li.dataset.dragItemId,
+      kind: li.dataset.dragKind,
+    };
+    li.classList.add('item--dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData(ITEM_DND_TYPE, JSON.stringify(itemDrag));
+  });
+
+  root.addEventListener('dragover', (e) => {
+    if (!isItemDrag(e)) return;
+    const zone = e.target.closest ? e.target.closest('[data-drop-zone]') : null;
+    // Zones nest (a week's item lists sit inside its body): closest() picks the
+    // innermost, which is always the most specific destination.
+    const move = plannedItemMove(zone);
+    setItemDropZone(move ? zone : null);
+    if (!move) return;
+    // Only a real move accepts the drop; anywhere else keeps the "no drop"
+    // cursor and releasing there does nothing.
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  });
+
+  // Leaving the planner entirely (moving between zones is handled above).
+  root.addEventListener('dragleave', (e) => {
+    if (!isItemDrag(e)) return;
+    if (!root.contains(e.relatedTarget)) setItemDropZone(null);
+  });
+
+  root.addEventListener('drop', (e) => {
+    if (!isItemDrag(e)) return;
+    e.preventDefault();
+    const zone = e.target.closest ? e.target.closest('[data-drop-zone]') : null;
+    const move = plannedItemMove(zone);
+    clearItemDrag();
+    if (move) applyItemMove(move);
+  });
+
+  // dragend is the catch-all for abandoned drags. It is bound to the document
+  // because a drop re-renders the board, detaching the source row before the
+  // event could bubble through #planner.
+  document.addEventListener('dragend', () => {
+    if (itemDrag || itemDropZone) clearItemDrag();
+  });
+}
+
 // Replace a title span with an input for inline renaming. Nothing outside the
 // span depends on an item's title, so committing swaps the same span back in
 // instead of re-rendering — the surrounding scroll positions never move.
@@ -1535,7 +1715,13 @@ function editItemTitle(span, item) {
   input.type = 'text';
   input.value = item.title;
   input.className = 'item-title';
+  // A draggable row would rather be dragged than let its input be selected, so
+  // the row stops being draggable for as long as the editor is open.
+  const row = span.closest('li.item');
+  const wasDraggable = !!row && row.draggable;
+  if (wasDraggable) row.draggable = false;
   const restore = () => {
+    if (wasDraggable) row.draggable = true;
     span.textContent = item.title;
     input.replaceWith(span); // the span kept its click handler while detached
   };
@@ -1589,7 +1775,14 @@ function editItemDueDate(originalSpan, item) {
   input.value = item.dueDate || '';
   input.className = 'item-due item-due-input';
 
+  // Same as the title editor: the row's drag would otherwise swallow clicks
+  // meant for the date input.
+  const row = originalSpan.closest('li.item');
+  const wasDraggable = !!row && row.draggable;
+  if (wasDraggable) row.draggable = false;
+
   const commit = () => {
+    if (wasDraggable) row.draggable = true;
     const v = input.value.trim();
     if (v !== (item.dueDate || '')) {
       item.dueDate = v;
@@ -1598,6 +1791,7 @@ function editItemDueDate(originalSpan, item) {
     input.replaceWith(dueElement(item));
   };
   const cancel = () => {
+    if (wasDraggable) row.draggable = true;
     input.replaceWith(originalSpan);
   };
 
@@ -2112,6 +2306,7 @@ async function init() {
   setupAddItem();
   setupTutorial();
   setupDragAndDrop();
+  setupItemDragDrop();
 
   // Auto-launch on first run (no tutorial seen and at least one semester exists).
   if (!hasTutorialBeenSeen()) {
@@ -3323,11 +3518,16 @@ async function importCourseFromModal() {
 // Accept .lectio.json files dropped anywhere on the window (semester or course).
 function setupDragAndDrop() {
   document.body.addEventListener('dragover', (e) => {
+    // An item being dragged around the board is not a file drop: leave it to
+    // setupItemDragDrop(), which decides where it may land. Claiming it here
+    // would force a "copy" cursor over the whole window.
+    if (isItemDrag(e)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
   });
 
   document.body.addEventListener('drop', async (e) => {
+    if (isItemDrag(e)) return;
     e.preventDefault();
     const file = e.dataTransfer.files[0];
     if (!file) return;
