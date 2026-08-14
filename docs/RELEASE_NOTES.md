@@ -1,5 +1,10 @@
 ## Unreleased
 
+- Changed (desktop): each week in the Moodle import dialog now picks
+  **Skip / Reading / Task** with three segmented buttons instead of a
+  drop-down, matching the mobile import screen. The choice is readable without
+  opening a menu, and the "All weeks" buttons light up the matching button in
+  every row, so a batch change is visible where the decision is made.
 - Fixed (mobile): weeks left on **Skip** in the Moodle import screen were still
   imported. The confirm step treated a week with no recorded decision as
   importable while the rows drew it as skipped; both now read the same default,
