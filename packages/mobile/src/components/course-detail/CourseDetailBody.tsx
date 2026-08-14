@@ -1,8 +1,24 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { formatHoursMinutes, getCourseStudySeconds } from '@lectio/core/pomodoro-core';
 import { useTheme } from '../../theme';
 import { Fab } from '../Fab';
+import {
+  NumericKeyboardDoneBar,
+  NUMERIC_KEYBOARD_ACCESSORY_ID,
+} from '../NumericKeyboardDoneBar';
 import { PomodoroFab } from '../../pomodoro/PomodoroFab';
 import { StudyTimeEditor } from '../../pomodoro/StudyTimeEditor';
 import { GroupMenu } from '../GroupMenu';
@@ -40,7 +56,8 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
     );
   }
 
-  const { course, readingTags, taskTags, progress, editing, selected, picker } = result;
+  const { course, readingTags, taskTags, progress, editing, selected, selectionKind, picker } =
+    result;
 
   // `showWeek` is off inside a By Week section, where the week is already the
   // header the row hangs under and repeating it on every row is just noise.
@@ -266,7 +283,7 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
           <ProgressBar value={progress} color={course.color} />
           <Text style={[styles.hint, { color: theme.muted }]}>
             {editing
-              ? 'Tap items to select them, then delete.'
+              ? 'Tap items to select them, then edit or delete them together.'
               : 'Tap an item to set its tag. Long-press to edit or delete.'}
           </Text>
           <Pressable
@@ -283,6 +300,21 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
 
         {byWeek ? renderByWeek() : renderByType()}
       </ScrollView>
+      {/* Pinned rather than placed in the ScrollView: selecting items means
+          scrolling, and a bar that scrolls away would send the user back to the
+          top to act on what they just picked. Deleting stays in the header,
+          away from the attribute edits. */}
+      {editing && (
+        <BatchBar
+          count={selected.size}
+          /* Mixed selections have no single tag list to offer — see
+             selectionKind in useCourseDetail. */
+          canTag={selectionKind !== null}
+          onTag={() => selectionKind && result.setBatchTagKind(selectionKind)}
+          onWeek={() => result.setWeekEditorOpen(true)}
+          onKind={result.showBatchKindActions}
+        />
+      )}
       <StudyTimeEditor
         visible={result.timeEditorOpen}
         courseName={course.name}
@@ -290,10 +322,17 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
         onSave={result.handleSaveStudyTime}
         onClose={() => result.setTimeEditorOpen(false)}
       />
-      <PomodoroFab semester={result.semester} defaultCourseId={course.id} />
-      {/* The "+" opens the add-sheet on the Tags tab; readings/tasks are added
-          from the per-section "+ Add" controls next to the Readings/Tasks headers. */}
-      <Fab onPress={() => router.push(`/add?context=tags&id=${result.semester?.id}`)} />
+      {/* The floating buttons would sit under the batch bar (and neither starting
+          a timer nor adding an item belongs in selection mode), so they step
+          aside while editing. */}
+      {!editing && (
+        <>
+          <PomodoroFab semester={result.semester} defaultCourseId={course.id} />
+          {/* The "+" opens the add-sheet on the Tags tab; readings/tasks are added
+              from the per-section "+ Add" controls next to the Readings/Tasks headers. */}
+          <Fab onPress={() => router.push(`/add?context=tags&id=${result.semester?.id}`)} />
+        </>
+      )}
       <GroupMenu
         visible={result.groupMenuOpen}
         current={result.groupMode}
@@ -314,7 +353,193 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
         onPick={(tagId) => result.applyStatus(picker!.kind, picker!.item.id, tagId)}
         onClose={() => result.setPicker(null)}
       />
+      {/* The same sheet, aimed at the whole selection: one kind, so one tag
+          list, and no current tag to check off (the items may disagree). */}
+      <TagPickerSheet
+        visible={editing && !!result.batchTagKind}
+        title={`${selected.size} ${selected.size === 1 ? 'item' : 'items'}`}
+        tags={result.batchTagKind === 'task' ? taskTags : readingTags}
+        currentStatus=""
+        onPick={result.applyBatchTag}
+        onClose={() => result.setBatchTagKind(null)}
+      />
+      <BatchWeekSheet
+        visible={editing && result.weekEditorOpen}
+        count={selected.size}
+        maxWeek={result.semester?.weeks}
+        onSave={result.applyBatchWeek}
+        onClose={() => result.setWeekEditorOpen(false)}
+      />
     </>
+  );
+}
+
+/**
+ * The batch action bar shown while editing. Delete lives in the header, next to
+ * Done — keeping the destructive action off the row of attribute edits people
+ * tap repeatedly.
+ */
+function BatchBar({
+  count,
+  canTag,
+  onTag,
+  onWeek,
+  onKind,
+}: {
+  count: number;
+  canTag: boolean;
+  onTag: () => void;
+  onWeek: () => void;
+  onKind: () => void;
+}) {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const empty = count === 0;
+  const action = (label: string, onPress: () => void, disabled: boolean) => (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      hitSlop={8}
+      style={({ pressed }) => [styles.batchAction, pressed && { opacity: 0.6 }]}
+    >
+      <Text style={[styles.batchActionText, { color: disabled ? theme.muted : theme.accent }]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+  return (
+    <View
+      style={[
+        styles.batchBar,
+        {
+          backgroundColor: theme.surface,
+          borderTopColor: theme.border,
+          paddingBottom: insets.bottom + 10,
+        },
+      ]}
+    >
+      <Text style={[styles.batchCount, { color: theme.muted }]}>
+        {empty ? 'Select items' : `${count} selected`}
+      </Text>
+      {action('Tag', onTag, empty || !canTag)}
+      {action('Week', onWeek, empty)}
+      {action('Kind', onKind, empty)}
+    </View>
+  );
+}
+
+/**
+ * "Move these items to week N". Same sheet shape as StudyTimeEditor, with the
+ * number-pad + Done-accessory input the Moodle triage screen uses (iOS's
+ * number pad has no return key of its own).
+ */
+function BatchWeekSheet({
+  visible,
+  count,
+  maxWeek,
+  onSave,
+  onClose,
+}: {
+  visible: boolean;
+  count: number;
+  maxWeek?: number;
+  onSave: (week: number) => void;
+  onClose: () => void;
+}) {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const [text, setText] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  // Re-seed on every open: the field is a destination, not a current value.
+  useEffect(() => {
+    if (!visible) return;
+    setText('');
+    setError(null);
+  }, [visible]);
+
+  function handleSave() {
+    const week = parseInt(text, 10);
+    if (!Number.isInteger(week) || week < 1 || (maxWeek !== undefined && week > maxWeek)) {
+      setError(maxWeek ? `Enter a week between 1 and ${maxWeek}.` : 'Enter a week number.');
+      return;
+    }
+    onSave(week);
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={styles.avoider}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <Pressable style={styles.backdrop} onPress={onClose}>
+          <Pressable
+            style={[
+              styles.sheet,
+              { backgroundColor: theme.surface, paddingBottom: insets.bottom + 16 },
+            ]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={[styles.sheetTitle, { color: theme.text }]}>Move to week</Text>
+            <Text style={[styles.sheetSub, { color: theme.muted }]}>
+              {count} {count === 1 ? 'item' : 'items'}
+            </Text>
+            <TextInput
+              value={text}
+              onChangeText={(v) => {
+                setText(v);
+                if (error) setError(null);
+              }}
+              autoFocus
+              keyboardType="number-pad"
+              inputAccessoryViewID={NUMERIC_KEYBOARD_ACCESSORY_ID}
+              placeholder={maxWeek ? `1 – ${maxWeek}` : 'Week'}
+              placeholderTextColor={theme.muted}
+              accessibilityLabel="Week number"
+              style={[
+                styles.sheetInput,
+                {
+                  color: theme.text,
+                  backgroundColor: theme.surfaceAlt,
+                  borderColor: error ? ERROR_COLOR : theme.border,
+                },
+              ]}
+            />
+            {error ? <Text style={[styles.sheetError, { color: ERROR_COLOR }]}>{error}</Text> : null}
+            <View style={styles.sheetActions}>
+              <Pressable
+                onPress={onClose}
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  styles.sheetBtn,
+                  { borderColor: theme.border, borderWidth: StyleSheet.hairlineWidth },
+                  pressed && { opacity: 0.6 },
+                ]}
+              >
+                <Text style={[styles.sheetBtnText, { color: theme.text }]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleSave}
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  styles.sheetBtn,
+                  { backgroundColor: theme.accent },
+                  pressed && { opacity: 0.8 },
+                ]}
+              >
+                <Text style={[styles.sheetBtnText, { color: '#fff', fontWeight: '600' }]}>
+                  Move
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
+      <NumericKeyboardDoneBar />
+    </Modal>
   );
 }
 
@@ -326,6 +551,9 @@ function Chevron({ open, color }: { open: boolean; color: string }) {
     />
   );
 }
+
+// The same red the rest of the app uses for destructive/invalid states.
+const ERROR_COLOR = '#ef4444';
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
@@ -395,4 +623,44 @@ const styles = StyleSheet.create({
   tagWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   tagDot: { width: 10, height: 10, borderRadius: 5 },
   tagName: { fontSize: 13 },
+
+  batchBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 18,
+    paddingTop: 12,
+    paddingHorizontal: 20,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  // Also the flexible spacer that pushes the actions to the right.
+  batchCount: { fontSize: 13, flex: 1 },
+  batchAction: { paddingVertical: 4 },
+  batchActionText: { fontSize: 15, fontWeight: '600' },
+
+  avoider: { flex: 1 },
+  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.4)' },
+  sheet: {
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingTop: 16,
+    paddingHorizontal: 16,
+  },
+  sheetTitle: { fontSize: 17, fontWeight: '600', textAlign: 'center' },
+  sheetSub: { fontSize: 13, textAlign: 'center', marginTop: 2, marginBottom: 12 },
+  sheetInput: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  sheetError: { fontSize: 12, marginTop: 6 },
+  sheetActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  sheetBtn: { flex: 1, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  sheetBtnText: { fontSize: 16 },
 });
