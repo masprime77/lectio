@@ -476,8 +476,11 @@
           <button type="button" id="set-moodle-add-cancel" class="btn btn-small">Cancel</button>
         </div>
         <div id="set-moodle-accounts-list" style="display:flex;flex-direction:column;gap:0.4rem;"></div>
-        <div style="display:flex;justify-content:flex-end;">
+        <div style="display:flex;justify-content:flex-end;gap:0.4rem;">
           <button type="button" id="set-moodle-import" class="btn btn-small hidden">Import courses…</button>
+          <!-- Same picker, opened straight into the per-item mode — the mode
+               toggle inside the picker can still switch back. -->
+          <button type="button" id="set-moodle-import-raw" class="btn btn-small hidden">Raw import…</button>
         </div>
         <span id="set-moodle-status-line" class="hidden" style="font-size:0.8rem;"></span>
       </div>
@@ -618,6 +621,22 @@
           style="display:block;width:100%;margin-top:0.25rem;" />
       </label>
 
+      <!-- Which triage screen the fetched content lands in. Lives here rather
+           than at each entry point so every one of them (Settings, a course's
+           own import icon, the New Semester modal) offers both modes without
+           duplicating the account/course picker. -->
+      <div id="moodle-course-mode-row" class="hidden" style="margin-top:0.75rem;font-size:0.85rem;color:var(--muted);">
+        Import mode
+        <!-- Wrapped so the inline-flex toggle sits on its own line under the
+             label, like the selects above it. -->
+        <div style="margin-top:0.25rem;">
+          <div id="moodle-course-mode" class="moodle-mode-toggle" role="group" aria-label="Import mode">
+            <button type="button" class="moodle-mode-btn" data-mode="sections">By section</button>
+            <button type="button" class="moodle-mode-btn" data-mode="raw">Every item</button>
+          </div>
+        </div>
+      </div>
+
       <div class="modal-actions">
         <button type="button" id="moodle-course-cancel" class="btn">Cancel</button>
         <button type="button" id="moodle-course-next" class="btn btn-primary" disabled>Fetch content</button>
@@ -650,6 +669,38 @@
       <div class="modal-actions">
         <button type="button" id="moodle-triage-cancel" class="btn">Cancel</button>
         <button type="button" id="moodle-triage-confirm" class="btn btn-primary">Import selected</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Moodle: raw per-item triage/import (Phase 16 Part E). Every importable
+       module of the course, flat, each with its own week and its own type. -->
+  <div id="moodle-raw-overlay" class="modal-overlay hidden">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="moodle-raw-title" style="max-width:720px;">
+      <h2 id="moodle-raw-title">Import items</h2>
+      <p id="moodle-raw-source" style="font-size:0.8rem;color:var(--muted);margin:-0.5rem 0 0.75rem;"></p>
+      <p id="moodle-raw-error" class="hidden" style="font-size:0.85rem;color:var(--danger);margin:-0.5rem 0 0.75rem;"></p>
+
+      <!-- Batch helpers. A 60-item course is unusable one row at a time, so
+           the type buttons and "Weeks from sections" apply to every row the
+           filter currently shows; rows the filter hides keep whatever they
+           were set to and are still imported. -->
+      <div class="moodle-raw-controls">
+        <input type="search" id="moodle-raw-filter" class="moodle-raw-filter" placeholder="Filter by name…"
+               aria-label="Filter items by name" />
+        <span style="font-size:0.75rem;color:var(--muted);">All shown:</span>
+        <button type="button" id="moodle-raw-all-skip" class="btn btn-small">Skip</button>
+        <button type="button" id="moodle-raw-all-reading" class="btn btn-small">Reading</button>
+        <button type="button" id="moodle-raw-all-task" class="btn btn-small">Task</button>
+        <button type="button" id="moodle-raw-reset-weeks" class="btn btn-small">Weeks from sections</button>
+      </div>
+
+      <div id="moodle-raw-list" style="max-height:50vh;overflow-y:auto;"></div>
+      <p id="moodle-raw-empty" class="moodle-raw-empty hidden">No items match that filter.</p>
+      <p id="moodle-raw-summary" class="moodle-raw-summary"></p>
+      <div class="modal-actions">
+        <button type="button" id="moodle-raw-cancel" class="btn">Cancel</button>
+        <button type="button" id="moodle-raw-confirm" class="btn btn-primary">Import selected</button>
       </div>
     </div>
   </div>

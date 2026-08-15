@@ -18,6 +18,21 @@
 - Fixed (mobile): backing out of the Moodle import after choosing "+ New
   course" no longer creates a second empty course when you fetch again — the
   form points at the course it just created instead of making another.
+- New (desktop): the Moodle import can now run in a **raw, per-item mode**. The
+  picker gained an "Import mode" toggle (By section / Every item), and Settings
+  a matching "Raw import…" button; both reuse the same account, course and
+  target selection. "Every item" lists every importable module of the course
+  flat — one row per item, each showing the Moodle section it came from, with
+  its own week number and its own Skip / Reading / Task choice, so a course
+  whose sections mix readings and tasks no longer has to be imported one
+  section at a time.
+- New (desktop): the raw import screen has batch helpers for long courses — a
+  name/section filter, Skip / Reading / Task applied to every row the filter
+  shows, and "Weeks from sections", which puts every shown row back on the week
+  guessed from its section's date range. Typing a week still cascades down the
+  list, counted in sections rather than rows, so items from one Moodle section
+  stay in the same week. Rows left on Skip create nothing, and the existing
+  per-section import is unchanged.
 - New (mobile): items can be **dragged between sections** on the course screen.
   In editing mode, long-press a row to lift it and drag it onto another
   section: By Week that moves it to that week, By Type it moves it to that week
