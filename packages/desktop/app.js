@@ -1037,7 +1037,9 @@ function renderCourseBoard() {
 }
 
 // "By Week" grouping: one collapsible "Week N · date range" section per week
-// that has any item, each listing that week's readings and tasks.
+// that has any item. A week lists its items flat — readings first, then tasks,
+// with no sub-headings — the same shape the type grouping uses, so each row
+// carries the R/T badge that its missing section header used to say.
 function fillColumnByWeek(body, course, sem) {
   // Week display order: ascending by default, descending for week-desc.
   let weekNumbers = Array.from({ length: sem.weeks }, (_, i) => i + 1);
@@ -1085,19 +1087,22 @@ function fillColumnByWeek(body, course, sem) {
 
     const weekBody = document.createElement('div');
     weekBody.className = 'course-week-body' + (isOpen ? ' open' : '');
-    weekBody.appendChild(sectionTitle('Readings'));
     weekBody.appendChild(
-      markDropZone(renderItemList(readings, 'reading', course), course, { week: w, kind: 'reading' })
-    );
-    weekBody.appendChild(sectionTitle('Tasks'));
-    weekBody.appendChild(
-      markDropZone(renderItemList(tasks, 'task', course), course, { week: w, kind: 'task' })
+      renderMixedItemList(
+        [
+          ...readings.map((item) => ({ item, type: 'reading' })),
+          ...tasks.map((item) => ({ item, type: 'task' })),
+        ],
+        course
+      )
     );
     weekBody.appendChild(addControls(course, w));
 
-    // Three nested zones per week: either item list moves the item to that week
-    // AND that kind, the body around them keeps the kind, and the header is the
-    // only target a collapsed week has (its body is display:none).
+    // Two zones per week: the body is the week itself (a drop sets the week and
+    // leaves the kind alone), and the header is the only target a collapsed
+    // week has (its body is display:none). There is no per-kind zone here any
+    // more — a week is one list now; converting a reading into a task by drag
+    // is the type grouping's own sections.
     markDropZone(weekHeader, course, { week: w });
     markDropZone(weekBody, course, { week: w });
 
@@ -1169,15 +1174,9 @@ function addCourseColumn() {
   return col;
 }
 
-function sectionTitle(text) {
-  const el = document.createElement('p');
-  el.className = 'card-section-title';
-  el.textContent = text;
-  return el;
-}
-
-// One <ul> of readings or tasks. `options.showWeek` prefixes each row with its
-// week number — needed by groupings whose sections aren't weeks themselves.
+// One <ul> of readings or tasks, all of one kind. `options.showWeek` prefixes
+// each row with its week number — needed by groupings whose sections aren't
+// weeks themselves.
 function renderItemList(items, type, course, options = {}) {
   const ul = document.createElement('ul');
   ul.className = 'item-list';
@@ -1188,139 +1187,169 @@ function renderItemList(items, type, course, options = {}) {
     ul.appendChild(empty);
     return ul;
   }
-  items.forEach((item) => {
-    const li = document.createElement('li');
-    li.className = 'item';
+  items.forEach((item) => ul.appendChild(itemRow(item, type, course, options)));
+  return ul;
+}
 
-    // Selection mode turns the whole row into one target: the checkbox marks
-    // it, the click handler toggles it, and the row's own controls (rename,
-    // due date, tag menu, delete) are made inert in CSS so a stray click
-    // can't edit an item the user meant to select. An item with no id (only
-    // possible in hand-edited data) simply isn't selectable.
-    if (state.selecting && item.id) {
-      li.classList.add('item--selectable');
-      li.dataset.itemId = item.id;
-      if (state.selection.has(item.id)) li.classList.add('item--selected');
-      const box = document.createElement('span');
-      box.className = 'item-select-box';
-      box.setAttribute('aria-hidden', 'true');
-      li.appendChild(box);
-      li.addEventListener('click', (e) => onSelectRowClick(e, li, item));
-    }
-
-    // Rows are draggable outside selection mode only: there a row is a
-    // selection target, and the batch bar already moves items between weeks,
-    // kinds and (through the tag list) whole groups.
-    if (!state.selecting && item.id) {
-      li.draggable = true;
-      li.classList.add('item--draggable');
-      li.dataset.dragItemId = item.id;
-      li.dataset.dragKind = type;
-      li.dataset.dragCourseId = course.id;
-    }
-
-    if (options.showWeek) {
-      const weekSpan = document.createElement('span');
-      weekSpan.className = 'item-week';
-      weekSpan.textContent = 'W' + item.week;
-      weekSpan.title = 'Week ' + item.week;
-      li.appendChild(weekSpan);
-    }
-
-    const titleSpan = document.createElement('span');
-    titleSpan.className = 'item-title';
-    titleSpan.textContent = item.title;
-    // Inline edit: click the title to rename
-    titleSpan.title = 'Click to rename';
-    titleSpan.style.cursor = 'text';
-    titleSpan.addEventListener('click', () => editItemTitle(titleSpan, item));
-    li.appendChild(titleSpan);
-
-    if (type === 'task') li.appendChild(dueElement(item));
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'tag-dropdown-wrapper';
-
-    // The trigger button shows the current tag's name and color.
-    const trigger = document.createElement('button');
-    trigger.className = 'badge tag-trigger';
-    const tags = type === 'reading'
-      ? getReadingTags(state.semester)
-      : getTaskTags(state.semester);
-    const currentTag = tags.find((t) => t.id === item.status)
-      || { name: '-', color: '#999', section: 'pending' }; // ghost fallback
-    trigger.textContent = currentTag.name;
-    trigger.style.setProperty('--tag-color', currentTag.color);
-    trigger.title = 'Click to change status';
-
-    // The dropdown menu (hidden by default).
-    const menu = document.createElement('div');
-    menu.className = 'tag-menu hidden';
-
-    // Build two sections: Pending and Done.
-    ['pending', 'done'].forEach((section) => {
-      const sectionTags = tags.filter((t) => t.section === section);
-      if (sectionTags.length === 0) return;
-      const label = document.createElement('div');
-      label.className = 'tag-menu-section-label';
-      label.textContent = section === 'pending' ? 'Pending' : 'Done';
-      menu.appendChild(label);
-      sectionTags.forEach((tag) => {
-        const opt = document.createElement('button');
-        opt.className = 'tag-menu-option' + (tag.id === item.status ? ' active' : '');
-        opt.textContent = tag.name;
-        opt.style.setProperty('--tag-color', tag.color);
-        opt.addEventListener('click', (e) => {
-          e.stopPropagation();
-          if (item.status !== tag.id) {
-            item.status = tag.id;
-            persist();
-            // Only this badge and the dashboard's progress depend on an item's
-            // tag, so update them directly. Rebuilding the planner would reset
-            // the page, board and column scroll offsets for a one-word change.
-            trigger.textContent = tag.name;
-            trigger.style.setProperty('--tag-color', tag.color);
-            menu.querySelectorAll('.tag-menu-option').forEach((o) => {
-              o.classList.toggle('active', o === opt);
-            });
-            renderDashboard();
-          }
-          menu.classList.add('hidden');
-        });
-        menu.appendChild(opt);
-      });
-    });
-
-    trigger.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isOpen = !menu.classList.contains('hidden');
-      // Close all other open menus first.
-      document.querySelectorAll('.tag-menu').forEach((m) => m.classList.add('hidden'));
-      if (!isOpen) menu.classList.remove('hidden');
-    });
-
-    wrapper.appendChild(trigger);
-    wrapper.appendChild(menu);
-    li.appendChild(wrapper);
-
-    const del = document.createElement('button');
-    del.className = 'icon-btn';
-    del.innerHTML = icon('x');
-    del.title = 'Delete';
-    del.addEventListener('click', () => {
-      const arr = type === 'reading' ? course.readings : course.tasks;
-      const idx = arr.indexOf(item);
-      if (idx > -1) arr.splice(idx, 1);
-      persist();
-      // A full re-render: emptying a week removes its whole section in the
-      // Course view, so the subtree really does have to be rebuilt.
-      renderPreservingScroll();
-    });
-    li.appendChild(del);
-
-    ul.appendChild(li);
+// One <ul> mixing both kinds, from `{ item, type }` entries already in display
+// order — the flat list a week shows in the week grouping. Every row gets the
+// R/T badge, since no section header says which kind it is. Never empty in
+// practice: a week with no items has no section at all.
+function renderMixedItemList(entries, course) {
+  const ul = document.createElement('ul');
+  ul.className = 'item-list';
+  entries.forEach(({ item, type }) => {
+    ul.appendChild(itemRow(item, type, course, { showType: true }));
   });
   return ul;
+}
+
+// One row: the item's own controls (rename, due date, tag menu, delete) plus
+// whatever its list needs it to carry — `options.showWeek` for the week number,
+// `options.showType` for the R/T badge. Shared by both list builders, so
+// selection and drag work identically in both groupings.
+function itemRow(item, type, course, options = {}) {
+  const li = document.createElement('li');
+  li.className = 'item';
+  // Selection mode turns the whole row into one target: the checkbox marks
+  // it, the click handler toggles it, and the row's own controls (rename,
+  // due date, tag menu, delete) are made inert in CSS so a stray click
+  // can't edit an item the user meant to select. An item with no id (only
+  // possible in hand-edited data) simply isn't selectable.
+  if (state.selecting && item.id) {
+    li.classList.add('item--selectable');
+    li.dataset.itemId = item.id;
+    if (state.selection.has(item.id)) li.classList.add('item--selected');
+    const box = document.createElement('span');
+    box.className = 'item-select-box';
+    box.setAttribute('aria-hidden', 'true');
+    li.appendChild(box);
+    li.addEventListener('click', (e) => onSelectRowClick(e, li, item));
+  }
+
+  // Rows are draggable outside selection mode only: there a row is a
+  // selection target, and the batch bar already moves items between weeks,
+  // kinds and (through the tag list) whole groups.
+  if (!state.selecting && item.id) {
+    li.draggable = true;
+    li.classList.add('item--draggable');
+    li.dataset.dragItemId = item.id;
+    li.dataset.dragKind = type;
+    li.dataset.dragCourseId = course.id;
+  }
+
+  if (options.showWeek) {
+    const weekSpan = document.createElement('span');
+    weekSpan.className = 'item-week';
+    weekSpan.textContent = 'W' + item.week;
+    weekSpan.title = 'Week ' + item.week;
+    li.appendChild(weekSpan);
+  }
+
+  // R/T marker for lists that mix the two kinds. The word is on the title
+  // attribute, not the box, so the row stays narrow.
+  if (options.showType) {
+    const label = type === 'reading' ? 'Reading' : 'Task';
+    const typeSpan = document.createElement('span');
+    typeSpan.className = 'item-type item-type--' + type;
+    typeSpan.textContent = label[0];
+    typeSpan.title = label;
+    typeSpan.setAttribute('aria-label', label);
+    li.appendChild(typeSpan);
+  }
+
+  const titleSpan = document.createElement('span');
+  titleSpan.className = 'item-title';
+  titleSpan.textContent = item.title;
+  // Inline edit: click the title to rename
+  titleSpan.title = 'Click to rename';
+  titleSpan.style.cursor = 'text';
+  titleSpan.addEventListener('click', () => editItemTitle(titleSpan, item));
+  li.appendChild(titleSpan);
+
+  if (type === 'task') li.appendChild(dueElement(item));
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'tag-dropdown-wrapper';
+
+  // The trigger button shows the current tag's name and color.
+  const trigger = document.createElement('button');
+  trigger.className = 'badge tag-trigger';
+  const tags = type === 'reading'
+    ? getReadingTags(state.semester)
+    : getTaskTags(state.semester);
+  const currentTag = tags.find((t) => t.id === item.status)
+    || { name: '-', color: '#999', section: 'pending' }; // ghost fallback
+  trigger.textContent = currentTag.name;
+  trigger.style.setProperty('--tag-color', currentTag.color);
+  trigger.title = 'Click to change status';
+
+  // The dropdown menu (hidden by default).
+  const menu = document.createElement('div');
+  menu.className = 'tag-menu hidden';
+
+  // Build two sections: Pending and Done.
+  ['pending', 'done'].forEach((section) => {
+    const sectionTags = tags.filter((t) => t.section === section);
+    if (sectionTags.length === 0) return;
+    const label = document.createElement('div');
+    label.className = 'tag-menu-section-label';
+    label.textContent = section === 'pending' ? 'Pending' : 'Done';
+    menu.appendChild(label);
+    sectionTags.forEach((tag) => {
+      const opt = document.createElement('button');
+      opt.className = 'tag-menu-option' + (tag.id === item.status ? ' active' : '');
+      opt.textContent = tag.name;
+      opt.style.setProperty('--tag-color', tag.color);
+      opt.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (item.status !== tag.id) {
+          item.status = tag.id;
+          persist();
+          // Only this badge and the dashboard's progress depend on an item's
+          // tag, so update them directly. Rebuilding the planner would reset
+          // the page, board and column scroll offsets for a one-word change.
+          trigger.textContent = tag.name;
+          trigger.style.setProperty('--tag-color', tag.color);
+          menu.querySelectorAll('.tag-menu-option').forEach((o) => {
+            o.classList.toggle('active', o === opt);
+          });
+          renderDashboard();
+        }
+        menu.classList.add('hidden');
+      });
+      menu.appendChild(opt);
+    });
+  });
+
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = !menu.classList.contains('hidden');
+    // Close all other open menus first.
+    document.querySelectorAll('.tag-menu').forEach((m) => m.classList.add('hidden'));
+    if (!isOpen) menu.classList.remove('hidden');
+  });
+
+  wrapper.appendChild(trigger);
+  wrapper.appendChild(menu);
+  li.appendChild(wrapper);
+
+  const del = document.createElement('button');
+  del.className = 'icon-btn';
+  del.innerHTML = icon('x');
+  del.title = 'Delete';
+  del.addEventListener('click', () => {
+    const arr = type === 'reading' ? course.readings : course.tasks;
+    const idx = arr.indexOf(item);
+    if (idx > -1) arr.splice(idx, 1);
+    persist();
+    // A full re-render: emptying a week removes its whole section in the
+    // Course view, so the subtree really does have to be rebuilt.
+    renderPreservingScroll();
+  });
+  li.appendChild(del);
+
+  return li;
 }
 
 // ---------------------------------------------------------------------------
@@ -1328,7 +1357,7 @@ function renderItemList(items, type, course, options = {}) {
 // them at once. The mode is a header toggle; the actions live in a contextual
 // bar that appears with the first selected row. Everything here works the same
 // in both groupings — it hangs off the item rows, which both of them build
-// through renderItemList().
+// through itemRow().
 // ---------------------------------------------------------------------------
 function setupSelectMode() {
   const btn = document.getElementById('select-mode-btn');
