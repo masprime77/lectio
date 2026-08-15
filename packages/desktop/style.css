@@ -814,13 +814,6 @@ body.electron-app .header-inner { padding-left: 80px; }
 /* Empty-state line shared by the dashboard, columns and item lists */
 .week-empty { color: var(--muted); font-size: 0.85rem; padding: 0.5rem 0; }
 
-.card-section-title {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-  margin: 0.6rem 0 0.3rem;
-}
 .item-list { list-style: none; margin: 0; padding: 0; }
 .item {
   display: flex;
@@ -951,6 +944,25 @@ body.electron-app .header-inner { padding-left: 80px; }
   border-radius: 4px;
   padding: 0.05rem 0.3rem;
 }
+/* R/T marker, shown when the section itself isn't a kind (By Week). Sized off
+   the week chip so the two line up, and filled with two accents that stay
+   distinct from each other — and from the tag badge's own colors — in both
+   themes. */
+.item-type {
+  flex: none;
+  width: 1.05rem;
+  height: 1.05rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--on-accent);
+  border-radius: 4px;
+}
+.item-type--reading { background: var(--primary); }
+.item-type--task { background: var(--st-reviewed); }
 /* Due date on tasks */
 .item-due {
   font-size: 0.75rem;

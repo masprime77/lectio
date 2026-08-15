@@ -1,5 +1,17 @@
 ## Unreleased
 
+- Changed (desktop): a week in **By Week** now lists its items flat. The
+  "Readings" and "Tasks" sub-headings inside a week are gone — one list per
+  week, readings first, then tasks — matching the shape By Type already used.
+- New (desktop): every row in that flat list carries a small **R / T** badge to
+  the left of its title, so the kind is still readable at a glance now that no
+  sub-heading says it. By Type is unchanged: its section header already names
+  the kind, and its rows keep the week number instead.
+- Changed (desktop): with a week's two lists merged, dragging an item onto a
+  week no longer converts it between reading and task — it only moves it to
+  that week (and course). Converting by drag is By Type's own sections, and
+  the multi-select bar's "Make readings"/"Make tasks" still does it in either
+  mode.
 - Changed (desktop): the email-confirmation UI is off behind a kill switch
   (`EMAIL_CONFIRMATION_UI_ENABLED` in `packages/desktop/auth.js`). With it off,
   sign-up signs you straight in — no "check your inbox" state, no Resend button
