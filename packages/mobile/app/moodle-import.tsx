@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -26,7 +27,7 @@ import { listMoodleAccounts, getMoodleAccountToken, type MoodleAccountSummary } 
 import { setMoodleImportSession } from '../src/moodle/import-session';
 import { useTheme } from '../src/theme';
 import { SheetHeader } from '../src/components/SheetHeader';
-import type { SemesterSummary, Course, MoodleCourse } from '../types/lectio-core';
+import type { SemesterSummary, Course, MoodleCourse, MoodleMappedContent } from '../types/lectio-core';
 
 // One small reusable picker for this screen's four choices (semester,
 // account, Moodle course, target course) — mirrors add.tsx's private
@@ -137,6 +138,25 @@ export default function MoodleImportScreen() {
     })();
   }, [accountBaseUrl]);
 
+  // The triage-vs-raw choice is one extra step at the handoff rather than a
+  // setting on this form, because it only becomes answerable once the content
+  // is fetched: how many sections and items there actually are is most of what
+  // decides whether per-section is enough. Cancelling leaves the session set,
+  // so "Fetch content" simply asks again.
+  function askImportMode(mapped: MoodleMappedContent) {
+    const sectionCount = mapped.weeks.length;
+    const itemCount = mapped.weeks.reduce((n, w) => n + w.items.length, 0);
+    Alert.alert(
+      'How do you want to sort this?',
+      `Found ${itemCount} item(s) in ${sectionCount} section(s).`,
+      [
+        { text: 'By section', onPress: () => router.push('/moodle-triage') },
+        { text: 'Every item', onPress: () => router.push('/moodle-raw') },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  }
+
   async function handleFetch() {
     setError(null);
     if (!semesterId || !accountBaseUrl || !moodleCourseId) return;
@@ -168,10 +188,16 @@ export default function MoodleImportScreen() {
           setBusy(false);
           return;
         }
+        // The course exists and is saved from here on. Point the form at it so
+        // backing out of the mode choice below and fetching again reuses it
+        // instead of quietly creating a second empty course with the same name.
+        setSemesterCourses((prev) => [...prev, created]);
+        setTargetCourseId(created.id);
+        setNewCourseName('');
       }
 
       setMoodleImportSession({ semesterId, courseId: targetId, accountBaseUrl, mapped });
-      router.push('/moodle-triage');
+      askImportMode(mapped);
     } catch (e: any) {
       setError(e?.message ?? 'Could not fetch course content.');
     } finally {
