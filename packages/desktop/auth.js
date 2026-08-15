@@ -38,10 +38,25 @@
     if (error) throw error;
   }
 
+  // Resolves to `{ needsConfirmation }`. When email confirmation is ENABLED in
+  // the Supabase project, signUp returns a user but no session (a confirm mail
+  // was sent); when DISABLED, a session comes back immediately and the auth
+  // listener signs the user straight in. Same check as the mobile
+  // AuthProvider's `lastSignUpNeedsConfirmation`.
   async function signUp(email, password) {
     const c = client();
     if (!c) throw new Error('Cannot reach the server. Check your connection and try again.');
-    const { error } = await c.auth.signUp({ email, password });
+    const { data, error } = await c.auth.signUp({ email, password });
+    if (error) throw error;
+    return { needsConfirmation: !!data && !data.session && !!data.user };
+  }
+
+  // Re-send the sign-up confirmation mail. Supabase rate-limits this; the
+  // "too many attempts" case comes back through friendlyAuthError().
+  async function resendConfirmation(email) {
+    const c = client();
+    if (!c) throw new Error('Cannot reach the server. Check your connection and try again.');
+    const { error } = await c.auth.resend({ type: 'signup', email });
     if (error) throw error;
   }
 
@@ -149,6 +164,7 @@
     signIn,
     signUp,
     signOut,
+    resendConfirmation,
     signInWithProvider,
     updateEmail,
     updatePassword,
