@@ -1,5 +1,18 @@
 ## Unreleased
 
+- Changed (desktop): the email-confirmation UI is off behind a kill switch
+  (`EMAIL_CONFIRMATION_UI_ENABLED` in `packages/desktop/auth.js`). With it off,
+  sign-up signs you straight in — no "check your inbox" state, no Resend button
+  and no confirm-your-email message on sign-in. Nothing was removed; flipping
+  the constant back to `true` restores the flow described below.
+- Changed (mobile): the same kill switch
+  (`EMAIL_CONFIRMATION_UI_ENABLED` in `src/auth/AuthProvider.tsx`) pins
+  `lastSignUpNeedsConfirmation` to false and hides the confirmation notice and
+  its Resend link on the sign-in screen.
+- Note: both flags only hide the apps' own UI. The Supabase project's
+  "Confirm email" toggle (Authentication → Providers → Email) is the
+  server-side authority and has to be turned off to match — if it stays on
+  while these flags are off, sign-in fails without an explanation.
 - Fixed (desktop): creating an account no longer looks like it did nothing when
   the project requires email confirmation. Sign-up now reports that a
   confirmation is pending, and the sign-in dialog switches to a "check your
