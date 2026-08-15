@@ -14,7 +14,8 @@ interface AuthContextValue {
   // unreachable (no cached session). The launch UI shows a retry state.
   connectionError: boolean;
   // True after a signUp that requires email confirmation (no immediate session).
-  // Stays false while confirmation is disabled in the Supabase console.
+  // Stays false while confirmation is disabled in the Supabase console, and
+  // always false while EMAIL_CONFIRMATION_UI_ENABLED below is off.
   lastSignUpNeedsConfirmation: boolean;
   signIn(email: string, password: string): Promise<void>;
   signUp(email: string, password: string): Promise<void>;
@@ -28,6 +29,15 @@ interface AuthContextValue {
   deleteAccount(): Promise<void>;
   retryConnection(): void;
 }
+
+// Kill switch: forces the app to behave as if email confirmation is not
+// required, regardless of what signUp() reports. Keep this in sync with the
+// Supabase project's "Confirm email" toggle (Authentication → Providers →
+// Email) — this flag only hides the app's own UI states, it does not override
+// Supabase's server-side enforcement. Flip both back on together when ready to
+// re-enable the flow. Exported so the screens gate their confirmation UI off
+// the same constant (one place to flip).
+export const EMAIL_CONFIRMATION_UI_ENABLED = false;
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -82,7 +92,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
     // When email confirmation is ENABLED, Supabase returns no session and a user
     // (a confirm email was sent); when DISABLED, a session is present immediately.
-    setLastSignUpNeedsConfirmation(!data.session && !!data.user);
+    // The kill switch pins this to false so the confirmation UI stays dormant.
+    setLastSignUpNeedsConfirmation(
+      EMAIL_CONFIRMATION_UI_ENABLED && !data.session && !!data.user
+    );
   }
 
   async function signOut() {
