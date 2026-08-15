@@ -943,6 +943,8 @@ function renderCourseBoard() {
     col.dataset.courseId = course.id;
     col.style.borderTopColor = course.color;
 
+    // Two rows: the course name alone on top (it's the column's identity, so it
+    // gets the full width), then a secondary toolbar row beneath it.
     const header = document.createElement('div');
     header.className = 'course-column-header';
 
@@ -953,13 +955,24 @@ function renderCourseBoard() {
     nameSpan.style.color = course.color;
     header.appendChild(nameSpan);
 
-    // Total studied time (click to edit).
+    const actions = document.createElement('div');
+    actions.className = 'course-column-header-actions';
+    header.appendChild(actions);
+
+    const btnGroup = document.createElement('div');
+    btnGroup.className = 'course-column-header-btns';
+    actions.appendChild(btnGroup);
+
+    // Total studied time (click to edit). Deliberately on the button row rather
+    // than next to the name: it's small, muted metadata like the icons, and at
+    // the 300px column width keeping it off the name row is what lets long
+    // course names render without truncating.
     const timeSpan = document.createElement('span');
     timeSpan.className = 'course-column-header-time';
     timeSpan.textContent = formatHoursMinutes(getCourseStudySeconds(course));
     timeSpan.title = 'Studied time — click to edit';
     timeSpan.addEventListener('click', () => editStudyTimeInline(timeSpan, course.id));
-    header.appendChild(timeSpan);
+    actions.appendChild(timeSpan);
 
     // Edit (opens the semester editor, the existing way to rename/recolor a course)
     const editBtn = document.createElement('button');
@@ -967,7 +980,7 @@ function renderCourseBoard() {
     editBtn.innerHTML = icon('pencil');
     editBtn.title = 'Edit semester (to rename/recolor this course)';
     editBtn.addEventListener('click', () => openEditModal(state.semesterId, 'courses'));
-    header.appendChild(editBtn);
+    btnGroup.appendChild(editBtn);
 
     // Export
     const exportBtn = document.createElement('button');
@@ -975,7 +988,7 @@ function renderCourseBoard() {
     exportBtn.innerHTML = icon('file-export');
     exportBtn.title = 'Export course';
     exportBtn.addEventListener('click', () => exportCourse(course));
-    header.appendChild(exportBtn);
+    btnGroup.appendChild(exportBtn);
 
     // Import (imports a course into this semester, not "replace this course")
     const importCourseBtn = document.createElement('button');
@@ -992,7 +1005,7 @@ function renderCourseBoard() {
         alert('Could not read file: ' + (err.message || err));
       }
     });
-    header.appendChild(importCourseBtn);
+    btnGroup.appendChild(importCourseBtn);
 
     // Import from Moodle (skips the target-course picker — this course is
     // already the target).
@@ -1004,7 +1017,7 @@ function renderCourseBoard() {
       if (!(await ensureMoodleAccountOrPrompt())) return;
       openMoodleCourseModal({ presetCourseId: course.id });
     });
-    header.appendChild(moodleImportBtn);
+    btnGroup.appendChild(moodleImportBtn);
 
     // Delete
     const delBtn = document.createElement('button');
@@ -1017,7 +1030,7 @@ function renderCourseBoard() {
       persist();
       render();
     });
-    header.appendChild(delBtn);
+    btnGroup.appendChild(delBtn);
 
     col.appendChild(header);
 

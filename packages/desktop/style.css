@@ -1181,16 +1181,35 @@ body.electron-app .header-inner { padding-left: 80px; }
   border-radius: var(--radius) var(--radius) 0 0;
   min-width: 0;
   display: flex;
-  align-items: center;
-  gap: 0.35rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.15rem;
 }
 .course-column-header-name {
-  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Second row: icon toolbar on the left, studied time trailing on the right. */
+.course-column-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.course-column-header-btns {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+  /* Pull the first icon's padding back so the row lines up with the name. */
+  margin-left: -0.25rem;
+}
+/* Smaller and more muted than the name above them. */
+.course-column-header-btns .icon-btn { padding: 0.1rem 0.25rem; opacity: 0.7; }
+.course-column-header-btns .icon-btn:hover { opacity: 1; }
+.course-column-header-btns .icon-btn .ti { width: 14px; height: 14px; }
 .course-column-header-time {
   font-size: 0.72rem;
   font-weight: 400;
