@@ -25,43 +25,62 @@
        aria-modal="true" aria-labelledby="signin-title">
     <div class="modal">
       <h2 id="signin-title">Sign in to Lectio</h2>
-      <form id="signin-form">
-        <label>
-          Email
-          <input type="email" id="signin-email" autocomplete="username"
-                 placeholder="you@example.com" required />
-        </label>
-        <label>
-          Password
-          <input type="password" id="signin-password" autocomplete="current-password"
-                 placeholder="Password" required />
-        </label>
-        <span id="signin-error" class="hidden"
-              style="display:block;font-size:0.8rem;color:var(--danger);margin-top:0.4rem;"></span>
-        <p class="legal-notice">
-          By creating an account you agree to our
-          <a href="#" id="signin-privacy-link">Privacy Policy</a> and
-          <a href="#" id="signin-impressum-link">Legal Notice</a>.
-        </p>
-        <div class="modal-actions">
-          <button type="button" id="signin-create" class="btn">Create account</button>
-          <button type="submit" id="signin-submit" class="btn btn-primary">Sign in</button>
+      <!-- The credentials + OAuth block. Hidden as a unit while the
+           confirm-your-email state below is showing. -->
+      <div id="signin-form-area">
+        <form id="signin-form">
+          <label>
+            Email
+            <input type="email" id="signin-email" autocomplete="username"
+                   placeholder="you@example.com" required />
+          </label>
+          <label>
+            Password
+            <input type="password" id="signin-password" autocomplete="current-password"
+                   placeholder="Password" required />
+          </label>
+          <span id="signin-error" class="hidden"
+                style="display:block;font-size:0.8rem;color:var(--danger);margin-top:0.4rem;"></span>
+          <p class="legal-notice">
+            By creating an account you agree to our
+            <a href="#" id="signin-privacy-link">Privacy Policy</a> and
+            <a href="#" id="signin-impressum-link">Legal Notice</a>.
+          </p>
+          <div class="modal-actions">
+            <button type="button" id="signin-create" class="btn">Create account</button>
+            <button type="submit" id="signin-submit" class="btn btn-primary">Sign in</button>
+          </div>
+        </form>
+        <div class="oauth-divider"><span>or</span></div>
+        <div class="oauth-buttons">
+          <button type="button" id="signin-google" class="btn-oauth btn-oauth-google">
+            <span class="oauth-icon-badge">
+              <img src="assets/google-logo.svg" alt="" width="18" height="18" />
+            </span>
+            <span>Continue with Google</span>
+          </button>
+          <button type="button" id="signin-apple" class="btn-oauth btn-oauth-apple">
+            <span class="oauth-icon-badge">
+              <span class="apple-icon" aria-hidden="true"></span>
+            </span>
+            <span>Continue with Apple</span>
+          </button>
         </div>
-      </form>
-      <div class="oauth-divider"><span>or</span></div>
-      <div class="oauth-buttons">
-        <button type="button" id="signin-google" class="btn-oauth btn-oauth-google">
-          <span class="oauth-icon-badge">
-            <img src="assets/google-logo.svg" alt="" width="18" height="18" />
-          </span>
-          <span>Continue with Google</span>
-        </button>
-        <button type="button" id="signin-apple" class="btn-oauth btn-oauth-apple">
-          <span class="oauth-icon-badge">
-            <span class="apple-icon" aria-hidden="true"></span>
-          </span>
-          <span>Continue with Apple</span>
-        </button>
+      </div>
+      <!-- Shown instead of the form when a sign-up (or a sign-in attempt on an
+           unconfirmed account) needs the emailed confirmation link first. -->
+      <div id="signin-confirm" class="signin-confirm hidden">
+        <p id="signin-confirm-note" class="signin-confirm-note hidden"></p>
+        <p class="signin-confirm-text">
+          Check your inbox to confirm
+          <strong id="signin-confirm-email"></strong>.
+          Open the link we sent, then sign in.
+        </p>
+        <span id="signin-confirm-status" class="signin-confirm-status hidden"></span>
+        <div class="modal-actions">
+          <button type="button" id="signin-confirm-back" class="btn">Back to sign in</button>
+          <button type="button" id="signin-confirm-resend" class="btn btn-primary">Resend email</button>
+        </div>
       </div>
     </div>
   </div>
