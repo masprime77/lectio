@@ -1,5 +1,14 @@
 ## Unreleased
 
+- Fixed (desktop): creating an account no longer looks like it did nothing when
+  the project requires email confirmation. Sign-up now reports that a
+  confirmation is pending, and the sign-in dialog switches to a "check your
+  inbox to confirm <your address>" state with a **Resend email** button and a
+  way back to the form. Resending surfaces the rate-limit message in plain
+  words when you ask for it too often.
+- New (desktop): signing in with an account that was never confirmed lands on
+  that same state, so the fix is one click away instead of just a sentence.
+  With email confirmation disabled, sign-up still signs you in immediately.
 - New (mobile): the Moodle import gained a **raw, per-item screen**. After the
   content is fetched, the import now asks how to sort it — "By section" keeps
   the existing per-section triage, "Every item" opens the new screen, which
