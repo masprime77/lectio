@@ -28,7 +28,7 @@ export default function SignInScreen() {
     signIn,
     signUp,
     resendConfirmation,
-    lastSignUpNeedsConfirmation,
+    needsEmailConfirmation,
     signInWithGoogle,
     signInWithApple,
   } = useAuth();
@@ -37,9 +37,13 @@ export default function SignInScreen() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Confirmation of a resend — without it, tapping "Resend email" looks like
+  // it did nothing.
+  const [sentNotice, setSentNotice] = useState<string | null>(null);
 
   async function handleAction(action: 'signIn' | 'signUp') {
     setError(null);
+    setSentNotice(null);
     setBusy(true);
     try {
       if (action === 'signIn') {
@@ -62,10 +66,19 @@ export default function SignInScreen() {
 
   async function handleResend() {
     setError(null);
+    setSentNotice(null);
+    const address = email.trim();
+    if (!address) {
+      setError('Enter your email address first.');
+      return;
+    }
     setBusy(true);
     try {
-      await resendConfirmation(email.trim());
+      await resendConfirmation(address);
+      setSentNotice('Sent — check your inbox (and your spam folder).');
     } catch (e) {
+      // Supabase rate-limits resends; friendlyAuthError turns that into
+      // "Too many attempts. Please wait a minute and try again."
       setError(friendlyAuthError(e));
     } finally {
       setBusy(false);
@@ -122,18 +135,24 @@ export default function SignInScreen() {
           <Text style={[styles.link, { color: theme.accent }]}>Forgot password?</Text>
         </Pressable>
 
-        {/* Latent email-confirmation seam: appears only once confirmation is enabled
-            in the Supabase console (signUp then returns no session). With confirmation
-            OFF — today's default — signUp logs the user straight in and the layout
-            redirect leaves this screen, so this notice stays dormant. */}
-        {lastSignUpNeedsConfirmation ? (
+        {/* Shown once confirmation is enabled in the Supabase console: after a
+            signUp that returned no session, or a signIn rejected because the
+            account was never confirmed. With confirmation OFF, signUp logs the
+            user straight in and the layout redirect leaves this screen, so this
+            notice stays dormant. */}
+        {needsEmailConfirmation ? (
           <View style={[styles.notice, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <Text style={[styles.noticeText, { color: theme.text }]}>
-              Check your inbox to confirm your email, then sign in.
+              {email.trim()
+                ? `Check your inbox to confirm ${email.trim()}, then sign in.`
+                : 'Check your inbox to confirm your email, then sign in.'}
             </Text>
             <Pressable onPress={handleResend} disabled={busy} hitSlop={8}>
               <Text style={[styles.link, { color: theme.accent }]}>Resend email</Text>
             </Pressable>
+            {sentNotice ? (
+              <Text style={[styles.noticeText, { color: theme.muted }]}>{sentNotice}</Text>
+            ) : null}
           </View>
         ) : null}
 

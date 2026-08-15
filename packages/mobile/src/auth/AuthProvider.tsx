@@ -13,9 +13,11 @@ interface AuthContextValue {
   // True when the initial session load failed because the project is paused /
   // unreachable (no cached session). The launch UI shows a retry state.
   connectionError: boolean;
-  // True after a signUp that requires email confirmation (no immediate session).
-  // Stays false while confirmation is disabled in the Supabase console.
-  lastSignUpNeedsConfirmation: boolean;
+  // True when the address last used on the sign-in screen still has to confirm
+  // its email: either a signUp that returned no session, or a signIn rejected
+  // with "Email not confirmed". Stays false while confirmation is disabled in
+  // the Supabase console. The sign-in screen turns it into the notice + Resend.
+  needsEmailConfirmation: boolean;
   signIn(email: string, password: string): Promise<void>;
   signUp(email: string, password: string): Promise<void>;
   signOut(): Promise<void>;
@@ -31,11 +33,19 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+// Supabase's rejection for an account that exists but never confirmed its
+// address — the same string friendlyAuthError() maps, matched here so the UI
+// can offer Resend instead of only printing the message.
+function isEmailNotConfirmed(err: unknown): boolean {
+  const msg = (err as any)?.message ? String((err as any).message).toLowerCase() : '';
+  return msg.includes('email not confirmed');
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [connectionError, setConnectionError] = useState(false);
-  const [lastSignUpNeedsConfirmation, setLastSignUpNeedsConfirmation] = useState(false);
+  const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
 
   // Load the cached/remote session. If the project is paused or the device is
   // offline, getSession can reject — flag it instead of spinning forever.
@@ -74,15 +84,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signIn(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
+    if (error) {
+      // An account that never confirmed fails here on every attempt, so this is
+      // the same dead end a pending sign-up is in — flag it for the same notice.
+      setNeedsEmailConfirmation(isEmailNotConfirmed(error));
+      throw error;
+    }
+    setNeedsEmailConfirmation(false);
   }
 
   async function signUp(email: string, password: string) {
     const { data, error } = await supabase.auth.signUp({ email, password });
-    if (error) throw error;
+    if (error) {
+      // Clear so a failure (e.g. "already registered") can't leave a notice up
+      // for whatever address was tried before this one.
+      setNeedsEmailConfirmation(false);
+      throw error;
+    }
     // When email confirmation is ENABLED, Supabase returns no session and a user
     // (a confirm email was sent); when DISABLED, a session is present immediately.
-    setLastSignUpNeedsConfirmation(!data.session && !!data.user);
+    setNeedsEmailConfirmation(!data.session && !!data.user);
   }
 
   async function signOut() {
@@ -132,7 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         session,
         loading,
         connectionError,
-        lastSignUpNeedsConfirmation,
+        needsEmailConfirmation,
         signIn,
         signUp,
         signOut,

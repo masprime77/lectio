@@ -164,7 +164,11 @@ npm run mobile:android # open on the Android emulator
 
 Setup details and current limitations are in
 [`packages/mobile/README.md`](packages/mobile/README.md) and
-[`docs/PENDING_FEATURES.md`](docs/PENDING_FEATURES.md).
+[`docs/PENDING_FEATURES.md`](docs/PENDING_FEATURES.md). New accounts are **not**
+asked to confirm their email address today; turning that on is a Supabase
+dashboard setting that both apps already handle — the checklist, the redirect
+URLs it depends on, and the rollback are in
+[`docs/EMAIL_VERIFICATION.md`](docs/EMAIL_VERIFICATION.md).
 
 ## Testing
 
@@ -332,6 +336,7 @@ lectio/
 │   ├── PENDING_FEATURES.md       # Mobile/desktop/infra gaps tracker
 │   ├── USER_STORIES.md           # Stories + test traceability
 │   ├── UPDATING_THE_ICON.md      # How to rebuild icon files from icon.png
+│   ├── EMAIL_VERIFICATION.md     # Enabling Supabase "Confirm email" (both apps)
 │   ├── MACOS_SIGNING.md          # Self-signed signing + auto-update notes
 │   └── GITHUB_RELEASE.md         # Release-description template
 ├── .github/workflows/  # ci.yml (tests + macOS build) + release.yml (build & publish)
