@@ -21,31 +21,10 @@ import { addItem } from '@lectio/core/planner-core';
 import { storage } from '../src/storage';
 import { saveWithConflict } from '../src/sync/saveWithConflict';
 import { getMoodleImportSession, clearMoodleImportSession } from '../src/moodle/import-session';
+import { suggestWeekFromDateRange } from '../src/moodle/suggest-week';
 import { useTheme } from '../src/theme';
 import { SheetHeader } from '../src/components/SheetHeader';
 import { NumericKeyboardDoneBar, NUMERIC_KEYBOARD_ACCESSORY_ID } from '../src/components/NumericKeyboardDoneBar';
-import type { MoodleWeek } from '../types/lectio-core';
-
-// Same suggestion heuristic as desktop's Phase 16 Part C
-// (app.js's suggestWeekFromDateRange) — kept local to this screen, not
-// @lectio/core, since it's UI-suggestion logic, not a reusable pure transform.
-function suggestWeekFromDateRange(
-  startDate: string | undefined,
-  totalWeeks: number | undefined,
-  dateRange: MoodleWeek['dateRange']
-): number | null {
-  if (!dateRange || !startDate || !totalWeeks) return null;
-  const start = new Date(startDate + 'T00:00:00');
-  const startYear = start.getFullYear();
-  const candidates = [startYear, startYear + 1].map(
-    (year) => new Date(year, dateRange.startMonth - 1, dateRange.startDay)
-  );
-  let sectionDate = candidates.find((d) => d >= start);
-  if (!sectionDate) sectionDate = candidates[0];
-  const diffDays = Math.floor((sectionDate.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-  const week = Math.floor(diffDays / 7) + 1;
-  return Math.max(1, Math.min(totalWeeks, week));
-}
 
 type Mode = 'skip' | 'reading' | 'task';
 type Decision = { mode: Mode; week: string };

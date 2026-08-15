@@ -128,6 +128,7 @@ function AppShell() {
           <Stack.Screen name="semester-form" options={{ presentation: 'modal', title: 'New Semester', headerShown: false }} />
           <Stack.Screen name="moodle-import" options={{ presentation: 'modal', title: 'Import from Moodle', headerShown: false }} />
           <Stack.Screen name="moodle-triage" options={{ presentation: 'modal', title: 'Import weeks', headerShown: false }} />
+          <Stack.Screen name="moodle-raw" options={{ presentation: 'modal', title: 'Import items', headerShown: false }} />
           <Stack.Screen name="settings" options={{ title: 'Settings' }} />
           <Stack.Screen name="settings/legal/[doc]" options={{ title: 'Legal' }} />
           <Stack.Screen name="moodle" options={{ title: 'Moodle' }} />
