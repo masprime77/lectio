@@ -5875,10 +5875,16 @@ function clearPlannerState() {
   if (dashboard) dashboard.innerHTML = '';
 }
 
+// Set by setupSignIn(): puts the overlay back on the credentials form. The
+// overlay can reappear after a sign-out while the confirm-your-email state is
+// still showing, so it is reset every time it is opened.
+let resetSignInView = () => {};
+
 function showSignIn() {
   clearPlannerState();
   const errEl = document.getElementById('signin-error');
   if (errEl) errEl.classList.add('hidden');
+  resetSignInView();
   document.getElementById('signin-overlay').classList.remove('hidden');
 }
 
@@ -5915,17 +5921,66 @@ function setupSignIn() {
   const errEl = document.getElementById('signin-error');
   const submitBtn = document.getElementById('signin-submit');
   const createBtn = document.getElementById('signin-create');
+  const titleEl = document.getElementById('signin-title');
+  const formArea = document.getElementById('signin-form-area');
+  const confirmEl = document.getElementById('signin-confirm');
+  const confirmNoteEl = document.getElementById('signin-confirm-note');
+  const confirmEmailEl = document.getElementById('signin-confirm-email');
+  const confirmStatusEl = document.getElementById('signin-confirm-status');
+  const resendBtn = document.getElementById('signin-confirm-resend');
+  const backBtn = document.getElementById('signin-confirm-back');
+
+  // The address the confirm state (and its Resend button) is about.
+  let pendingEmail = '';
 
   function showError(msg) {
     errEl.textContent = msg;
     errEl.classList.remove('hidden');
   }
+
+  function setConfirmStatus(msg, isError) {
+    confirmStatusEl.textContent = msg || '';
+    confirmStatusEl.classList.toggle('hidden', !msg);
+    confirmStatusEl.classList.toggle('is-error', !!isError);
+  }
+
+  // Swap the form area for "check your inbox". `note` is an optional lead-in
+  // (used on the sign-in path, where the user did not just create the account).
+  function showConfirm(email, note) {
+    pendingEmail = email;
+    confirmEmailEl.textContent = email;
+    confirmNoteEl.textContent = note || '';
+    confirmNoteEl.classList.toggle('hidden', !note);
+    setConfirmStatus('', false);
+    errEl.classList.add('hidden');
+    pwEl.value = '';
+    titleEl.textContent = 'Confirm your email';
+    formArea.classList.add('hidden');
+    confirmEl.classList.remove('hidden');
+  }
+
+  function showForm() {
+    pendingEmail = '';
+    setConfirmStatus('', false);
+    titleEl.textContent = 'Sign in to Lectio';
+    confirmEl.classList.add('hidden');
+    formArea.classList.remove('hidden');
+  }
+  resetSignInView = showForm;
+
   function setBusy(busy) {
     submitBtn.disabled = busy;
     createBtn.disabled = busy;
     emailEl.disabled = busy;
     pwEl.disabled = busy;
     submitBtn.textContent = busy ? 'Please wait…' : 'Sign in';
+  }
+
+  // Supabase's "Email not confirmed" sign-in rejection — the same string
+  // friendlyAuthError() maps, matched here to pick the confirm state instead.
+  function isEmailNotConfirmed(e) {
+    const msg = e && e.message ? String(e.message).toLowerCase() : '';
+    return msg.includes('email not confirmed');
   }
 
   async function run(action) {
@@ -5938,17 +5993,47 @@ function setupSignIn() {
     }
     setBusy(true);
     try {
-      await action(email, password);
-      // On success, onAuthChange → handleSession() hides the overlay and inits.
-      // (With email confirmation OFF — today's default — sign-up returns a
-      // session immediately; nothing more to do here.)
+      const result = await action(email, password);
       pwEl.value = '';
+      // With email confirmation OFF, sign-up returns a session immediately and
+      // onAuthChange → handleSession() hides the overlay and inits — nothing
+      // more to do here. With it ON, signUp reports needsConfirmation instead
+      // and no session arrives until the emailed link is opened.
+      if (result && result.needsConfirmation) showConfirm(email);
     } catch (e) {
-      showError(lectioAuth.friendlyAuthError(e));
+      const msg = lectioAuth.friendlyAuthError(e);
+      // Signing in on an account that never confirmed: same dead end as a
+      // pending sign-up, so offer the same Resend instead of a bare message.
+      if (isEmailNotConfirmed(e)) showConfirm(email, msg);
+      else showError(msg);
     } finally {
       setBusy(false);
     }
   }
+
+  async function resend() {
+    if (!pendingEmail) return;
+    setConfirmStatus('', false);
+    resendBtn.disabled = true;
+    backBtn.disabled = true;
+    const label = resendBtn.textContent;
+    resendBtn.textContent = 'Sending…';
+    try {
+      await lectioAuth.resendConfirmation(pendingEmail);
+      setConfirmStatus('Sent — check your inbox (and your spam folder).', false);
+    } catch (e) {
+      // Supabase rate-limits resends; friendlyAuthError turns that into
+      // "Too many attempts. Please wait a minute and try again."
+      setConfirmStatus(lectioAuth.friendlyAuthError(e), true);
+    } finally {
+      resendBtn.disabled = false;
+      backBtn.disabled = false;
+      resendBtn.textContent = label;
+    }
+  }
+
+  resendBtn.addEventListener('click', resend);
+  backBtn.addEventListener('click', showForm);
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();

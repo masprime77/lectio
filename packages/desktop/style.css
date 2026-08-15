@@ -1402,6 +1402,32 @@ body.electron-app .header-inner { padding-left: 80px; }
   mask: url('assets/apple-logo.svg') no-repeat center / contain;
 }
 
+/* Confirm-your-email state (signin-overlay) — replaces the form area after a
+   sign-up that needs the emailed link, or a sign-in on an unconfirmed account. */
+.signin-confirm-note {
+  margin: 0 0 0.6rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius);
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+.signin-confirm-text {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.signin-confirm-text strong { overflow-wrap: anywhere; }
+.signin-confirm-status {
+  display: block;
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.signin-confirm-status.is-error { color: var(--danger); }
+
 /* Modal tabs */
 .modal-tabs {
   display: flex;
