@@ -31,6 +31,13 @@
   that week (and course). Converting by drag is By Type's own sections, and
   the multi-select bar's "Make readings"/"Make tasks" still does it in either
   mode.
+- Changed (desktop): a course column's header is now two rows — the course name
+  alone on top, and the edit / export / import / Moodle-import / delete buttons
+  on a second, quieter row beneath it. The name had been sharing one row with
+  five icons and the studied time, which left it little room at the column's
+  normal width.
+- Changed (desktop): the studied-time label moved down to that button row, at
+  its right edge. Clicking it still opens the same inline editor.
 - Changed (desktop): the email-confirmation UI is off behind a kill switch
   (`EMAIL_CONFIRMATION_UI_ENABLED` in `packages/desktop/auth.js`). With it off,
   sign-up signs you straight in — no "check your inbox" state, no Resend button
