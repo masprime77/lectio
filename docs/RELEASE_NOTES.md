@@ -1,5 +1,23 @@
 ## Unreleased
 
+- New (mobile): the Moodle import gained a **raw, per-item screen**. After the
+  content is fetched, the import now asks how to sort it — "By section" keeps
+  the existing per-section triage, "Every item" opens the new screen, which
+  lists every importable module of the course flat, one row per item, each
+  showing the section it came from with its own week number and its own
+  Skip / Read / Task choice. That's what a section mixing readings and tasks,
+  or spanning weeks, needs.
+- New (mobile): the raw screen carries the same batch helpers and week cascade
+  as the per-section one — Skip / Read / Task applied to every row (Skip being
+  the clear-all, since it creates nothing), and "Weeks from sections" to put
+  every row back on the week guessed from its section's date range. Typing a
+  week cascades down the list counted in sections rather than rows, so items
+  from one Moodle section stay in the same week. Rows left on Skip create
+  nothing, importing is blocked until the semester has loaded, and the existing
+  per-section screen is unchanged.
+- Fixed (mobile): backing out of the Moodle import after choosing "+ New
+  course" no longer creates a second empty course when you fetch again — the
+  form points at the course it just created instead of making another.
 - New (mobile): items can be **dragged between sections** on the course screen.
   In editing mode, long-press a row to lift it and drag it onto another
   section: By Week that moves it to that week, By Type it moves it to that week
