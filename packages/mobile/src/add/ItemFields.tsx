@@ -30,12 +30,15 @@ export function ItemFields({
   courseId,
   kind,
   itemId,
+  initialWeek,
 }: {
   mode: 'create' | 'edit';
   semesterId: string;
   courseId: string;
   kind: 'reading' | 'task';
   itemId?: string;
+  /** Week to open a new item on — a host that stands for one week passes it. */
+  initialWeek?: string;
 }) {
   const theme = useTheme();
   const router = useRouter();
@@ -43,7 +46,12 @@ export function ItemFields({
   const editItemId = mode === 'edit' ? itemId : undefined;
 
   const [title, setTitle] = useState('');
-  const [week, setWeek] = useState('1');
+  // Seeded once: in edit mode the load below overwrites it with the item's own
+  // week, and anything unparseable falls back to the first week (save clamps it
+  // to the semester's length either way).
+  const [week, setWeek] = useState(() =>
+    initialWeek && /^\d+$/.test(initialWeek) ? initialWeek : '1'
+  );
   const [dueDate, setDueDate] = useState('');
   const [maxWeeks, setMaxWeeks] = useState(52);
   const [loaded, setLoaded] = useState(false);
