@@ -44,7 +44,6 @@ import type {
   DropTarget,
   Kind,
   UseCourseDetailResult,
-  WeekGroup,
   WeekSection,
 } from './useCourseDetail';
 import type { PlannerItem, Tag } from '../../../types/lectio-core';
@@ -53,9 +52,10 @@ import type { PlannerItem, Tag } from '../../../types/lectio-core';
 // Drag and drop
 //
 // Long-press a row to lift it, then drag it onto another section to move it
-// there — the phone's version of the desktop board's drag and drop. A By Week
-// section sets the week; a By Type week group sets the week *and* the kind,
-// since the section it hangs under is the kind.
+// there — the phone's version of the desktop board's drag and drop. Each
+// grouping moves what its sections stand for: a By Week section sets the week
+// and leaves the kind alone, a By Type section sets the kind and leaves the
+// week alone.
 //
 // It is deliberately gated behind editing (multi-select) mode. Outside it every
 // gesture on a row is already taken: a tap opens the tag picker, a long-press
@@ -219,22 +219,20 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
   );
 
   const byWeek = result.groupMode === 'week';
-  const readingGroups = byWeek ? [] : result.weekGroups('reading');
-  const taskGroups = byWeek ? [] : result.weekGroups('task');
+  const readingItems = byWeek ? [] : result.sectionItems('reading');
+  const taskItems = byWeek ? [] : result.sectionItems('task');
   const weekSections = byWeek ? result.weekSections() : [];
 
   // Sections come and go as items move between them; a rect left behind by one
-  // that no longer exists would be a hole the finger could land in. The empty
-  // Readings/Tasks placeholders are zones too, so they belong on this list.
-  const emptyKindKeys: string[] = [];
-  if (!byWeek && result.course) {
-    if (result.course.readings.length === 0) emptyKindKeys.push(`${result.course.id}:reading:empty`);
-    if (result.course.tasks.length === 0) emptyKindKeys.push(`${result.course.id}:task:empty`);
-  }
+  // that no longer exists would be a hole the finger could land in. The type
+  // grouping's two sections are always both there — an empty one is a
+  // placeholder, and a drop zone all the same.
   const liveZoneKeys = (
     byWeek
       ? weekSections.map((s) => s.key)
-      : [...readingGroups, ...taskGroups].map((g) => g.key).concat(emptyKindKeys)
+      : result.course
+        ? [`${result.course.id}:reading`, `${result.course.id}:task`]
+        : []
   ).join('|');
   useEffect(() => {
     const live = new Set(liveZoneKeys.split('|'));
@@ -257,8 +255,10 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
   const { course, readingTags, taskTags, progress, editing, selected, selectionKind, picker } =
     result;
 
-  // `showWeek` is off inside a By Week section, where the week is already the
-  // header the row hangs under and repeating it on every row is just noise.
+  // A row carries the caption its list doesn't say for it: `showWeek` in a By
+  // Type section, whose rows span every week, and `showType` in a By Week
+  // section, whose rows are both kinds at once. Neither grouping shows both —
+  // the section header already says the other half.
   // `zoneKey` is the section the row currently sits in — the one place a drag
   // is not allowed to drop it.
   const renderItem = (
@@ -266,7 +266,7 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
     item: PlannerItem,
     tags: Tag[],
     zoneKey: string,
-    showWeek = true
+    caption: { showWeek?: boolean; showType?: boolean }
   ) => {
     const tag = tags.find((t) => t.id === item.status);
     const row = (
@@ -299,8 +299,11 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
           )}
           <View style={styles.itemMain}>
             <Text style={[styles.itemTitle, { color: theme.text }]}>{item.title}</Text>
-            {showWeek && typeof item.week === 'number' && (
+            {caption.showWeek && typeof item.week === 'number' && (
               <Text style={[styles.itemWeek, { color: theme.muted }]}>Week {item.week}</Text>
+            )}
+            {caption.showType && (
+              <Text style={[styles.itemWeek, { color: theme.muted }]}>{kind}</Text>
             )}
             {kind === 'task' && typeof item.dueDate === 'string' && item.dueDate !== '' && (
               <Text style={[styles.itemWeek, { color: theme.muted }]}>due {item.dueDate}</Text>
@@ -330,9 +333,9 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
     );
   };
 
-  // A "Week N · Apr 7 – Apr 13" header with a chevron. Same idea as the desktop
-  // course view's collapsible .course-week-header, and shared by both groupings
-  // — only what hangs under it differs.
+  // A "Week N · Apr 7 – Apr 13" header with a chevron — the desktop course
+  // view's collapsible .course-week-header. Only the By Week grouping has these
+  // now: a By Type section is one list under a plain title.
   const renderSectionHeader = (
     section: CollapsibleSection & { title: string; range: string },
     count: number
@@ -358,27 +361,12 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
     </Pressable>
   );
 
-  // By Type: one week of a single section (Readings or Tasks) and its items.
-  // Dropping a row here sets its week and, when it came from the other section,
-  // its kind — the section it hangs under is the kind.
-  const renderWeekGroup = (kind: Kind, group: WeekGroup, tags: Tag[]) => (
-    <DropSection
-      key={group.key}
-      zoneKey={group.key}
-      target={{ week: group.week, kind }}
-      register={registerZone}
-      activeZone={activeZone}
-      sourceZone={sourceZone}
-    >
-      {renderSectionHeader(group, group.items.length)}
-      {group.open && group.items.map((item) => renderItem(kind, item, tags, group.key))}
-    </DropSection>
-  );
-
-  // By Week: one week of the course, its readings then its tasks. The kind
-  // labels are the desktop week body's "Readings"/"Tasks" section titles; an
-  // empty one is dropped rather than shown as a placeholder — a phone week
-  // section is usually short and the label alone would be noise.
+  // By Week: one week of the course, its readings then its tasks, in one flat
+  // list — each row says which of the two it is, so there is no "Readings" /
+  // "Tasks" sub-heading between them (the desktop week body reads the same).
+  // The add buttons close the list because that is the only place left to hang
+  // them: with the sub-headings gone there is no per-kind header inside a week,
+  // and they are what puts an item straight into *this* week.
   // Dropping a row here only changes its week: the section holds both kinds, so
   // there is nothing in it to say what the item should become.
   const renderWeekSection = (section: WeekSection) => (
@@ -390,31 +378,31 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
       activeZone={activeZone}
       sourceZone={sourceZone}
     >
-      {renderSectionHeader(section, section.count)}
+      {renderSectionHeader(section, section.items.length)}
       {section.open && (
         <>
-          {section.readings.length > 0 && (
-            <>
-              <Text style={[styles.kindLabel, { color: theme.muted }]}>Readings</Text>
-              {section.readings.map((item) =>
-                renderItem('reading', item, readingTags, section.key, false)
-              )}
-            </>
+          {section.items.map(({ kind, item }) =>
+            renderItem(kind, item, kind === 'reading' ? readingTags : taskTags, section.key, {
+              showType: true,
+            })
           )}
-          {section.tasks.length > 0 && (
-            <>
-              <Text style={[styles.kindLabel, { color: theme.muted }]}>Tasks</Text>
-              {section.tasks.map((item) => renderItem('task', item, taskTags, section.key, false))}
-            </>
-          )}
+          <View style={styles.addRow}>
+            <Pressable onPress={() => result.pushAddItem('reading', section.week ?? undefined)}>
+              <Text style={[styles.addMini, { color: theme.accent }]}>+ Reading</Text>
+            </Pressable>
+            <Pressable onPress={() => result.pushAddItem('task', section.week ?? undefined)}>
+              <Text style={[styles.addMini, { color: theme.accent }]}>+ Task</Text>
+            </Pressable>
+          </View>
         </>
       )}
     </DropSection>
   );
 
-  // "Expand all" / "Collapse all" for one section's week headers — the mobile
-  // equivalent of the desktop header's chevrons-down/up buttons. Hidden when
-  // there is at most one week to toggle.
+  // "Expand all" / "Collapse all" for the week headers — the mobile equivalent
+  // of the desktop header's chevrons-down/up buttons. Weeks are the only
+  // collapsible sections left, so this belongs to the By Week grouping alone.
+  // Hidden when there is at most one week to toggle.
   const renderCollapseAll = (groups: CollapsibleSection[]) => {
     if (groups.length < 2) return null;
     const allOpen = groups.every((g) => g.open);
@@ -434,9 +422,10 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
   };
 
   // Top level of the By Week grouping: one "Week N · date range" section per
-  // week that has anything in it, with the per-kind add buttons alongside the
-  // expand/collapse-all control (there are no per-kind sections to hang them
-  // off in this mode).
+  // week that has anything in it. The add buttons here are the ones that reach
+  // a week with nothing in it yet — such a week has no section, so it has none
+  // of the per-week buttons either (the desktop's week picker is the same
+  // escape hatch).
   const renderByWeek = () => (
     <>
       <View style={styles.sectionHeader}>
@@ -463,57 +452,56 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
     </>
   );
 
-  // An empty Readings/Tasks section is still a drop zone — it is the only way
-  // to convert the last item of a kind by dragging, since a section with no
-  // week groups has nothing else to aim at. It stands for the kind alone, so a
-  // row dropped here keeps the week it already had.
-  const renderEmptyKindSection = (kind: Kind, label: string) => (
+  // By Type: one kind's whole list, flat and week-ordered, under the section
+  // header that names the kind — each row carries its own week, so nothing is
+  // grouped under week headers on top of that.
+  // The section stands for the kind alone, so a row dropped here is converted
+  // and keeps the week it already had. An empty section is a placeholder and a
+  // drop zone all the same: it is the only way to convert the last item of a
+  // kind by dragging, since there is nothing else left to aim at.
+  const renderKindSection = (kind: Kind, items: PlannerItem[], tags: Tag[], empty: string) => (
     <DropSection
-      zoneKey={`${course.id}:${kind}:empty`}
+      zoneKey={`${course.id}:${kind}`}
       target={{ kind }}
       register={registerZone}
       activeZone={activeZone}
       sourceZone={sourceZone}
     >
-      <Pressable onPress={() => result.pushAddItem(kind)}>
-        <Text style={[styles.empty, { color: theme.muted }]}>{label}</Text>
-      </Pressable>
+      {items.length === 0 ? (
+        <Pressable onPress={() => result.pushAddItem(kind)}>
+          <Text style={[styles.empty, { color: theme.muted }]}>{empty}</Text>
+        </Pressable>
+      ) : (
+        items.map((item) =>
+          renderItem(kind, item, tags, `${course.id}:${kind}`, { showWeek: true })
+        )
+      )}
     </DropSection>
   );
 
   // Top level of the By Type grouping: a Readings section and a Tasks section,
-  // each split into its own week groups.
+  // each one flat list of that kind.
   const renderByType = () => (
     <>
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Readings</Text>
         <View style={styles.sectionActions}>
-          {renderCollapseAll(readingGroups)}
           <Pressable onPress={() => result.pushAddItem('reading')}>
             <Text style={{ color: theme.accent, fontSize: 15 }}>+ Add</Text>
           </Pressable>
         </View>
       </View>
-      {course.readings.length === 0 ? (
-        renderEmptyKindSection('reading', 'No readings. Tap to add one.')
-      ) : (
-        readingGroups.map((g) => renderWeekGroup('reading', g, readingTags))
-      )}
+      {renderKindSection('reading', readingItems, readingTags, 'No readings. Tap to add one.')}
 
       <View style={[styles.sectionHeader, { marginTop: 24 }]}>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Tasks</Text>
         <View style={styles.sectionActions}>
-          {renderCollapseAll(taskGroups)}
           <Pressable onPress={() => result.pushAddItem('task')}>
             <Text style={{ color: theme.accent, fontSize: 15 }}>+ Add</Text>
           </Pressable>
         </View>
       </View>
-      {course.tasks.length === 0 ? (
-        renderEmptyKindSection('task', 'No tasks. Tap to add one.')
-      ) : (
-        taskGroups.map((g) => renderWeekGroup('task', g, taskTags))
-      )}
+      {renderKindSection('task', taskItems, taskTags, 'No tasks. Tap to add one.')}
     </>
   );
 
@@ -580,7 +568,8 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
         <>
           <PomodoroFab semester={result.semester} defaultCourseId={course.id} />
           {/* The "+" opens the add-sheet on the Tags tab; readings/tasks are added
-              from the per-section "+ Add" controls next to the Readings/Tasks headers. */}
+              from the "+ Add" controls next to the section headers (By Type) or
+              the "+ Reading"/"+ Task" ones closing each week (By Week). */}
           <Fab onPress={() => router.push(`/add?context=tags&id=${result.semester?.id}`)} />
         </>
       )}
@@ -983,8 +972,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   weekTitle: { fontSize: 14, fontWeight: '600' },
-  // "Readings"/"Tasks" inside a By Week section — quieter than a week header.
-  kindLabel: { fontSize: 12, fontWeight: '600', marginBottom: 6, letterSpacing: 0.3 },
   weekRange: { fontSize: 12, flex: 1 },
   weekCount: { fontSize: 12, fontVariant: ['tabular-nums'] },
   chevron: {
@@ -1007,6 +994,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     marginHorizontal: -6,
   },
+
+  // "+ Reading" / "+ Task" closing a week's list — deliberately quieter than
+  // the section headers' actions, like the desktop's .add-mini buttons.
+  addRow: { flexDirection: 'row', gap: 16, marginBottom: 12 },
+  addMini: { fontSize: 14 },
 
   itemContainer: { marginBottom: 8 },
   item: {
