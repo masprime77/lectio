@@ -4343,10 +4343,12 @@ function renderMoodleAccountRow(account) {
 }
 
 // Re-reads the account list from storage and re-renders it, showing/hiding
-// the "Import courses…" button depending on whether any account exists.
+// the "Import courses…" / "Raw import…" buttons depending on whether any
+// account exists.
 async function refreshMoodleAccounts() {
   const listEl = document.getElementById('set-moodle-accounts-list');
   const importBtn = document.getElementById('set-moodle-import');
+  const rawImportBtn = document.getElementById('set-moodle-import-raw');
   if (!window.moodleAuth) {
     listEl.textContent = 'Unavailable';
     return [];
@@ -4369,6 +4371,7 @@ async function refreshMoodleAccounts() {
     accounts.forEach((a) => listEl.appendChild(renderMoodleAccountRow(a)));
   }
   if (importBtn) importBtn.classList.toggle('hidden', accounts.length === 0);
+  if (rawImportBtn) rawImportBtn.classList.toggle('hidden', accounts.length === 0);
   return accounts;
 }
 
@@ -4473,6 +4476,10 @@ function setupMoodleSettings() {
 // than a live semester: the target course lives in state.editingSemester.courses
 // keyed to a course row, and nothing is persisted until Create is clicked.
 // The triage step must read it before writing items anywhere.
+// `raw` picks which triage screen the fetched content lands in: the per-section
+// one (false) or the per-item raw one (true). It's a property of this session,
+// not of the entry point, so the picker's own mode toggle can flip it right up
+// until "Fetch content".
 const moodleImport = {
   accountBaseUrl: null,
   client: null,
@@ -4480,6 +4487,7 @@ const moodleImport = {
   selectedCourseId: null,
   mapped: null,
   draft: false,
+  raw: false,
   returnToSemesterModal: false,
 };
 
@@ -4588,7 +4596,7 @@ function closeMoodleCourseModal() {
   }
 }
 
-async function openMoodleCourseModal({ presetCourseId, draftMode = false } = {}) {
+async function openMoodleCourseModal({ presetCourseId, draftMode = false, raw = false } = {}) {
   const overlay = document.getElementById('moodle-course-overlay');
   const errorEl = document.getElementById('moodle-course-error');
   const loadingEl = document.getElementById('moodle-course-loading');
@@ -4596,6 +4604,7 @@ async function openMoodleCourseModal({ presetCourseId, draftMode = false } = {})
   const selectRow = document.getElementById('moodle-course-select-row');
   const targetRow = document.getElementById('moodle-course-target-row');
   const newNameRow = document.getElementById('moodle-course-newname-row');
+  const modeRow = document.getElementById('moodle-course-mode-row');
   const nextBtn = document.getElementById('moodle-course-next');
 
   errorEl.classList.add('hidden');
@@ -4603,13 +4612,16 @@ async function openMoodleCourseModal({ presetCourseId, draftMode = false } = {})
   selectRow.classList.add('hidden');
   targetRow.classList.add('hidden');
   newNameRow.classList.add('hidden');
+  modeRow.classList.add('hidden');
   nextBtn.disabled = true;
   moodleImport.accountBaseUrl = null;
   moodleImport.client = null;
   moodleImport.courses = [];
   moodleImport.mapped = null;
   moodleImport.draft = draftMode;
+  moodleImport.raw = raw;
   moodleImport.returnToSemesterModal = draftMode;
+  syncMoodleModeToggle();
 
   overlay.classList.remove('hidden');
   loadingEl.textContent = 'Loading your Moodle accounts…';
@@ -4649,6 +4661,7 @@ async function openMoodleCourseModal({ presetCourseId, draftMode = false } = {})
   accountRow.classList.toggle('hidden', accounts.length <= 1);
 
   targetRow.classList.remove('hidden');
+  modeRow.classList.remove('hidden');
   populateMoodleTargetSelect(draftMode);
   const targetSelect = document.getElementById('moodle-course-target');
   if (presetCourseId) {
@@ -4693,6 +4706,19 @@ function draftCourseRows() {
     .filter(Boolean);
 }
 
+// Lights the picker's "By section" / "Every item" button that matches
+// moodleImport.raw. The single place that decides which one is active, so a
+// click, an entry point's preset and a reopen can't disagree.
+function syncMoodleModeToggle() {
+  const toggle = document.getElementById('moodle-course-mode');
+  if (!toggle) return;
+  [...toggle.querySelectorAll('.moodle-mode-btn')].forEach((btn) => {
+    const active = (btn.dataset.mode === 'raw') === moodleImport.raw;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', String(active));
+  });
+}
+
 function setupMoodleImport() {
   const importBtn = document.getElementById('set-moodle-import');
   if (importBtn) {
@@ -4701,6 +4727,22 @@ function setupMoodleImport() {
       openMoodleCourseModal();
     });
   }
+
+  // Same picker, same client, same mapper — only the triage screen differs.
+  const rawImportBtn = document.getElementById('set-moodle-import-raw');
+  if (rawImportBtn) {
+    rawImportBtn.addEventListener('click', () => {
+      closeSettingsModal();
+      openMoodleCourseModal({ raw: true });
+    });
+  }
+
+  document.getElementById('moodle-course-mode').addEventListener('click', (e) => {
+    const btn = e.target.closest('.moodle-mode-btn');
+    if (!btn) return;
+    moodleImport.raw = btn.dataset.mode === 'raw';
+    syncMoodleModeToggle();
+  });
 
   document.getElementById('moodle-course-cancel').addEventListener('click', closeMoodleCourseModal);
   document.getElementById('moodle-course-overlay').addEventListener('click', (e) => {
@@ -4810,10 +4852,11 @@ function setupMoodleImport() {
       }
 
       closeMoodleCourseModal();
-      // Hand the mapped weeks to the triage screen, which owns turning them
-      // into readings/tasks. closeMoodleCourseModal() runs first so a
+      // Hand the mapped weeks to the chosen triage screen, which owns turning
+      // them into readings/tasks. closeMoodleCourseModal() runs first so a
       // create-mode import's New Semester modal is already restored behind it.
-      openMoodleTriageModal(targetCourse, moodleImport.mapped, moodleImport.accountBaseUrl);
+      const openTriage = moodleImport.raw ? openMoodleRawModal : openMoodleTriageModal;
+      openTriage(targetCourse, moodleImport.mapped, moodleImport.accountBaseUrl);
     });
   });
 }
@@ -5050,11 +5093,19 @@ function renderMoodleTriageRow(week, semester) {
 // type every one. Only rows *below* the edited one move — anything already
 // corrected above it stays put — and editing an earlier row re-runs the
 // cascade from there.
-function cascadeMoodleTriageWeeks(rows, fromIndex, maxWeeks) {
+//
+// `stepOf(row, index)` says how far apart two rows are in weeks; it defaults to
+// the row's own index, which is the per-section list's one-row-per-week case.
+// The raw per-item list passes the row's section index instead, so items from
+// the same Moodle section all land in the same week and the next section is the
+// one that advances — the same cascade, counted in sections rather than rows.
+function cascadeMoodleTriageWeeks(rows, fromIndex, maxWeeks, stepOf) {
   const base = rows[fromIndex].getWeekValue();
   if (!Number.isInteger(base) || base < 1) return; // mid-edit or cleared
+  const step = stepOf || ((row, i) => i);
+  const from = step(rows[fromIndex], fromIndex);
   for (let j = fromIndex + 1; j < rows.length; j += 1) {
-    rows[j].setWeekValue(Math.min(maxWeeks, base + (j - fromIndex)));
+    rows[j].setWeekValue(Math.min(maxWeeks, base + (step(rows[j], j) - from)));
   }
 }
 
@@ -5185,6 +5236,273 @@ function openMoodleTriageModal(targetCourse, mapped, accountBaseUrl) {
     });
   };
 
+  overlay.classList.remove('hidden');
+}
+
+// ---------------------------------------------------------------------------
+// Moodle import, raw per-item triage (Phase 16 Part E). The per-section screen
+// above makes one decision per Moodle section; this one makes one decision per
+// *item* — every importable module of the course, flat, each row carrying its
+// own week number and its own Skip/Reading/Task choice. Same mapped input, same
+// suggestWeekFromDateRange seeding, same addItem/persist confirm path; only the
+// granularity of the decision differs.
+//
+// A course can easily reach 60 items, so the batch helpers (filter, set every
+// shown row's type, re-seed every shown row's week) are what make the screen
+// usable — a row-at-a-time pass is the fallback, not the expected workflow.
+// ---------------------------------------------------------------------------
+
+// mapped.weeks[].items → one flat entry per item, each keeping the section it
+// came from (for the row's context line and for grouping) plus that section's
+// week suggestion, which every item in it starts on.
+function flattenMoodleRawItems(mapped, semester) {
+  const entries = [];
+  (mapped.weeks || []).forEach((week, sectionIndex) => {
+    const suggestedWeek = suggestWeekFromDateRange(semester, week.dateRange);
+    week.items.forEach((item) => {
+      entries.push({ item, week, sectionIndex, suggestedWeek });
+    });
+  });
+  return entries;
+}
+
+// One row per Moodle item: its name, the section it came from as context, its
+// own week input (seeded from the section's suggestion) and its own type
+// toggle. Skip is the default, the same default the confirm step filters on, so
+// an untouched row creates nothing.
+//
+// Like renderMoodleTriageRow, the returned object is the row's whole API — the
+// modal drives filtering, batch changes and the week cascade through it rather
+// than reaching into the DOM. `onWeekInput` / `onModeChange` are mutable hooks
+// the modal fills in once the full row list exists.
+function renderMoodleRawRow(entry, semester) {
+  const el = document.createElement('div');
+  el.className = 'moodle-raw-row';
+
+  const info = document.createElement('div');
+  info.className = 'moodle-raw-info';
+  const name = document.createElement('div');
+  name.className = 'moodle-raw-name';
+  name.textContent = entry.item.name;
+  name.title = entry.item.name; // the row ellipsises; the full name stays reachable
+  const section = document.createElement('div');
+  section.className = 'moodle-raw-section';
+  section.textContent = entry.week.sectionName || ('Section ' + entry.week.moodleSection);
+  info.appendChild(name);
+  info.appendChild(section);
+
+  const weekInput = document.createElement('input');
+  weekInput.type = 'number';
+  weekInput.className = 'moodle-raw-week';
+  weekInput.min = '1';
+  weekInput.max = String(semester.weeks);
+  weekInput.placeholder = 'Wk';
+  weekInput.value = entry.suggestedWeek || '';
+  weekInput.setAttribute('aria-label', `Week for ${entry.item.name}`);
+
+  const modeToggle = document.createElement('div');
+  modeToggle.className = 'moodle-mode-toggle';
+  modeToggle.setAttribute('role', 'group');
+  modeToggle.setAttribute('aria-label', 'Import this item as');
+  let mode = 'skip';
+  const modeBtns = MOODLE_TRIAGE_MODES.map((m) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'moodle-mode-btn';
+    btn.textContent = m.label;
+    btn.addEventListener('click', () => {
+      setMode(m.value);
+      if (api.onModeChange) api.onModeChange();
+    });
+    modeToggle.appendChild(btn);
+    return btn;
+  });
+
+  function setMode(next) {
+    mode = next;
+    modeBtns.forEach((btn, i) => {
+      const active = MOODLE_TRIAGE_MODES[i].value === next;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-pressed', String(active));
+    });
+  }
+  setMode(mode);
+
+  el.appendChild(info);
+  el.appendChild(weekInput);
+  el.appendChild(modeToggle);
+
+  const api = {
+    el,
+    entry,
+    onWeekInput: null,
+    onModeChange: null,
+    // Section name is searchable too, so one query can isolate a whole section
+    // and the batch buttons can then be aimed at just that section.
+    matches: (query) =>
+      !query ||
+      entry.item.name.toLowerCase().includes(query) ||
+      String(entry.week.sectionName || '').toLowerCase().includes(query),
+    isVisible: () => !el.classList.contains('hidden'),
+    setVisible: (visible) => el.classList.toggle('hidden', !visible),
+    getMode: () => mode,
+    setMode,
+    getWeekValue: () => parseInt(weekInput.value, 10),
+    setWeekValue: (n) => {
+      weekInput.value = String(n);
+    },
+    // Back to the row's section suggestion — the "Weeks from sections" reset.
+    // A section whose name held no parseable date range has no suggestion, so
+    // the field goes empty rather than to a made-up number.
+    resetWeek: () => {
+      weekInput.value = entry.suggestedWeek || '';
+    },
+    getDecision: () => ({
+      item: entry.item,
+      sectionName: entry.week.sectionName,
+      mode,
+      targetWeek: parseInt(weekInput.value, 10),
+    }),
+  };
+
+  weekInput.addEventListener('input', () => {
+    if (api.onWeekInput) api.onWeekInput();
+  });
+
+  return api;
+}
+
+function closeMoodleRawModal() {
+  document.getElementById('moodle-raw-overlay').classList.add('hidden');
+}
+
+function openMoodleRawModal(targetCourse, mapped, accountBaseUrl) {
+  const overlay = document.getElementById('moodle-raw-overlay');
+  const listEl = document.getElementById('moodle-raw-list');
+  const errorEl = document.getElementById('moodle-raw-error');
+  const emptyEl = document.getElementById('moodle-raw-empty');
+  const sourceEl = document.getElementById('moodle-raw-source');
+  const summaryEl = document.getElementById('moodle-raw-summary');
+  const filterEl = document.getElementById('moodle-raw-filter');
+  const confirmBtn = document.getElementById('moodle-raw-confirm');
+
+  errorEl.classList.add('hidden');
+  sourceEl.textContent = accountBaseUrl ? `From ${accountBaseUrl}` : '';
+  listEl.innerHTML = '';
+  filterEl.value = '';
+  confirmBtn.textContent = 'Import selected';
+
+  const sem = moodleTriageSemesterContext();
+  const isDraft = moodleImport.draft;
+  const rows = flattenMoodleRawItems(mapped, sem).map((entry) => {
+    const row = renderMoodleRawRow(entry, sem);
+    listEl.appendChild(row.el);
+    return row;
+  });
+  confirmBtn.disabled = rows.length === 0;
+
+  // Counts every row, not just the shown ones: the filter is a view, and a row
+  // it hides keeps its decision and is still imported. Saying so out loud here
+  // is what stops a filtered import from looking like it did the wrong thing.
+  const syncSummary = () => {
+    const readings = rows.filter((r) => r.getMode() === 'reading').length;
+    const tasks = rows.filter((r) => r.getMode() === 'task').length;
+    const shown = rows.filter((r) => r.isVisible()).length;
+    const parts = [`${readings} reading(s), ${tasks} task(s) of ${rows.length} item(s)`];
+    if (shown !== rows.length) parts.push(`showing ${shown}`);
+    summaryEl.textContent = parts.join(' · ');
+  };
+
+  const applyFilter = () => {
+    const query = filterEl.value.trim().toLowerCase();
+    rows.forEach((r) => r.setVisible(r.matches(query)));
+    // An empty list means one of two different things — a course with nothing
+    // importable in it, or a filter that matched nothing — and a blank panel
+    // explains neither.
+    emptyEl.textContent =
+      rows.length === 0
+        ? 'This Moodle course has no importable items.'
+        : 'No items match that filter.';
+    emptyEl.classList.toggle('hidden', rows.some((r) => r.isVisible()));
+    syncSummary();
+  };
+
+  // The cascade runs over the whole list, filtered or not, and counts in
+  // sections rather than rows — Moodle sections are consecutive weeks, the
+  // items inside one are not.
+  rows.forEach((row, i) => {
+    row.onWeekInput = () =>
+      cascadeMoodleTriageWeeks(rows, i, sem.weeks, (r) => r.entry.sectionIndex);
+    row.onModeChange = syncSummary;
+  });
+  syncSummary();
+
+  // Assigned (not addEventListener) so re-running the import replaces these
+  // handlers instead of stacking them, mirroring openMoodleTriageModal.
+  document.getElementById('moodle-raw-cancel').onclick = () => closeMoodleRawModal();
+  overlay.onclick = (e) => {
+    if (e.target === overlay) closeMoodleRawModal();
+  };
+  filterEl.oninput = applyFilter;
+
+  // Batch helpers act on the rows the filter currently shows, so "Reading" can
+  // be aimed at a search result instead of the whole course.
+  const shownRows = () => rows.filter((r) => r.isVisible());
+  const setShownModes = (mode) => {
+    shownRows().forEach((r) => r.setMode(mode));
+    syncSummary();
+  };
+  document.getElementById('moodle-raw-all-skip').onclick = () => setShownModes('skip');
+  document.getElementById('moodle-raw-all-reading').onclick = () => setShownModes('reading');
+  document.getElementById('moodle-raw-all-task').onclick = () => setShownModes('task');
+  document.getElementById('moodle-raw-reset-weeks').onclick = () =>
+    shownRows().forEach((r) => r.resetWeek());
+
+  confirmBtn.onclick = async () => {
+    errorEl.classList.add('hidden');
+    const decisions = rows.map((r) => r.getDecision()).filter((d) => d.mode !== 'skip');
+
+    // Every row defaults to Skip, so without this a click here would "succeed"
+    // at creating nothing — same reasoning as the per-section screen.
+    if (decisions.length === 0) {
+      errorEl.textContent = 'Choose Reading or Task for at least one item before importing.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    // Validate every contributing row up front so a bad week number can never
+    // leave a half-finished import behind.
+    const invalid = decisions.find(
+      (d) => !Number.isInteger(d.targetWeek) || d.targetWeek < 1 || d.targetWeek > sem.weeks
+    );
+    if (invalid) {
+      errorEl.textContent = `Enter a valid week (1–${sem.weeks}) for "${invalid.item.name}".`;
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    await withBusy(confirmBtn, 'Importing…', async () => {
+      decisions.forEach((d) => {
+        addItem(targetCourse, d.mode, { title: d.item.name, week: d.targetWeek });
+      });
+      // A create-mode import writes into the unsaved draft course, which the
+      // New Semester modal still owns — Create does the saving and rendering.
+      if (!isDraft) {
+        persist();
+        renderPreservingScroll();
+      }
+      closeMoodleRawModal();
+      const again = confirm(
+        `Imported ${decisions.length} item(s) into "${targetCourse.name}".\n\nImport another course?`
+      );
+      if (again) {
+        if (isDraft) closeModal();
+        openMoodleCourseModal({ draftMode: isDraft, raw: true });
+      }
+    });
+  };
+
+  applyFilter();
   overlay.classList.remove('hidden');
 }
 
