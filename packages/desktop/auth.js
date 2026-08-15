@@ -7,6 +7,15 @@
 // Loaded AFTER supabase-client.js (which sets window.lectioSupabase) and BEFORE
 // app.js. Exposes window.lectioAuth.
 (function () {
+  // Kill switch: forces the app to behave as if email confirmation is not
+  // required, regardless of what signUp() reports. Keep this in sync with the
+  // Supabase project's "Confirm email" toggle (Authentication → Providers →
+  // Email) — this flag only hides the app's own UI states, it does not override
+  // Supabase's server-side enforcement. Flip both back on together when ready to
+  // re-enable the flow. Exported on window.lectioAuth so app.js gates the
+  // confirm-your-email UI off the same constant (one place to flip).
+  const EMAIL_CONFIRMATION_UI_ENABLED = false;
+
   function client() {
     return window.lectioSupabase || null;
   }
@@ -42,13 +51,17 @@
   // the Supabase project, signUp returns a user but no session (a confirm mail
   // was sent); when DISABLED, a session comes back immediately and the auth
   // listener signs the user straight in. Same check as the mobile
-  // AuthProvider's `lastSignUpNeedsConfirmation`.
+  // AuthProvider's `lastSignUpNeedsConfirmation`. Always reports false while the
+  // kill switch above is off, so the caller never opens the confirm state.
   async function signUp(email, password) {
     const c = client();
     if (!c) throw new Error('Cannot reach the server. Check your connection and try again.');
     const { data, error } = await c.auth.signUp({ email, password });
     if (error) throw error;
-    return { needsConfirmation: !!data && !data.session && !!data.user };
+    return {
+      needsConfirmation:
+        EMAIL_CONFIRMATION_UI_ENABLED && !!data && !data.session && !!data.user,
+    };
   }
 
   // Re-send the sign-up confirmation mail. Supabase rate-limits this; the
@@ -159,6 +172,7 @@
   }
 
   window.lectioAuth = {
+    EMAIL_CONFIRMATION_UI_ENABLED,
     getSession,
     onAuthChange,
     signIn,

@@ -5933,6 +5933,14 @@ function setupSignIn() {
   // The address the confirm state (and its Resend button) is about.
   let pendingEmail = '';
 
+  // Kill switch, owned by auth.js (see EMAIL_CONFIRMATION_UI_ENABLED there):
+  // when false, no confirm-your-email state, no Resend button and no blocked
+  // sign-in message — sign-up and sign-in behave as they did before the
+  // confirmation flow existed. Keep it in sync with the Supabase project's
+  // "Confirm email" toggle; it only hides this app's UI, it does not override
+  // Supabase's server-side enforcement.
+  const confirmationUi = lectioAuth.EMAIL_CONFIRMATION_UI_ENABLED;
+
   function showError(msg) {
     errEl.textContent = msg;
     errEl.classList.remove('hidden');
@@ -5998,14 +6006,23 @@ function setupSignIn() {
       // With email confirmation OFF, sign-up returns a session immediately and
       // onAuthChange → handleSession() hides the overlay and inits — nothing
       // more to do here. With it ON, signUp reports needsConfirmation instead
-      // and no session arrives until the emailed link is opened.
-      if (result && result.needsConfirmation) showConfirm(email);
+      // and no session arrives until the emailed link is opened. The kill
+      // switch (auth.js) also forces needsConfirmation false when the whole
+      // confirmation UI is disabled.
+      if (confirmationUi && result && result.needsConfirmation) showConfirm(email);
     } catch (e) {
       const msg = lectioAuth.friendlyAuthError(e);
       // Signing in on an account that never confirmed: same dead end as a
       // pending sign-up, so offer the same Resend instead of a bare message.
-      if (isEmailNotConfirmed(e)) showConfirm(email, msg);
-      else showError(msg);
+      if (isEmailNotConfirmed(e)) {
+        if (confirmationUi) showConfirm(email, msg);
+        // Kill switch off: neither the confirm state nor friendlyAuthError's
+        // "confirm your email" text should surface. Reaching here means the
+        // Supabase "Confirm email" toggle is still ON while the flag is off (the
+        // two are meant to stay in sync), so fall back to a generic failure
+        // rather than pointing at a flow the app currently hides.
+        else showError('Something went wrong. Please try again.');
+      } else showError(msg);
     } finally {
       setBusy(false);
     }
