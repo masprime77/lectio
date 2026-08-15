@@ -1,5 +1,16 @@
 ## Unreleased
 
+- Fixed (mobile): the "check your inbox" notice now also appears when you try to
+  **sign in** with an account that was never confirmed — previously that showed
+  a message with no way to act on it, while the Resend link only existed after a
+  sign-up. Resending also confirms itself ("Sent — check your inbox…") instead
+  of looking like nothing happened, the notice names the address it is about,
+  and it no longer lingers from an earlier attempt with a different email.
+- Docs: `docs/EMAIL_VERIFICATION.md` describes turning on Supabase's "Confirm
+  email" — what to enable, the exact redirect URLs both apps need, why the
+  confirmation link must not point at the `lectio://` scheme, what happens to
+  existing accounts, how to test it on each platform, and how to roll it back.
+  Linked from the README.
 - Fixed (desktop): creating an account no longer looks like it did nothing when
   the project requires email confirmation. Sign-up now reports that a
   confirmation is pending, and the sign-in dialog switches to a "check your
