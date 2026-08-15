@@ -1,5 +1,24 @@
 ## Unreleased
 
+- Changed (mobile): a course's **By Type** sections no longer split into week
+  groups. Readings and Tasks are each one flat list ordered by week, since every
+  row already captions the week it belongs to — the header row and the caption
+  were saying the same thing twice.
+- Changed (mobile): a week in **By Week** now lists its items flat too. The
+  "Readings" and "Tasks" sub-headings inside a week are gone; each row carries a
+  small "reading"/"task" caption instead, in the same muted style as its week
+  and due-date captions.
+- New (mobile): "+ Reading" and "+ Task" buttons close each week's list in **By
+  Week**, and open the add form on that week — the sub-headings they used to sit
+  next to are gone. The buttons next to the "Weeks" header stay: a week with
+  nothing in it yet has no section, so they are the way to reach it.
+- Changed (mobile): dragging a row is now what the section it lands on stands
+  for — a week in **By Week** (kind untouched), a kind in **By Type** (week
+  untouched). Dragging inside **By Type** no longer changes an item's week; the
+  multi-select bar's "Week" action still does, in either mode.
+- Changed (mobile): with **By Type**'s week groups gone, "Expand all"/"Collapse
+  all" appears in **By Week** only — weeks are the only collapsible sections
+  left.
 - Changed (desktop): a week in **By Week** now lists its items flat. The
   "Readings" and "Tasks" sub-headings inside a week are gone — one list per
   week, readings first, then tasks — matching the shape By Type already used.
