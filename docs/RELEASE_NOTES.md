@@ -1,5 +1,11 @@
 ## Unreleased
 
+- Fixed (desktop): the Pomodoro menu bar timer no longer freezes when the window
+  is minimized, occluded, or unfocused. Chromium was throttling the renderer's
+  tick loop, which stopped both the Tray countdown and phase-complete detection
+  (study-time credit, the system notification, the "move on?" modal) until the
+  window regained focus. Remaining time was never wrong — the session is
+  deadline-based — only its reporting was stalled.
 - Changed (mobile): a course's **By Type** sections no longer split into week
   groups. Readings and Tasks are each one flat list ordered by week, since every
   row already captions the week it belongs to — the header row and the caption

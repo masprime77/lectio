@@ -39,6 +39,15 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // Without this, Chromium throttles/suspends the renderer's timers
+      // (including the Pomodoro's setInterval tick loop in app.js) once the
+      // window is minimized, occluded, or unfocused — freezing both the
+      // header countdown and the Tray display, and delaying phase-complete
+      // detection (study-time credit, notification, advance modal) until
+      // the window regains focus. The session itself is deadline-based
+      // (see pomodoro-core.js), so this only affects how promptly ticks
+      // fire, never the correctness of the remaining time.
+      backgroundThrottling: false,
     },
   });
 
