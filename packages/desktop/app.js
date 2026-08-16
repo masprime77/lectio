@@ -2624,6 +2624,17 @@ async function setupPomodoro() {
     window.pomodoroTray.onOpenModal(openPomodoroModal);
   }
 
+  // Defensive resync: backgroundThrottling:false (see main.js) is the real
+  // fix, but if a tick is ever delayed right as the window is restored,
+  // this catches up immediately instead of waiting up to POMODORO_TICK_MS
+  // for the next natural tick — cheap, and never wrong since onPomodoroTick
+  // is idempotent when nothing has changed.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && state.pomodoro.intervalId) {
+      onPomodoroTick();
+    }
+  });
+
   const overlay = document.getElementById('pomodoro-overlay');
   const closeBtn = document.getElementById('pomodoro-close');
   closeBtn.innerHTML = icon('x');
