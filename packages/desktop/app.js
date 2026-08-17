@@ -2624,6 +2624,11 @@ async function setupPomodoro() {
     window.pomodoroTray.onOpenModal(openPomodoroModal);
   }
 
+  if (window.pomodoroPopup) {
+    window.pomodoroPopup.onConfirm(() => confirmPomodoroAdvance());
+    window.pomodoroPopup.onStop(() => stopPomodoro(true));
+  }
+
   // Defensive resync: backgroundThrottling:false (see main.js) is the real
   // fix, but if a tick is ever delayed right as the window is restored,
   // this catches up immediately instead of waiting up to POMODORO_TICK_MS
@@ -2789,6 +2794,7 @@ function handlePomodoroPhaseComplete() {
   stopPomodoroTicking();
   persistPomodoroSession();
   openPomodoroAdvanceModal();
+  showPomodoroCompletionPopup();
   renderPomodoroControl();
 }
 
@@ -2850,6 +2856,47 @@ function pomodoroAdvanceCopy(session) {
   };
 }
 
+// Effective light/dark for windows outside this document (the completion
+// popup): 'auto' has no data-theme attribute to read from a second window,
+// so fall back to the same media query the CSS itself would resolve.
+function resolveEffectiveTheme() {
+  const attr = document.documentElement.getAttribute('data-theme');
+  if (attr === 'light' || attr === 'dark') return attr;
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light';
+}
+
+// "Pomodoro N of {pomodorosUntilLongBreak}" — same modulo math as the
+// header button's dot indicator (see pomodoroDotsHtml below), so the two
+// never disagree. `session.completedPomodoros` hasn't been incremented yet
+// for the work phase that just finished, hence the +1 there.
+function pomodoroCycleStatusText(session) {
+  const count = clampPomodoroSettings(state.pomodoro.settings).pomodorosUntilLongBreak;
+  const done = session.phase === 'work' ? session.completedPomodoros + 1 : session.completedPomodoros;
+  const within = done % count;
+  const filled = within === 0 && done > 0 ? count : within;
+  return `Pomodoro ${filled} of ${count}`;
+}
+
+// Shows the always-on-top completion popup (main.js) with the same copy as
+// the in-window advance modal, so the two are never inconsistent. No-op if
+// the bridge isn't present or there is nothing awaiting a decision.
+function showPomodoroCompletionPopup() {
+  if (!window.pomodoroPopup) return;
+  const s = state.pomodoro.session;
+  if (!isAwaitingAdvance(s)) return;
+  const copy = pomodoroAdvanceCopy(s);
+  window.pomodoroPopup.show({
+    title: copy.title,
+    status: pomodoroCycleStatusText(s),
+    message: copy.message,
+    confirmLabel: copy.confirm,
+    canStop: copy.canStop,
+    theme: resolveEffectiveTheme(),
+  });
+}
+
 function openPomodoroAdvanceModal() {
   const overlay = document.getElementById('pomodoro-advance-overlay');
   if (!overlay || !isAwaitingAdvance(state.pomodoro.session)) return;
@@ -2866,6 +2913,7 @@ function openPomodoroAdvanceModal() {
 function closePomodoroAdvanceModal() {
   const overlay = document.getElementById('pomodoro-advance-overlay');
   if (overlay) overlay.classList.add('hidden');
+  if (window.pomodoroPopup) window.pomodoroPopup.hide();
 }
 
 // The user said yes: perform the transition core held back.

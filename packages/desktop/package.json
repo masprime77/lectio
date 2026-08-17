@@ -91,7 +91,9 @@
     "files": [
       "main.js",
       "preload.js",
+      "preload-pomodoro-popup.js",
       "index.html",
+      "pomodoro-popup.html",
       "app.js",
       "auth.js",
       "supabase-client.js",
