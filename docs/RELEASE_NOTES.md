@@ -1,5 +1,15 @@
 ## Unreleased
 
+- New (desktop): when a focus block or break ends, a small always-on-top popup
+  now appears wherever you are — in another app, on another Space, or over a
+  full-screen window — instead of only inside Lectio. It names the pomodoro
+  ("Pomodoro 2 of 4"), says what comes next, and takes focus so its button is
+  clickable straight away.
+- New (desktop): the completion popup's buttons drive the same session actions
+  as the in-window "move on?" modal (start the next phase, or stop the timer and
+  credit partial time), and the two stay in sync — resolving the question in
+  either place closes both. Dismissing the popup (× or Escape) leaves the
+  session parked exactly as before, ready to resume from the header button.
 - Fixed (desktop): the Pomodoro menu bar timer no longer freezes when the window
   is minimized, occluded, or unfocused. Chromium was throttling the renderer's
   tick loop, which stopped both the Tray countdown and phase-complete detection
