@@ -1191,6 +1191,13 @@ body.electron-app .header-inner { padding-left: 80px; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Muted metadata under the name, styled like .course-column-header-time. */
+.course-column-header-exam {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--muted);
+  white-space: nowrap;
+}
 /* Second row: icon toolbar on the left, studied time trailing on the right. */
 .course-column-header-actions {
   display: flex;
@@ -1329,6 +1336,15 @@ body.electron-app .header-inner { padding-left: 80px; }
   border: 1px solid var(--border);
   border-radius: 6px;
   background: none;
+}
+.ns-course-row input[type="date"] {
+  width: 130px;
+  padding: 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--surface);
+  flex-shrink: 0;
 }
 .modal-actions {
   display: flex;
