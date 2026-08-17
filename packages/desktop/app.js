@@ -3531,6 +3531,7 @@ async function exportCourse(course) {
     id: course.id,
     name: course.name,
     color: course.color,
+    examDate: course.examDate || '',
     readings: course.readings.map(({ id, week, title, status }) => ({ id, week, title, status })),
     tasks: course.tasks.map(({ id, week, title, dueDate, status }) => ({ id, week, title, dueDate, status })),
   };
@@ -3565,6 +3566,7 @@ async function importCourse(parsedPayload) {
     id: uid('course'),
     name: incoming.name,
     color: incoming.color || '#4A90D9',
+    examDate: incoming.examDate || '',
     readings: (incoming.readings || []).map((r) => ({ ...r, id: uid('r') })),
     tasks: (incoming.tasks || []).map((t) => ({ ...t, id: uid('t') })),
   };
@@ -3603,6 +3605,7 @@ async function importCourseFromModal() {
     id: uid('course'),
     name: incoming.name,
     color: incoming.color || '#4A90D9',
+    examDate: incoming.examDate || '',
     readings: (incoming.readings || []).map((r) => ({ ...r, id: uid('r') })),
     tasks: (incoming.tasks || []).map((t) => ({ ...t, id: uid('t') })),
   };
