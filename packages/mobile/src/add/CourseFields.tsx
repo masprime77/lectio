@@ -11,10 +11,16 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { addCourse, editCourseColor, editCourseName } from '@lectio/core/planner-core';
+import {
+  addCourse,
+  editCourseColor,
+  editCourseExamDate,
+  editCourseName,
+} from '@lectio/core/planner-core';
 import { storage } from '../storage';
 import { saveWithConflict } from '../sync/saveWithConflict';
 import { useTheme } from '../theme';
+import { DateField } from '../components/DateField';
 
 const COURSE_COLORS = ['#4a90d9', '#22c55e', '#ef4444', '#f97316',
                        '#a855f7', '#eab308', '#14b8a6', '#ec4899'];
@@ -35,6 +41,7 @@ export function CourseFields({
 
   const [name, setName] = useState('');
   const [color, setColor] = useState(COURSE_COLORS[0]);
+  const [examDate, setExamDate] = useState('');
   const [loaded, setLoaded] = useState(!editCourseId);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +64,7 @@ export function CourseFields({
         }
         setName(course.name);
         if (course.color) setColor(course.color);
+        setExamDate(typeof course.examDate === 'string' ? course.examDate : '');
         setLoaded(true);
       })
       .catch((err) => {
@@ -87,8 +95,9 @@ export function CourseFields({
       if (editCourseId) {
         editCourseName(sem, editCourseId, trimmedName);
         editCourseColor(sem, editCourseId, color);
+        editCourseExamDate(sem, editCourseId, examDate);
       } else {
-        addCourse(sem, { name: trimmedName, color });
+        addCourse(sem, { name: trimmedName, color, examDate });
       }
       // Conflict-aware: "Cancel" stays on the form so edits aren't lost.
       const outcome = await saveWithConflict(id, sem);
@@ -129,6 +138,15 @@ export function CourseFields({
           />
         ))}
       </View>
+
+      <Text style={[styles.label, { color: theme.muted }]}>Exam date</Text>
+      <DateField
+        value={examDate}
+        onChange={setExamDate}
+        placeholder="No exam date"
+        allowClear
+        disabled={busy}
+      />
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
