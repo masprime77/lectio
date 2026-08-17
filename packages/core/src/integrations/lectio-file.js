@@ -53,6 +53,7 @@
       id: course.id,
       name: course.name,
       color: course.color,
+      examDate: course.examDate || '',
       readings: (course.readings || []).map(({ id, week, title, status }) => ({
         id,
         week,
@@ -177,6 +178,7 @@
       id: newId('course'),
       name: course.name,
       color: course.color || '#4A90D9',
+      examDate: course.examDate || '',
       readings: (course.readings || []).map((r) => ({ ...r, id: newId('r') })),
       tasks: (course.tasks || []).map((t) => ({ ...t, id: newId('t') })),
     };

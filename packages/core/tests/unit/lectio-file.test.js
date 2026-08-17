@@ -69,6 +69,19 @@ describe('build (export) envelopes', () => {
     expect(clean.tasks).toEqual([]);
   });
 
+  it('keeps the course exam date through cleanCourse/buildCourseFile', () => {
+    const clean = cleanCourse({ ...sampleCourse(), examDate: '2026-05-01' });
+    expect(clean.examDate).toBe('2026-05-01');
+    const file = buildCourseFile({ ...sampleCourse(), examDate: '2026-05-01' });
+    expect(file.course.examDate).toBe('2026-05-01');
+  });
+
+  it('cleanCourse defaults a missing exam date to empty string, not an absent key', () => {
+    const clean = cleanCourse(sampleCourse());
+    expect(clean.examDate).toBe('');
+    expect(clean).toHaveProperty('examDate');
+  });
+
   it('a built course file round-trips through parse', () => {
     const file = buildCourseFile(sampleCourse());
     expect(parseCourseFile(file).name).toBe('Algorithms');
@@ -196,6 +209,21 @@ describe('prepareImportedCourse', () => {
     expect(out.color).toBe('#4A90D9');
     expect(out.readings).toEqual([]);
     expect(out.tasks).toEqual([]);
+  });
+
+  it('preserves the exam date, defaulting a missing one to empty string', () => {
+    const makeId = (p) => `${p}-x`;
+    const dated = prepareImportedCourse({ ...sampleCourse(), examDate: '2026-05-01' }, makeId);
+    expect(dated.examDate).toBe('2026-05-01');
+    const bare = prepareImportedCourse({ name: 'Bare' }, makeId);
+    expect(bare.examDate).toBe('');
+  });
+
+  it('an exported course round-trips its exam date back through import', () => {
+    const makeId = (p) => `${p}-x`;
+    const file = buildCourseFile({ ...sampleCourse(), examDate: '2026-05-01' });
+    const imported = prepareImportedCourse(parseCourseFile(file), makeId);
+    expect(imported.examDate).toBe('2026-05-01');
   });
 
   it('uses core uid when no id maker is supplied', () => {
