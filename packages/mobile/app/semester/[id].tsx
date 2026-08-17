@@ -280,6 +280,7 @@ export default function CoursesScreen() {
             {getCourseStudySeconds(item) > 0
               ? ` · ${formatHoursMinutes(getCourseStudySeconds(item))} studied`
               : ''}
+            {item.examDate ? ` · exam ${item.examDate}` : ''}
           </Text>
           {breakdownOpen && (
             <CourseBreakdown course={item} semester={semester!} />
