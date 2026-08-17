@@ -111,6 +111,7 @@
     'alpha-asc',
     'week-asc',
     'week-desc',
+    'exam-asc',
   ];
 
   // Return a NEW sorted array of courses (never mutates input). Progress sorts
@@ -122,6 +123,19 @@
       return copy.sort((a, b) => courseProgress(a, semester) - courseProgress(b, semester));
     if (sortOrder === 'progress-desc')
       return copy.sort((a, b) => courseProgress(b, semester) - courseProgress(a, semester));
+    if (sortOrder === 'exam-asc') {
+      // Soonest exam first ('YYYY-MM-DD' compares correctly as a string);
+      // courses with no exam date sort after every dated one, and ties fall
+      // back to alphabetical like every other order here.
+      return copy.sort((a, b) => {
+        const ea = a.examDate || '';
+        const eb = b.examDate || '';
+        if (ea && eb) return ea === eb ? a.name.localeCompare(b.name) : ea < eb ? -1 : 1;
+        if (ea && !eb) return -1;
+        if (!ea && eb) return 1;
+        return a.name.localeCompare(b.name);
+      });
+    }
     // alpha-asc, week-asc and week-desc all use alphabetical (A → Z) order.
     // Any unknown/removed order (e.g. a stale 'alpha-desc') also lands here.
     return copy.sort((a, b) => a.name.localeCompare(b.name));
@@ -138,10 +152,18 @@
     return item;
   }
 
-  // Add a course with a generated unique id; returns the new course.
-  function addCourse(semester, { name, color }) {
+  // Add a course with a generated unique id; returns the new course. `examDate`
+  // is optional and defaults to '' (no exam date set).
+  function addCourse(semester, { name, color, examDate }) {
     if (!Array.isArray(semester.courses)) semester.courses = [];
-    const course = { id: uid('course'), name, color, readings: [], tasks: [] };
+    const course = {
+      id: uid('course'),
+      name,
+      color,
+      examDate: examDate || '',
+      readings: [],
+      tasks: [],
+    };
     semester.courses.push(course);
     return course;
   }
@@ -168,6 +190,15 @@
     const course = getCourses(semester).find((c) => c.id === courseId);
     if (!course) return null;
     course.color = color;
+    return course;
+  }
+
+  // Sets a course's exam date ('' clears it); returns the updated course,
+  // or null if not found. Mirrors editCourseColor.
+  function editCourseExamDate(semester, courseId, examDate) {
+    const course = getCourses(semester).find((c) => c.id === courseId);
+    if (!course) return null;
+    course.examDate = examDate || '';
     return course;
   }
 
@@ -331,6 +362,7 @@
     deleteCourse,
     editCourseName,
     editCourseColor,
+    editCourseExamDate,
     reorderCourses,
     addItem,
     editItem,
