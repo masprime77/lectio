@@ -73,6 +73,7 @@ function restoreSort() {
     'progress-desc', 'progress-asc',
     'alpha-asc',
     'week-asc', 'week-desc',
+    'exam-asc',
   ];
   return valid.includes(v) ? v : 'progress-desc';
 }
@@ -628,6 +629,18 @@ function sortedCourses(courses) {
     return copy.sort(
       (a, b) => courseProgress(b, state.semester) - courseProgress(a, state.semester)
     );
+  if (state.sortOrder === 'exam-asc') {
+    // Mirrors core's exam-asc: soonest date first ('YYYY-MM-DD' compares as a
+    // string), undated courses after every dated one, alphabetical on ties.
+    return copy.sort((a, b) => {
+      const ea = a.examDate || '';
+      const eb = b.examDate || '';
+      if (ea && eb) return ea === eb ? a.name.localeCompare(b.name) : ea < eb ? -1 : 1;
+      if (ea && !eb) return -1;
+      if (!ea && eb) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }
   // alpha-asc, week-asc and week-desc all use alphabetical (A → Z) order.
   // Any unknown/removed order (e.g. a stale 'alpha-desc') also lands here.
   return copy.sort((a, b) => a.name.localeCompare(b.name));
