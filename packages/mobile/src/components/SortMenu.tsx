@@ -18,6 +18,7 @@ interface SortMenuProps {
 
 // Same wording and order as the desktop's #sort-select options.
 const OPTIONS: { value: SortOrder; label: string }[] = [
+  { value: 'exam-asc', label: 'Nearest exam' },
   { value: 'week-desc', label: 'Weeks: high to low' },
   { value: 'week-asc', label: 'Weeks: low to high' },
   { value: 'progress-desc', label: 'Progress: high % first' },

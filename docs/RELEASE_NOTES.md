@@ -251,6 +251,16 @@
   importing one back, would have silently dropped the new exam date — both
   sides whitelist which course fields survive, so `examDate` was added to
   each. A course with no date round-trips as an empty one.
+- New (mobile): the course form gained an optional **Exam date** field, using
+  the same date picker a task's due date already uses. Editing a course
+  pre-fills the saved date, and Clear removes it.
+- New (mobile): a course card on the semester's course list shows
+  " · exam &lt;date&gt;" at the end of its meta line once a date is set, in the
+  same place the studied time appears.
+- New (mobile): "Nearest exam" joins the course sort menu, first in the list,
+  ordering the soonest exam first with undated courses last. The saved choice
+  already validates against the shared sort-order list, so it persists like
+  every other order with no extra work.
 - New (desktop): each course row in the New/Edit semester dialog gains an
   optional exam-date field, saved with the course and pre-filled when the
   dialog reopens. Clearing it removes the date. A course that has one shows a
