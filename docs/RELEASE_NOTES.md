@@ -261,6 +261,18 @@
   ordering the soonest exam first with undated courses last. The saved choice
   already validates against the shared sort-order list, so it persists like
   every other order with no extra work.
+- New (desktop): each course row in the New/Edit semester dialog gains an
+  optional exam-date field, saved with the course and pre-filled when the
+  dialog reopens. Clearing it removes the date. A course that has one shows a
+  muted "exam &lt;date&gt;" line under its name in the course column header.
+- New (desktop): "Nearest exam" joins the course sort dropdown, ordering
+  columns by the soonest exam first. Courses with no exam date come after
+  every dated one, and courses sharing a date stay in A → Z order. The choice
+  now survives a restart like the other sort orders do.
+- Fixed (desktop): exporting a course to a `.lectio.json` file and importing
+  it back dropped the exam date. The renderer keeps its own copy of the
+  export/import field list rather than using the shared one, so all three
+  places it appears needed the new field.
 
 ## 1.1.1 — 2026-08-11
 
