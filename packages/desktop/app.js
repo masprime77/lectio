@@ -955,6 +955,15 @@ function renderCourseBoard() {
     nameSpan.style.color = course.color;
     header.appendChild(nameSpan);
 
+    // Raw ISO string, like the item due-date badge — no locale formatting.
+    if (course.examDate) {
+      const examSpan = document.createElement('span');
+      examSpan.className = 'course-column-header-exam';
+      examSpan.textContent = 'exam ' + course.examDate;
+      examSpan.title = 'Exam date — edit in "Edit semester"';
+      header.appendChild(examSpan);
+    }
+
     const actions = document.createElement('div');
     actions.className = 'course-column-header-actions';
     header.appendChild(actions);
@@ -3923,6 +3932,12 @@ function addCourseField(course) {
   color.value = course ? course.color : DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
   color.className = 'ns-course-color';
 
+  const exam = document.createElement('input');
+  exam.type = 'date';
+  exam.className = 'ns-course-exam';
+  exam.title = 'Exam date (optional)';
+  if (course && course.examDate) exam.value = course.examDate;
+
   const remove = document.createElement('button');
   remove.type = 'button';
   remove.className = 'icon-btn';
@@ -3932,6 +3947,7 @@ function addCourseField(course) {
 
   row.appendChild(name);
   row.appendChild(color);
+  row.appendChild(exam);
   row.appendChild(remove);
   container.appendChild(row);
 }
@@ -3998,9 +4014,18 @@ async function submitSemesterFromModal() {
       const cname = row.querySelector('.ns-course-name').value.trim();
       if (!cname) return;
       const color = row.querySelector('.ns-course-color').value;
+      const examDate = row.querySelector('.ns-course-exam').value || '';
       const existing = byId.get(row.dataset.courseId);
-      if (existing) courses.push({ ...existing, name: cname, color });
-      else courses.push({ id: uid('course'), name: cname, color, readings: [], tasks: [] });
+      if (existing) courses.push({ ...existing, name: cname, color, examDate });
+      else
+        courses.push({
+          id: uid('course'),
+          name: cname,
+          color,
+          examDate,
+          readings: [],
+          tasks: [],
+        });
     });
 
     const semester = {
@@ -4038,9 +4063,18 @@ async function submitSemesterFromModal() {
     const cname = row.querySelector('.ns-course-name').value.trim();
     if (!cname) return;
     const color = row.querySelector('.ns-course-color').value;
+    const examDate = row.querySelector('.ns-course-exam').value || '';
     const drafted = draftById.get(row.dataset.courseId);
-    if (drafted) courses.push({ ...drafted, name: cname, color });
-    else courses.push({ id: uid('course'), name: cname, color, readings: [], tasks: [] });
+    if (drafted) courses.push({ ...drafted, name: cname, color, examDate });
+    else
+      courses.push({
+        id: uid('course'),
+        name: cname,
+        color,
+        examDate,
+        readings: [],
+        tasks: [],
+      });
   });
 
   const existing = await api.list();
