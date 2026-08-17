@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import core from '../../src/planner-core.js';
+import cjsCore from '../helpers/require-core.cjs';
 
 const sample = () => ({
   id: 'ss2025',
@@ -37,6 +38,18 @@ describe('course operations', () => {
     expect(a.tasks).toEqual([]);
   });
 
+  it('adding a course without an exam date defaults it to empty string', () => {
+    const sem = { courses: [] };
+    const a = core.addCourse(sem, { name: 'A', color: '#1' });
+    expect(a.examDate).toBe('');
+  });
+
+  it('adding a course accepts an exam date', () => {
+    const sem = { courses: [] };
+    const a = core.addCourse(sem, { name: 'A', color: '#1', examDate: '2026-07-01' });
+    expect(a.examDate).toBe('2026-07-01');
+  });
+
   it('deleting a course removes it from the list', () => {
     const sem = sample();
     expect(core.deleteCourse(sem, 'c1')).toBe(true);
@@ -69,6 +82,26 @@ describe('course operations', () => {
     expect(core.editCourseColor(sem, 'nope', '#abc')).toBeNull();
   });
 
+  it('editing a course exam date changes only that course', () => {
+    const sem = sample();
+    const course = core.editCourseExamDate(sem, 'c1', '2026-06-15');
+    expect(course).toBe(sem.courses[0]);
+    expect(sem.courses[0]).toMatchObject({ id: 'c1', examDate: '2026-06-15' });
+    expect(sem.courses[1].examDate).toBeUndefined();
+  });
+
+  it('editing a course exam date to empty string clears it', () => {
+    const sem = sample();
+    core.editCourseExamDate(sem, 'c1', '2026-06-15');
+    core.editCourseExamDate(sem, 'c1', '');
+    expect(sem.courses[0].examDate).toBe('');
+  });
+
+  it('editing the exam date of an unknown course returns null', () => {
+    const sem = sample();
+    expect(core.editCourseExamDate(sem, 'nope', '2026-06-15')).toBeNull();
+  });
+
   it('reordering courses applies the given order in place', () => {
     const sem = sample();
     const ref = sem.courses;
@@ -81,5 +114,18 @@ describe('course operations', () => {
     const sem = sample();
     core.reorderCourses(sem, ['nope', 'c2']);
     expect(sem.courses.map((c) => c.id)).toEqual(['c2', 'c1']);
+  });
+});
+
+describe('CommonJS surface (desktop main-process path)', () => {
+  it('exposes addCourse with the exam-date default', () => {
+    const sem = { courses: [] };
+    expect(cjsCore.addCourse(sem, { name: 'A', color: '#1' }).examDate).toBe('');
+  });
+
+  it('exposes editCourseExamDate', () => {
+    const sem = sample();
+    expect(cjsCore.editCourseExamDate(sem, 'c1', '2026-06-15').examDate).toBe('2026-06-15');
+    expect(cjsCore.editCourseExamDate(sem, 'nope', '2026-06-15')).toBeNull();
   });
 });

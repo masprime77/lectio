@@ -29,6 +29,7 @@ describe('SORT_ORDERS', () => {
       'alpha-asc',
       'week-asc',
       'week-desc',
+      'exam-asc',
     ]);
   });
 });
@@ -89,6 +90,56 @@ describe('sortedCourses', () => {
     expect(names(core.sortedCourses(courses(), semester(), 'week-desc'))).toEqual([
       'Alpha',
       'Mid',
+      'Zeta',
+    ]);
+  });
+
+  it('exam-asc orders courses with an exam date soonest-first', () => {
+    const cs = [
+      { id: 'c-1', name: 'Late', examDate: '2026-06-01', readings: [], tasks: [] },
+      { id: 'c-2', name: 'Soon', examDate: '2026-03-15', readings: [], tasks: [] },
+      { id: 'c-3', name: 'Mid', examDate: '2026-04-20', readings: [], tasks: [] },
+    ];
+    expect(names(core.sortedCourses(cs, semester(), 'exam-asc'))).toEqual([
+      'Soon',
+      'Mid',
+      'Late',
+    ]);
+  });
+
+  it('exam-asc puts courses with no exam date after every dated course', () => {
+    const cs = [
+      { id: 'c-1', name: 'NoDate', examDate: '', readings: [], tasks: [] },
+      { id: 'c-2', name: 'Dated', examDate: '2026-05-01', readings: [], tasks: [] },
+    ];
+    expect(names(core.sortedCourses(cs, semester(), 'exam-asc'))).toEqual([
+      'Dated',
+      'NoDate',
+    ]);
+  });
+
+  it('exam-asc treats a missing examDate like an empty one', () => {
+    const cs = [
+      { id: 'c-1', name: 'Absent', readings: [], tasks: [] },
+      { id: 'c-2', name: 'Dated', examDate: '2026-05-01', readings: [], tasks: [] },
+    ];
+    expect(names(core.sortedCourses(cs, semester(), 'exam-asc'))).toEqual([
+      'Dated',
+      'Absent',
+    ]);
+  });
+
+  it('exam-asc falls back to A → Z among courses with the same or no exam date', () => {
+    const cs = [
+      { id: 'c-1', name: 'Zeta', examDate: '', readings: [], tasks: [] },
+      { id: 'c-2', name: 'Alpha', examDate: '', readings: [], tasks: [] },
+      { id: 'c-3', name: 'Beta', examDate: '2026-05-01', readings: [], tasks: [] },
+      { id: 'c-4', name: 'Yeta', examDate: '2026-05-01', readings: [], tasks: [] },
+    ];
+    expect(names(core.sortedCourses(cs, semester(), 'exam-asc'))).toEqual([
+      'Beta',
+      'Yeta',
+      'Alpha',
       'Zeta',
     ]);
   });
