@@ -92,3 +92,16 @@ contextBridge.exposeInMainWorld('pomodoroTray', {
   onStop: (callback) => ipcRenderer.on('tray-pomodoro-stop', () => callback()),
   onOpenModal: (callback) => ipcRenderer.on('tray-open-pomodoro-modal', () => callback()),
 });
+
+// Pomodoro completion popup bridge (main window side): asks main to
+// show/hide the always-on-top completion alert (see main.js's
+// showPomodoroPopup) and listens for the two actions its buttons can
+// trigger, relayed back here so @lectio/core's session logic —
+// confirmAdvance()/stopPomodoro() — only ever runs in this renderer, the
+// same as the header button and the Tray.
+contextBridge.exposeInMainWorld('pomodoroPopup', {
+  show: (payload) => ipcRenderer.send('pomodoro-popup-show', payload),
+  hide: () => ipcRenderer.send('pomodoro-popup-hide'),
+  onConfirm: (callback) => ipcRenderer.on('popup-pomodoro-confirm', () => callback()),
+  onStop: (callback) => ipcRenderer.on('popup-pomodoro-stop', () => callback()),
+});
