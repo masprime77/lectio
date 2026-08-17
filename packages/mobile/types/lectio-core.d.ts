@@ -41,6 +41,8 @@ export interface Course {
   id: string;
   name: string;
   color?: string;
+  /** 'YYYY-MM-DD', or '' / absent for no exam date set. */
+  examDate?: string;
   readings: ReadingItem[];
   tasks: TaskItem[];
   /** Present only once time has been logged; see @lectio/core/pomodoro-core. */
@@ -112,7 +114,8 @@ export type SortOrder =
   | 'progress-desc'
   | 'alpha-asc'
   | 'week-asc'
-  | 'week-desc';
+  | 'week-desc'
+  | 'exam-asc';
 export const SORT_ORDERS: SortOrder[];
 export function courseBreakdown(course: Course, semester: Semester): CourseBreakdown;
 export function sortedCourses(
@@ -129,7 +132,7 @@ export function setItemStatus(
 export function uid(prefix: string): string;
 export function addCourse(
   semester: Semester,
-  course: { name: string; color?: string }
+  course: { name: string; color?: string; examDate?: string }
 ): Course;
 export function deleteCourse(semester: Semester, courseId: string): boolean;
 export function editCourseName(
@@ -141,6 +144,11 @@ export function editCourseColor(
   semester: Semester,
   courseId: string,
   color: string
+): Course | null;
+export function editCourseExamDate(
+  semester: Semester,
+  courseId: string,
+  examDate: string
 ): Course | null;
 export function reorderCourses(semester: Semester, orderedIds: string[]): void;
 export function addItem(
