@@ -238,6 +238,19 @@
 - Changed (mobile): the semester and course screens shed the extra bottom
   padding the old two-high stack needed, so their lists end closer to the
   bottom of the screen.
+- New (core): a course can now carry an exam date (`examDate`, a `YYYY-MM-DD`
+  string or empty when unset — the same convention a task's due date uses),
+  set through the new `editCourseExamDate` and accepted as an optional field
+  by `addCourse`. Groundwork only: the desktop and mobile UIs for it land
+  separately.
+- New (core): a "nearest exam" course sort order (`exam-asc`) that lists the
+  soonest upcoming exam first. Courses with no exam date sort after every
+  dated one, and courses sharing a date fall back to A → Z, matching how the
+  existing orders break ties.
+- Fixed (core): exporting a course or semester to a `.lectio.json` file, and
+  importing one back, would have silently dropped the new exam date — both
+  sides whitelist which course fields survive, so `examDate` was added to
+  each. A course with no date round-trips as an empty one.
 
 ## 1.1.1 — 2026-08-11
 
