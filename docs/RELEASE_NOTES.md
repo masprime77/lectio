@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 1.1.2 — 2026-08-18
+
 - New: readings and tasks can now carry a short free-text note (capped at 280
   characters). Core stores it only when non-empty and clamps it defensively, and
   exports `MAX_NOTE_LENGTH` so every app enforces the same limit.
