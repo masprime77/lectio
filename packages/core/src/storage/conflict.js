@@ -31,11 +31,22 @@
   // Pure decision. Returns true when the cloud row was modified since we loaded it.
   // - If we never observed a baseline (expected == null) → no conflict (first write / unknown).
   // - If the row didn't exist before (actual == null) → no conflict (fresh insert).
-  // - Otherwise conflict iff actual !== expected (string compare of ISO timestamps).
+  // - Otherwise conflict iff the two timestamps are different instants.
   function detectConflict(expectedUpdatedAt, actualUpdatedAt) {
     if (expectedUpdatedAt == null) return false;
     if (actualUpdatedAt == null) return false;
-    return actualUpdatedAt !== expectedUpdatedAt;
+    if (expectedUpdatedAt === actualUpdatedAt) return false;
+    // Postgres/PostgREST can return a timestamp in a different string
+    // representation than the one we cached (e.g. differing sub-second
+    // precision, or a "+00:00" vs "Z" UTC suffix) even when it is the exact
+    // same instant. A raw string compare treats that as a conflict on every
+    // single save. Compare the parsed instants instead; only fall back to
+    // "different" for a value that doesn't even parse as a date, since that's
+    // a genuinely unexpected shape rather than a formatting artifact.
+    const expectedMs = Date.parse(expectedUpdatedAt);
+    const actualMs = Date.parse(actualUpdatedAt);
+    if (Number.isNaN(expectedMs) || Number.isNaN(actualMs)) return true;
+    return expectedMs !== actualMs;
   }
 
   return { detectConflict, ConflictError };
