@@ -1066,6 +1066,44 @@ body.electron-app .header-inner { padding-left: 80px; }
   margin-right: 0.5rem;
   vertical-align: middle;
 }
+
+/* Per-item note affordance. Structurally the same as .tag-dropdown-wrapper
+   above: a relative wrapper holding an absolute panel. The icon stays faint
+   until a note exists, so the board reads unchanged at a glance. */
+.item-note-wrapper { position: relative; display: inline-flex; }
+.item-note-btn { opacity: 0.55; }
+.item-note-btn:hover { opacity: 1; }
+.icon-btn.item-note-btn--filled { opacity: 1; color: var(--primary); }
+.item-note-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 100;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  width: 220px;
+  padding: 0.5rem;
+}
+.item-note-textarea {
+  width: 100%;
+  min-height: 70px;
+  resize: vertical;
+  padding: 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--text);
+  background: var(--bg);
+}
+.item-note-counter {
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-align: right;
+  margin-top: 0.25rem;
+}
 .icon-btn {
   border: none;
   background: none;

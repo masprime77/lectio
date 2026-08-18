@@ -29,6 +29,8 @@ export interface PlannerItem {
   week?: number;
   title?: string;
   dueDate?: string;
+  /** Capped free-text note; absent or '' means no note. See MAX_NOTE_LENGTH. */
+  note?: string;
   status: string;
   _ghostSection?: TagSection;
   [k: string]: unknown;
@@ -117,6 +119,8 @@ export type SortOrder =
   | 'week-desc'
   | 'exam-asc';
 export const SORT_ORDERS: SortOrder[];
+/** Character cap for PlannerItem.note. Enforce this live in any note input. */
+export const MAX_NOTE_LENGTH: number;
 export function courseBreakdown(course: Course, semester: Semester): CourseBreakdown;
 export function sortedCourses(
   courses: Course[],
@@ -154,13 +158,13 @@ export function reorderCourses(semester: Semester, orderedIds: string[]): void;
 export function addItem(
   course: Course,
   kind: 'reading' | 'task',
-  item: { title: string; week: number; dueDate?: string }
+  item: { title: string; week: number; dueDate?: string; note?: string }
 ): PlannerItem;
 export function editItem(
   course: Course,
   kind: 'reading' | 'task',
   itemId: string,
-  patch: { title?: string; week?: number; dueDate?: string }
+  patch: { title?: string; week?: number; dueDate?: string; note?: string }
 ): PlannerItem | null;
 export function deleteItem(
   course: Course,

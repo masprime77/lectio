@@ -216,30 +216,52 @@
     arr.splice(0, arr.length, ...reordered);
   }
 
+  // Character cap for an item's note (readings and tasks). Enforced here
+  // defensively (never trust a caller) and again live in each UI via a
+  // maxlength-style input constraint — this constant is the single source
+  // of truth for both.
+  const MAX_NOTE_LENGTH = 280;
+
+  // Clamp/normalize a note string: truncates to MAX_NOTE_LENGTH, and
+  // anything non-string or empty-after-truncation becomes ''. Never throws.
+  function clampNote(note) {
+    return typeof note === 'string' ? note.slice(0, MAX_NOTE_LENGTH) : '';
+  }
+
   // Add a reading or task to a course. Readings get status 'r-pending',
-  // tasks 't-pending' and a dueDate ('' when none). Returns the new item.
-  function addItem(course, kind, { title, week, dueDate }) {
+  // tasks 't-pending' and a dueDate ('' when none). An optional note rides
+  // along on either kind, present only when non-empty. Returns the new item.
+  function addItem(course, kind, { title, week, dueDate, note }) {
+    const trimmedNote = clampNote(note);
     if (kind === 'reading') {
       if (!Array.isArray(course.readings)) course.readings = [];
       const item = { id: uid('r'), week, title, status: 'r-pending' };
+      if (trimmedNote) item.note = trimmedNote;
       course.readings.push(item);
       return item;
     }
     if (!Array.isArray(course.tasks)) course.tasks = [];
     const item = { id: uid('t'), week, title, dueDate: dueDate || '', status: 't-pending' };
+    if (trimmedNote) item.note = trimmedNote;
     course.tasks.push(item);
     return item;
   }
 
-  // Patch an item's title / week / dueDate. Only provided fields change; an
-  // empty-string dueDate clears it (tasks only). Returns the item or null.
-  function editItem(course, kind, itemId, { title, week, dueDate }) {
+  // Patch an item's title / week / dueDate / note. Only provided fields
+  // change; an empty-string dueDate clears it (tasks only), and an
+  // empty-string note removes the note key entirely (both kinds).
+  function editItem(course, kind, itemId, { title, week, dueDate, note }) {
     const arr = (kind === 'reading' ? course.readings : course.tasks) || [];
     const item = arr.find((it) => it.id === itemId);
     if (!item) return null;
     if (typeof title === 'string' && title.trim()) item.title = title.trim();
     if (typeof week === 'number') item.week = week;
     if (kind === 'task' && dueDate !== undefined) item.dueDate = dueDate || '';
+    if (note !== undefined) {
+      const trimmed = clampNote(note);
+      if (trimmed) item.note = trimmed;
+      else delete item.note;
+    }
     return item;
   }
 
@@ -356,6 +378,7 @@
     courseProgress,
     courseBreakdown,
     SORT_ORDERS,
+    MAX_NOTE_LENGTH,
     sortedCourses,
     setItemStatus,
     addCourse,
