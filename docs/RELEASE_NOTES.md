@@ -14,6 +14,12 @@
   verbatim can never match a later read, which made every save after the first
   conflict against its own previous write.
 
+- Fixed (mobile): the same conflict-baseline fix as desktop — the Supabase
+  adapter caches the `updated_at` the server actually stored, read back via
+  `.select()` on the upsert, instead of the timestamp it guessed locally before
+  writing. Same symptom: every save after the first conflicted against its own
+  previous write.
+
 ## 1.1.2 — 2026-08-18
 
 - New: readings and tasks can now carry a short free-text note (capped at 280
