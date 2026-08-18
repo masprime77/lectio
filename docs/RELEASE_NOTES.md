@@ -1,5 +1,12 @@
 ## Unreleased
 
+- Fixed: the "Changed on another device" conflict dialog no longer appears on
+  nearly every save. Conflict detection compared the cached and remote
+  `updated_at` values as raw strings, so a timestamp Postgres returned in a
+  different-but-equivalent format (microsecond precision, `+00:00` instead of
+  `Z`) counted as a change. The two timestamps are now compared as instants; a
+  value that doesn't parse as a date is still treated as a conflict.
+
 ## 1.1.2 — 2026-08-18
 
 - New: readings and tasks can now carry a short free-text note (capped at 280
