@@ -1,5 +1,25 @@
 ## Unreleased
 
+- Fixed: the "Changed on another device" conflict dialog no longer appears on
+  nearly every save. Conflict detection compared the cached and remote
+  `updated_at` values as raw strings, so a timestamp Postgres returned in a
+  different-but-equivalent format (microsecond precision, `+00:00` instead of
+  `Z`) counted as a change. The two timestamps are now compared as instants; a
+  value that doesn't parse as a date is still treated as a conflict.
+
+- Fixed (desktop): the cloud adapter now caches the `updated_at` Supabase
+  actually stored (read back via `.select()` on the upsert) as its
+  conflict-detection baseline, instead of the timestamp it guessed locally
+  before writing. A locally guessed value that the server never echoes back
+  verbatim can never match a later read, which made every save after the first
+  conflict against its own previous write.
+
+- Fixed (mobile): the same conflict-baseline fix as desktop — the Supabase
+  adapter caches the `updated_at` the server actually stored, read back via
+  `.select()` on the upsert, instead of the timestamp it guessed locally before
+  writing. Same symptom: every save after the first conflicted against its own
+  previous write.
+
 ## 1.1.2 — 2026-08-18
 
 - New: readings and tasks can now carry a short free-text note (capped at 280
