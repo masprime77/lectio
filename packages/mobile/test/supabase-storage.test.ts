@@ -64,13 +64,13 @@ describe('supabase-storage: conflict detection', () => {
     expect(Array.isArray(err.remote?.readingTags)).toBe(true);
   });
 
-  it('save() succeeds and advances the baseline when there is no external change', async () => {
+  it('save() succeeds across repeated saves with no external change, even '
+     + 'though the server stamps its own updated_at on every write (regression '
+     + 'for the "changed on another device on every save" bug)', async () => {
     __reset();
     const s = createSupabaseStorage();
-    await s.save('c', v1);
-    await s.get('c');
+    await expect(s.save('c', v1)).resolves.toEqual({ ok: true, id: 'c' });
     await expect(s.save('c', v2)).resolves.toEqual({ ok: true, id: 'c' });
-    // Baseline advanced, so an immediate second save also succeeds.
     await expect(s.save('c', v1)).resolves.toEqual({ ok: true, id: 'c' });
   });
 });
