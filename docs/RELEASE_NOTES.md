@@ -7,6 +7,13 @@
   `Z`) counted as a change. The two timestamps are now compared as instants; a
   value that doesn't parse as a date is still treated as a conflict.
 
+- Fixed (desktop): the cloud adapter now caches the `updated_at` Supabase
+  actually stored (read back via `.select()` on the upsert) as its
+  conflict-detection baseline, instead of the timestamp it guessed locally
+  before writing. A locally guessed value that the server never echoes back
+  verbatim can never match a later read, which made every save after the first
+  conflict against its own previous write.
+
 ## 1.1.2 — 2026-08-18
 
 - New: readings and tasks can now carry a short free-text note (capped at 280
