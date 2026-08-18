@@ -22,6 +22,32 @@ describe('detectConflict', () => {
       detectConflict('2025-01-01T00:00:00.000Z', '2025-01-02T00:00:00.000Z')
     ).toBe(true);
   });
+
+  it('returns false for the same instant written in a different string format', () => {
+    // What Postgres/PostgREST hands back vs. what the client cached: microsecond
+    // precision with a "+00:00" offset instead of millisecond precision + "Z".
+    expect(
+      detectConflict(
+        '2025-01-01T00:00:00.000Z',
+        '2025-01-01T00:00:00.000000+00:00'
+      )
+    ).toBe(false);
+  });
+
+  it('returns false for the same UTC instant expressed in a non-zero offset', () => {
+    expect(
+      detectConflict(
+        '2025-01-01T01:00:00.000+01:00',
+        '2025-01-01T00:00:00.000Z'
+      )
+    ).toBe(false);
+  });
+
+  it('returns true when either value is unparseable and the strings differ', () => {
+    expect(detectConflict('not-a-date', '2025-01-01T00:00:00.000Z')).toBe(true);
+    expect(detectConflict('2025-01-01T00:00:00.000Z', 'not-a-date')).toBe(true);
+    expect(detectConflict('not-a-date', 'also-not-a-date')).toBe(true);
+  });
 });
 
 describe('ConflictError', () => {

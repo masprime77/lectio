@@ -65,14 +65,19 @@ export function createSupabaseStorage(): Storage {
         });
       }
       const newTs = new Date().toISOString();
-      const { error } = await supabase.from('semesters').upsert({
-        id,
-        user_id,
-        data: value,
-        updated_at: newTs,
-      });
+      const { data: written, error } = await supabase
+        .from('semesters')
+        .upsert({ id, user_id, data: value, updated_at: newTs })
+        .select('updated_at')
+        .maybeSingle();
       if (error) throw error;
-      seen.set(id, newTs);
+      // Trust whatever Postgres actually stored over our own local guess: if
+      // it reformats the timestamp (or a trigger owns the column), our guess
+      // won't match the next read, and every following save would falsely
+      // conflict against its own prior write. Fall back to the local guess
+      // only if the write somehow didn't return a row.
+      const storedTs = (written as any)?.updated_at ?? newTs;
+      seen.set(id, storedTs);
       return { ok: true, id };
     },
 
