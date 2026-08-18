@@ -21,35 +21,19 @@ import { addItem } from '@lectio/core/planner-core';
 import { storage } from '../src/storage';
 import { saveWithConflict } from '../src/sync/saveWithConflict';
 import { getMoodleImportSession, clearMoodleImportSession } from '../src/moodle/import-session';
+import { suggestWeekFromDateRange } from '../src/moodle/suggest-week';
 import { useTheme } from '../src/theme';
 import { SheetHeader } from '../src/components/SheetHeader';
 import { NumericKeyboardDoneBar, NUMERIC_KEYBOARD_ACCESSORY_ID } from '../src/components/NumericKeyboardDoneBar';
-import type { MoodleWeek } from '../types/lectio-core';
-
-// Same suggestion heuristic as desktop's Phase 16 Part C
-// (app.js's suggestWeekFromDateRange) — kept local to this screen, not
-// @lectio/core, since it's UI-suggestion logic, not a reusable pure transform.
-function suggestWeekFromDateRange(
-  startDate: string | undefined,
-  totalWeeks: number | undefined,
-  dateRange: MoodleWeek['dateRange']
-): number | null {
-  if (!dateRange || !startDate || !totalWeeks) return null;
-  const start = new Date(startDate + 'T00:00:00');
-  const startYear = start.getFullYear();
-  const candidates = [startYear, startYear + 1].map(
-    (year) => new Date(year, dateRange.startMonth - 1, dateRange.startDay)
-  );
-  let sectionDate = candidates.find((d) => d >= start);
-  if (!sectionDate) sectionDate = candidates[0];
-  const diffDays = Math.floor((sectionDate.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-  const week = Math.floor(diffDays / 7) + 1;
-  return Math.max(1, Math.min(totalWeeks, week));
-}
 
 type Mode = 'skip' | 'reading' | 'task';
+type Decision = { mode: Mode; week: string };
 const MODES: Mode[] = ['skip', 'reading', 'task'];
 const MODE_LABEL: Record<Mode, string> = { skip: 'Skip', reading: 'Read', task: 'Task' };
+// The one default for a week with no decision yet. Render, edit and confirm all
+// read through it, so a missing entry can never mean "skipped" in one place and
+// "importable" in another.
+const DEFAULT_DECISION: Decision = { mode: 'skip', week: '' };
 
 export default function MoodleTriageScreen() {
   const theme = useTheme();
@@ -58,28 +42,38 @@ export default function MoodleTriageScreen() {
   const weeks = session?.mapped.weeks ?? [];
 
   const [totalWeeks, setTotalWeeks] = useState<number | undefined>();
-  const [decisions, setDecisions] = useState<Record<number, { mode: Mode; week: string }>>({});
+  const [decisions, setDecisions] = useState<Record<number, Decision>>({});
   // One selection flag per item, keyed by moodleSection then array index —
   // every item defaults to selected, matching the old "whole week" behavior.
   const [selected, setSelected] = useState<Record<number, boolean[]>>({});
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
+  // False until the semester (and with it totalWeeks + the seeded decisions)
+  // has loaded; confirming before that would import against an empty map.
+  const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session) return;
-    storage.get(session.semesterId).then((sem) => {
-      setTotalWeeks(sem.weeks);
-      const initialDecisions: Record<number, { mode: Mode; week: string }> = {};
-      const initialSelected: Record<number, boolean[]> = {};
-      session.mapped.weeks.forEach((w) => {
-        const suggested = suggestWeekFromDateRange(sem.startDate, sem.weeks, w.dateRange);
-        initialDecisions[w.moodleSection] = { mode: 'skip', week: suggested ? String(suggested) : '' };
-        initialSelected[w.moodleSection] = w.items.map(() => true);
-      });
-      setDecisions(initialDecisions);
-      setSelected(initialSelected);
-    });
+    storage
+      .get(session.semesterId)
+      .then((sem) => {
+        setTotalWeeks(sem.weeks);
+        const initialDecisions: Record<number, Decision> = {};
+        const initialSelected: Record<number, boolean[]> = {};
+        session.mapped.weeks.forEach((w) => {
+          const suggested = suggestWeekFromDateRange(sem.startDate, sem.weeks, w.dateRange);
+          initialDecisions[w.moodleSection] = {
+            ...DEFAULT_DECISION,
+            week: suggested ? String(suggested) : '',
+          };
+          initialSelected[w.moodleSection] = w.items.map(() => true);
+        });
+        setDecisions(initialDecisions);
+        setSelected(initialSelected);
+        setLoaded(true);
+      })
+      .catch((e: any) => setError(e?.message ?? 'Could not load this semester.'));
   }, [session]);
 
   if (!session) {
@@ -93,8 +87,15 @@ export default function MoodleTriageScreen() {
     );
   }
 
-  function setDecision(section: number, patch: Partial<{ mode: Mode; week: string }>) {
-    setDecisions((prev) => ({ ...prev, [section]: { ...prev[section], ...patch } }));
+  function decisionFor(section: number): Decision {
+    return decisions[section] ?? DEFAULT_DECISION;
+  }
+
+  function setDecision(section: number, patch: Partial<Decision>) {
+    setDecisions((prev) => ({
+      ...prev,
+      [section]: { ...(prev[section] ?? DEFAULT_DECISION), ...patch },
+    }));
   }
 
   // Sets every week's mode in one click — a starting point, not a lock; any
@@ -103,7 +104,7 @@ export default function MoodleTriageScreen() {
     setDecisions((prev) => {
       const next = { ...prev };
       weeks.forEach((w) => {
-        next[w.moodleSection] = { ...next[w.moodleSection], mode };
+        next[w.moodleSection] = { ...(next[w.moodleSection] ?? DEFAULT_DECISION), mode };
       });
       return next;
     });
@@ -122,7 +123,10 @@ export default function MoodleTriageScreen() {
       const next = { ...prev };
       for (let j = index + 1; j < weeks.length; j += 1) {
         const sec = weeks[j].moodleSection;
-        next[sec] = { ...next[sec], week: String(Math.min(totalWeeks, base + (j - index))) };
+        next[sec] = {
+          ...(next[sec] ?? DEFAULT_DECISION),
+          week: String(Math.min(totalWeeks, base + (j - index))),
+        };
       }
       return next;
     });
@@ -161,6 +165,7 @@ export default function MoodleTriageScreen() {
   }
 
   async function handleConfirm() {
+    if (!loaded) return;
     setError(null);
 
     // A week contributes only if it isn't skipped AND still has at least one
@@ -168,13 +173,18 @@ export default function MoodleTriageScreen() {
     // week whose items were all deselected can't block the import over a
     // week number that no longer matters.
     const toImport = weeks.filter((w) => {
-      if (decisions[w.moodleSection]?.mode === 'skip') return false;
+      if (decisionFor(w.moodleSection).mode === 'skip') return false;
       const sel = selected[w.moodleSection];
       return sel ? sel.some(Boolean) : true;
     });
 
+    if (toImport.length === 0) {
+      setError('Choose Reading or Task for at least one week, and keep an item selected.');
+      return;
+    }
+
     for (const w of toImport) {
-      const weekNum = parseInt(decisions[w.moodleSection]?.week ?? '', 10);
+      const weekNum = parseInt(decisionFor(w.moodleSection).week, 10);
       if (!totalWeeks || !Number.isInteger(weekNum) || weekNum < 1 || weekNum > totalWeeks) {
         setError(`Enter a valid week (1–${totalWeeks ?? '?'}) for "${w.sectionName || 'that section'}".`);
         return;
@@ -189,8 +199,8 @@ export default function MoodleTriageScreen() {
 
       let created = 0;
       toImport.forEach((w) => {
-        const mode = decisions[w.moodleSection].mode as 'reading' | 'task';
-        const weekNum = parseInt(decisions[w.moodleSection].week, 10);
+        const mode = decisionFor(w.moodleSection).mode as 'reading' | 'task';
+        const weekNum = parseInt(decisionFor(w.moodleSection).week, 10);
         const sel = selected[w.moodleSection];
         w.items.forEach((item, idx) => {
           if (sel && sel[idx] === false) return;
@@ -253,7 +263,7 @@ export default function MoodleTriageScreen() {
           </View>
         }
         renderItem={({ item: w, index }) => {
-          const d = decisions[w.moodleSection] ?? { mode: 'skip' as Mode, week: '' };
+          const d = decisionFor(w.moodleSection);
           const sel = selected[w.moodleSection] ?? w.items.map(() => true);
           const selCount = sel.filter(Boolean).length;
           const isOpen = !!expanded[w.moodleSection];
@@ -329,10 +339,14 @@ export default function MoodleTriageScreen() {
       />
       <NumericKeyboardDoneBar />
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      {busy ? (
+      {busy || (!loaded && !error) ? (
         <ActivityIndicator color={theme.accent} style={{ marginVertical: 12 }} />
       ) : (
-        <Pressable style={[styles.confirmBtn, { backgroundColor: theme.accent }]} onPress={handleConfirm}>
+        <Pressable
+          style={[styles.confirmBtn, { backgroundColor: theme.accent }, !loaded && styles.confirmBtnDisabled]}
+          onPress={handleConfirm}
+          disabled={!loaded}
+        >
           <Text style={styles.confirmText}>Import selected</Text>
         </Pressable>
       )}
@@ -381,5 +395,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     marginTop: 8,
   },
+  confirmBtnDisabled: { opacity: 0.5 },
   confirmText: { color: '#fff', fontWeight: '600', fontSize: 16 },
 });

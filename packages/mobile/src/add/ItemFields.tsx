@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { addItem, editItem, getCourses } from '@lectio/core/planner-core';
+import { addItem, editItem, getCourses, MAX_NOTE_LENGTH } from '@lectio/core/planner-core';
 import { storage } from '../storage';
 import { saveWithConflict } from '../sync/saveWithConflict';
 import { useTheme } from '../theme';
@@ -30,12 +30,15 @@ export function ItemFields({
   courseId,
   kind,
   itemId,
+  initialWeek,
 }: {
   mode: 'create' | 'edit';
   semesterId: string;
   courseId: string;
   kind: 'reading' | 'task';
   itemId?: string;
+  /** Week to open a new item on — a host that stands for one week passes it. */
+  initialWeek?: string;
 }) {
   const theme = useTheme();
   const router = useRouter();
@@ -43,8 +46,14 @@ export function ItemFields({
   const editItemId = mode === 'edit' ? itemId : undefined;
 
   const [title, setTitle] = useState('');
-  const [week, setWeek] = useState('1');
+  // Seeded once: in edit mode the load below overwrites it with the item's own
+  // week, and anything unparseable falls back to the first week (save clamps it
+  // to the semester's length either way).
+  const [week, setWeek] = useState(() =>
+    initialWeek && /^\d+$/.test(initialWeek) ? initialWeek : '1'
+  );
   const [dueDate, setDueDate] = useState('');
+  const [note, setNote] = useState('');
   const [maxWeeks, setMaxWeeks] = useState(52);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -70,6 +79,7 @@ export function ItemFields({
           if (kind === 'task') {
             setDueDate(typeof item.dueDate === 'string' ? item.dueDate : '');
           }
+          setNote(typeof item.note === 'string' ? item.note : '');
         }
         setLoaded(true);
       })
@@ -110,12 +120,14 @@ export function ItemFields({
         editItem(course, kind, editItemId, {
           title: trimmedTitle,
           week: parsedWeek,
+          note,
           ...(kind === 'task' ? { dueDate: trimmedDue } : {}),
         });
       } else {
         addItem(course, kind, {
           title: trimmedTitle,
           week: parsedWeek,
+          note,
           ...(kind === 'task' ? { dueDate: trimmedDue } : {}),
         });
       }
@@ -164,6 +176,25 @@ export function ItemFields({
         </>
       )}
 
+      <Text style={[styles.label, { color: theme.muted }]}>Note</Text>
+      <TextInput
+        style={[
+          styles.input,
+          styles.noteInput,
+          { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text },
+        ]}
+        placeholder="Optional note"
+        placeholderTextColor={theme.muted}
+        value={note}
+        onChangeText={setNote}
+        editable={!busy}
+        multiline
+        maxLength={MAX_NOTE_LENGTH}
+      />
+      <Text style={[styles.noteCounter, { color: theme.muted }]}>
+        {note.length}/{MAX_NOTE_LENGTH}
+      </Text>
+
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       {busy ? (
@@ -186,6 +217,17 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 14,
     fontSize: 16,
+  },
+  noteInput: {
+    height: 90,
+    paddingTop: 12,
+    paddingBottom: 12,
+    textAlignVertical: 'top',
+  },
+  noteCounter: {
+    fontSize: 11,
+    textAlign: 'right',
+    marginTop: 2,
   },
   error: { color: '#ef4444', fontSize: 13, textAlign: 'center', marginTop: 4 },
   btn: {

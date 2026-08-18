@@ -1,8 +1,10 @@
 // Create/edit a reading or task. Modal screen at /semester/item-form:
 // `?id=<semesterId>&courseId=<courseId>&kind=reading|task` (required) plus
-// `?itemId=<itemId>` => edit, none => create. Thin wrapper: params in,
-// ItemFields body out. The query param picks the initial kind; in create mode
-// the Reading | Task tabs can switch it (edit mode keeps the item's kind fixed).
+// `?itemId=<itemId>` => edit, none => create, and `?week=<n>` to open a new
+// item on a week (what the course screen's per-week add buttons pass). Thin
+// wrapper: params in, ItemFields body out. The query param picks the initial
+// kind; in create mode the Reading | Task tabs can switch it (edit mode keeps
+// the item's kind fixed).
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
@@ -18,6 +20,7 @@ export default function ItemFormScreen() {
     courseId: string;
     kind?: string;
     itemId?: string;
+    week?: string;
   }>();
   const { id, courseId, itemId } = params;
   const [kind, setKind] = useState<'reading' | 'task'>(
@@ -45,6 +48,7 @@ export default function ItemFormScreen() {
         courseId={courseId}
         kind={kind}
         itemId={itemId}
+        initialWeek={params.week}
       />
     </KeyboardAvoidingView>
   );

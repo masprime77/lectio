@@ -29,6 +29,8 @@ export interface PlannerItem {
   week?: number;
   title?: string;
   dueDate?: string;
+  /** Capped free-text note; absent or '' means no note. See MAX_NOTE_LENGTH. */
+  note?: string;
   status: string;
   _ghostSection?: TagSection;
   [k: string]: unknown;
@@ -41,6 +43,8 @@ export interface Course {
   id: string;
   name: string;
   color?: string;
+  /** 'YYYY-MM-DD', or '' / absent for no exam date set. */
+  examDate?: string;
   readings: ReadingItem[];
   tasks: TaskItem[];
   /** Present only once time has been logged; see @lectio/core/pomodoro-core. */
@@ -112,8 +116,11 @@ export type SortOrder =
   | 'progress-desc'
   | 'alpha-asc'
   | 'week-asc'
-  | 'week-desc';
+  | 'week-desc'
+  | 'exam-asc';
 export const SORT_ORDERS: SortOrder[];
+/** Character cap for PlannerItem.note. Enforce this live in any note input. */
+export const MAX_NOTE_LENGTH: number;
 export function courseBreakdown(course: Course, semester: Semester): CourseBreakdown;
 export function sortedCourses(
   courses: Course[],
@@ -129,7 +136,7 @@ export function setItemStatus(
 export function uid(prefix: string): string;
 export function addCourse(
   semester: Semester,
-  course: { name: string; color?: string }
+  course: { name: string; color?: string; examDate?: string }
 ): Course;
 export function deleteCourse(semester: Semester, courseId: string): boolean;
 export function editCourseName(
@@ -142,23 +149,37 @@ export function editCourseColor(
   courseId: string,
   color: string
 ): Course | null;
+export function editCourseExamDate(
+  semester: Semester,
+  courseId: string,
+  examDate: string
+): Course | null;
 export function reorderCourses(semester: Semester, orderedIds: string[]): void;
 export function addItem(
   course: Course,
   kind: 'reading' | 'task',
-  item: { title: string; week: number; dueDate?: string }
+  item: { title: string; week: number; dueDate?: string; note?: string }
 ): PlannerItem;
 export function editItem(
   course: Course,
   kind: 'reading' | 'task',
   itemId: string,
-  patch: { title?: string; week?: number; dueDate?: string }
+  patch: { title?: string; week?: number; dueDate?: string; note?: string }
 ): PlannerItem | null;
 export function deleteItem(
   course: Course,
   kind: 'reading' | 'task',
   itemId: string
 ): boolean;
+/**
+ * Move an item between `course.readings` and `course.tasks`. Returns the moved
+ * item, or null when the id is unknown or it already is that kind.
+ */
+export function convertItemKind(
+  course: Course,
+  itemId: string,
+  toKind: 'reading' | 'task'
+): PlannerItem | null;
 
 // ---------------------------------------------------------------------------
 // storage/migrate and storage/contract surfaces
@@ -216,6 +237,7 @@ export function cleanCourse(course: Course): Course;
 export function parseSemesterFile(payload: unknown): Semester;
 export function parseCourseFile(payload: unknown): Course;
 export function withResetStatuses(semester: Semester): Semester;
+export function withResetCourseItems(course: Course): Course;
 export function slugify(s: string): string;
 export function uniqueSemesterId(
   name: string,

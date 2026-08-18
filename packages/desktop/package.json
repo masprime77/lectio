@@ -1,6 +1,6 @@
 {
   "name": "@lectio/desktop",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Lectio desktop app (Electron) for planning a university semester",
   "main": "main.js",
   "license": "MIT",
@@ -91,7 +91,9 @@
     "files": [
       "main.js",
       "preload.js",
+      "preload-pomodoro-popup.js",
       "index.html",
+      "pomodoro-popup.html",
       "app.js",
       "auth.js",
       "supabase-client.js",
@@ -103,6 +105,9 @@
       "planner-core.js",
       "pomodoro-core.js",
       "migrate.js",
+      "conflict.js",
+      "moodle.js",
+      "moodle-client.js",
       "semesters/",
       "assets/icon.png",
       "assets/pomodoro-tray-icon.png",

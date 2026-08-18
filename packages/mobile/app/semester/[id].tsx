@@ -280,6 +280,7 @@ export default function CoursesScreen() {
             {getCourseStudySeconds(item) > 0
               ? ` · ${formatHoursMinutes(getCourseStudySeconds(item))} studied`
               : ''}
+            {item.examDate ? ` · exam ${item.examDate}` : ''}
           </Text>
           {breakdownOpen && (
             <CourseBreakdown course={item} semester={semester!} />
@@ -370,10 +371,12 @@ export default function CoursesScreen() {
                     editing={detail.editing}
                     selectedCount={detail.selected.size}
                     hasItems={detail.hasItems}
+                    groupMode={detail.groupMode}
                     onToggleEditing={detail.toggleEditing}
                     onBatchDelete={detail.batchDelete}
                     onExport={detail.handleExportCourse}
                     onSortPress={() => detail.setSortMenuOpen(true)}
+                    onGroupPress={() => detail.setGroupMenuOpen(true)}
                   />
                 </View>
                 <CourseDetailBody result={detail} embedded />
@@ -417,7 +420,9 @@ export default function CoursesScreen() {
 }
 
 const styles = StyleSheet.create({
-  list: { padding: 16, gap: 12, paddingBottom: 180 },
+  // Clears the tallest floating column: the bottom-left timer stack, 24 + 56
+  // (timer) + 10 + 44 (study time) above the safe area, plus a little air.
+  list: { padding: 16, gap: 12, paddingBottom: 150 },
   emptyWrap: { alignItems: 'center', gap: 12, marginTop: 32 },
   emptyBtn: {
     height: 48,

@@ -13,12 +13,20 @@ import {
 } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useRouter } from 'expo-router';
-import { useAuth } from '../src/auth/AuthProvider';
+import { EMAIL_CONFIRMATION_UI_ENABLED, useAuth } from '../src/auth/AuthProvider';
 import { friendlyAuthError, isConnectivityError } from '../src/auth/auth-errors';
 import { useTheme } from '../src/theme';
 
 const googleSignInLight = require('../assets/google-signin-light.png');
 const googleSignInDark = require('../assets/google-signin-dark.png');
+
+// Supabase's "Email not confirmed" sign-in rejection — the same string
+// friendlyAuthError() maps, matched here so the kill switch can suppress it.
+// Mirrors isEmailNotConfirmed() in the desktop renderer's setupSignIn().
+function isEmailNotConfirmed(e: unknown): boolean {
+  const msg = (e as any)?.message ? String((e as any).message).toLowerCase() : '';
+  return msg.includes('email not confirmed');
+}
 
 export default function SignInScreen() {
   const theme = useTheme();
@@ -50,11 +58,17 @@ export default function SignInScreen() {
     } catch (e) {
       // A paused free-tier project or an offline device surfaces as a fetch error;
       // give it a clearer message than the generic one.
-      setError(
-        isConnectivityError(e)
-          ? "Can't reach the server — it may be paused or you're offline. Try again in a moment."
-          : friendlyAuthError(e)
-      );
+      if (isConnectivityError(e)) {
+        setError("Can't reach the server — it may be paused or you're offline. Try again in a moment.");
+      } else if (!EMAIL_CONFIRMATION_UI_ENABLED && isEmailNotConfirmed(e)) {
+        // Kill switch off: friendlyAuthError's "confirm your email" text is part
+        // of the flow the app hides, and reaching here means the Supabase
+        // "Confirm email" toggle is still ON while the flag is off (the two are
+        // meant to stay in sync). Fall back to a generic failure.
+        setError('Something went wrong. Please try again.');
+      } else {
+        setError(friendlyAuthError(e));
+      }
     } finally {
       setBusy(false);
     }
@@ -125,8 +139,9 @@ export default function SignInScreen() {
         {/* Latent email-confirmation seam: appears only once confirmation is enabled
             in the Supabase console (signUp then returns no session). With confirmation
             OFF — today's default — signUp logs the user straight in and the layout
-            redirect leaves this screen, so this notice stays dormant. */}
-        {lastSignUpNeedsConfirmation ? (
+            redirect leaves this screen, so this notice stays dormant. The kill switch
+            (EMAIL_CONFIRMATION_UI_ENABLED) keeps it dormant either way. */}
+        {EMAIL_CONFIRMATION_UI_ENABLED && lastSignUpNeedsConfirmation ? (
           <View style={[styles.notice, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <Text style={[styles.noticeText, { color: theme.text }]}>
               Check your inbox to confirm your email, then sign in.

@@ -16,6 +16,7 @@ import {
   parseSemesterFile,
   parseCourseFile,
   withResetStatuses,
+  withResetCourseItems,
   uniqueSemesterId,
   prepareImportedCourse,
 } from '@lectio/core/integrations/lectio-file';
@@ -127,12 +128,16 @@ export interface ImportedCourse {
 
 // Add an imported course to an existing semester with fresh ids (the course and
 // every reading/task), so it can't collide with anything already there.
+// `keepStatus=false` resets every item to its default pending tag and clears
+// the task due dates, which belong to the semester the course came from.
 export async function saveImportedCourse(
   semesterId: string,
   course: Course,
+  keepStatus: boolean,
 ): Promise<ImportedCourse> {
   const semester = await storage.get(semesterId);
-  const fresh = prepareImportedCourse(course, uid);
+  const source = keepStatus ? course : withResetCourseItems(course);
+  const fresh = prepareImportedCourse(source, uid);
   const next: Semester = {
     ...semester,
     courses: [...(semester.courses ?? []), fresh],

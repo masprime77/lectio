@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lectio</title>
+  <style>
+    :root {
+      --surface: #ffffff;
+      --border: #e3e6ea;
+      --text: #1f2933;
+      --muted: #6b7684;
+      --primary: #4a90d9;
+      --primary-hover: #3a7bc0;
+      --primary-tint: rgba(74, 144, 217, 0.14);
+      --on-accent: #ffffff;
+      --radius: 10px;
+      --font-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+    [data-theme="dark"] {
+      --surface: #1f242b;
+      --border: #333a42;
+      --text: #e6e9ec;
+      --muted: #8b96a3;
+      --primary: #5b9fe0;
+      --primary-hover: #6cabe6;
+      --primary-tint: rgba(91, 159, 224, 0.22);
+      --on-accent: #0b0d0f;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      font-family: var(--font-base);
+      color: var(--text);
+    }
+    .drag-strip {
+      height: 8px;
+      -webkit-app-region: drag;
+      flex-shrink: 0;
+    }
+    .content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 0 20px 18px;
+      min-height: 0;
+    }
+    .top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      -webkit-app-region: drag;
+    }
+    .status-pill {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--primary);
+      background: var(--primary-tint);
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      -webkit-app-region: no-drag;
+    }
+    .close-btn {
+      -webkit-app-region: no-drag;
+      border: none;
+      background: none;
+      color: var(--muted);
+      font-size: 1.1rem;
+      line-height: 1;
+      cursor: pointer;
+      padding: 4px;
+    }
+    .close-btn:hover { color: var(--text); }
+    h1 {
+      font-size: 1.05rem;
+      margin: 0.6rem 0 0.4rem;
+    }
+    p {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin: 0 0 1rem;
+      line-height: 1.4;
+    }
+    .actions {
+      margin-top: auto;
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+    }
+    button.btn {
+      -webkit-app-region: no-drag;
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 0.5rem 0.9rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+    }
+    button.btn-primary {
+      background: var(--primary);
+      color: var(--on-accent);
+      border-color: var(--primary);
+    }
+    button.btn-primary:hover { background: var(--primary-hover); }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="drag-strip"></div>
+  <div class="content">
+    <div class="top-row">
+      <span class="status-pill" id="status"></span>
+      <button class="close-btn" id="close-btn" aria-label="Dismiss">&#x2715;</button>
+    </div>
+    <h1 id="title"></h1>
+    <p id="message"></p>
+    <div class="actions">
+      <button type="button" class="btn hidden" id="stop-btn">Stop timer</button>
+      <button type="button" class="btn btn-primary" id="confirm-btn"></button>
+    </div>
+  </div>
+  <script>
+    window.pomodoroPopup.onData((data) => {
+      if (data.theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+      document.getElementById('status').textContent = data.status || '';
+      document.getElementById('title').textContent = data.title || '';
+      document.getElementById('message').textContent = data.message || '';
+      const confirmBtn = document.getElementById('confirm-btn');
+      confirmBtn.textContent = data.confirmLabel || 'Continue';
+      document.getElementById('stop-btn').classList.toggle('hidden', !data.canStop);
+    });
+
+    document.getElementById('confirm-btn').addEventListener('click', () => window.pomodoroPopup.confirm());
+    document.getElementById('stop-btn').addEventListener('click', () => window.pomodoroPopup.stop());
+    document.getElementById('close-btn').addEventListener('click', () => window.pomodoroPopup.dismiss());
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') window.pomodoroPopup.dismiss();
+    });
+  </script>
+</body>
+</html>
