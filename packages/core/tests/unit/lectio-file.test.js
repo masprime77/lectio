@@ -82,6 +82,25 @@ describe('build (export) envelopes', () => {
     expect(clean).toHaveProperty('examDate');
   });
 
+  it('keeps item notes through cleanCourse/buildCourseFile', () => {
+    const withNotes = sampleCourse();
+    withNotes.readings[0].note = 'skim the proofs';
+    withNotes.tasks[0].note = 'submit as a pair';
+    const clean = cleanCourse(withNotes);
+    expect(clean.readings[0].note).toBe('skim the proofs');
+    expect(clean.tasks[0].note).toBe('submit as a pair');
+    const file = buildCourseFile(withNotes);
+    expect(file.course.readings[0].note).toBe('skim the proofs');
+    expect(file.course.tasks[0].note).toBe('submit as a pair');
+  });
+
+  it('cleanCourse leaves the note key off items that have none', () => {
+    const clean = cleanCourse(sampleCourse());
+    expect(clean.readings[0]).not.toHaveProperty('note');
+    expect(clean.tasks[0]).not.toHaveProperty('note');
+    expect(clean.readings[0]).toEqual({ id: 'r-1', week: 1, title: 'Intro', status: 'r-studied' });
+  });
+
   it('a built course file round-trips through parse', () => {
     const file = buildCourseFile(sampleCourse());
     expect(parseCourseFile(file).name).toBe('Algorithms');
@@ -201,6 +220,25 @@ describe('prepareImportedCourse', () => {
     // non-id fields preserved
     expect(out.readings[0].title).toBe('Intro');
     expect(out.tasks[0].dueDate).toBe('2025-04-14');
+  });
+
+  it('preserves item notes untouched (they already ride along on the spread)', () => {
+    const makeId = (p) => `${p}-x`;
+    const withNotes = sampleCourse();
+    withNotes.readings[0].note = 'skim the proofs';
+    withNotes.tasks[0].note = 'submit as a pair';
+    const out = prepareImportedCourse(withNotes, makeId);
+    expect(out.readings[0].note).toBe('skim the proofs');
+    expect(out.tasks[0].note).toBe('submit as a pair');
+  });
+
+  it('an exported course round-trips its item notes back through import', () => {
+    const makeId = (p) => `${p}-x`;
+    const withNotes = sampleCourse();
+    withNotes.readings[0].note = 'skim the proofs';
+    const imported = prepareImportedCourse(parseCourseFile(buildCourseFile(withNotes)), makeId);
+    expect(imported.readings[0].note).toBe('skim the proofs');
+    expect(imported.tasks[0]).not.toHaveProperty('note');
   });
 
   it('defaults the color and tolerates missing arrays', () => {

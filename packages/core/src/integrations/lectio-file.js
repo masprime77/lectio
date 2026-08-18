@@ -54,18 +54,20 @@
       name: course.name,
       color: course.color,
       examDate: course.examDate || '',
-      readings: (course.readings || []).map(({ id, week, title, status }) => ({
+      readings: (course.readings || []).map(({ id, week, title, status, note }) => ({
         id,
         week,
         title,
         status,
+        ...(note ? { note } : {}),
       })),
-      tasks: (course.tasks || []).map(({ id, week, title, dueDate, status }) => ({
+      tasks: (course.tasks || []).map(({ id, week, title, dueDate, status, note }) => ({
         id,
         week,
         title,
         dueDate,
         status,
+        ...(note ? { note } : {}),
       })),
     };
   }
