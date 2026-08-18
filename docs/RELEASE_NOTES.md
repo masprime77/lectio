@@ -1,5 +1,11 @@
 ## Unreleased
 
+- New: readings and tasks can now carry a short free-text note (capped at 280
+  characters). Core stores it only when non-empty and clamps it defensively, and
+  exports `MAX_NOTE_LENGTH` so every app enforces the same limit. The desktop
+  and mobile ways to write one land separately.
+- Fixed: exporting a course (or a semester) no longer strips item notes — the
+  export projection whitelists fields, and `note` had to be added to it.
 - New (desktop): when a focus block or break ends, a small always-on-top popup
   now appears wherever you are — in another app, on another Space, or over a
   full-screen window — instead of only inside Lectio. It names the pomodoro
