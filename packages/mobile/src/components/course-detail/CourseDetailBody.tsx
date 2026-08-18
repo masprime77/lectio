@@ -308,6 +308,9 @@ export function CourseDetailBody({ result }: CourseDetailBodyProps) {
             {kind === 'task' && typeof item.dueDate === 'string' && item.dueDate !== '' && (
               <Text style={[styles.itemWeek, { color: theme.muted }]}>due {item.dueDate}</Text>
             )}
+            {typeof item.note === 'string' && item.note !== '' && (
+              <Text style={[styles.itemWeek, { color: theme.muted }]}>note</Text>
+            )}
           </View>
           <View style={styles.tagWrap}>
             <View style={[styles.tagDot, { backgroundColor: tag?.color ?? theme.muted }]} />

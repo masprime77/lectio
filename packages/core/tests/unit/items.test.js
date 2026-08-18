@@ -80,6 +80,84 @@ describe('item operations', () => {
   });
 });
 
+describe('item notes', () => {
+  it('exports MAX_NOTE_LENGTH as 280', () => {
+    expect(core.MAX_NOTE_LENGTH).toBe(280);
+    expect(cjsCore.MAX_NOTE_LENGTH).toBe(280);
+  });
+
+  it('adding without a note leaves the key off entirely', () => {
+    const c = course();
+    const reading = core.addItem(c, 'reading', { title: 'Sorting', week: 2 });
+    const task = core.addItem(c, 'task', { title: 'Lab 1', week: 2 });
+    expect('note' in reading).toBe(false);
+    expect('note' in task).toBe(false);
+  });
+
+  it('adding with a blank or non-string note leaves the key off entirely', () => {
+    const c = course();
+    expect('note' in core.addItem(c, 'reading', { title: 'R', week: 1, note: '' })).toBe(false);
+    expect('note' in core.addItem(c, 'task', { title: 'T', week: 1, note: 42 })).toBe(false);
+  });
+
+  it('adding with a note under the cap stores it verbatim on either kind', () => {
+    const c = course();
+    const reading = core.addItem(c, 'reading', { title: 'Sorting', week: 2, note: 'skim ch. 4' });
+    const task = core.addItem(c, 'task', { title: 'Lab 1', week: 2, note: 'group of three' });
+    expect(reading.note).toBe('skim ch. 4');
+    expect(task.note).toBe('group of three');
+  });
+
+  it('adding truncates a note longer than the cap', () => {
+    const c = course();
+    const item = core.addItem(c, 'reading', { title: 'x', week: 1, note: 'a'.repeat(500) });
+    expect(item.note).toHaveLength(core.MAX_NOTE_LENGTH);
+    expect(item.note).toBe('a'.repeat(core.MAX_NOTE_LENGTH));
+  });
+
+  it('editing without a note in the patch leaves an existing note untouched', () => {
+    const c = course();
+    c.readings[0].note = 'keep me';
+    core.editItem(c, 'reading', 'r-1', { week: 4 });
+    expect(c.readings[0].note).toBe('keep me');
+  });
+
+  it('editing with an empty note removes the key rather than blanking it', () => {
+    const c = course();
+    c.readings[0].note = 'gone soon';
+    c.tasks[0].note = 'gone soon';
+    core.editItem(c, 'reading', 'r-1', { note: '' });
+    core.editItem(c, 'task', 't-1', { note: '' });
+    expect('note' in c.readings[0]).toBe(false);
+    expect('note' in c.tasks[0]).toBe(false);
+  });
+
+  it('editing overwrites an existing note, truncating to the cap', () => {
+    const c = course();
+    c.readings[0].note = 'old';
+    core.editItem(c, 'reading', 'r-1', { note: 'new note' });
+    expect(c.readings[0].note).toBe('new note');
+    core.editItem(c, 'reading', 'r-1', { note: 'b'.repeat(400) });
+    expect(c.readings[0].note).toHaveLength(core.MAX_NOTE_LENGTH);
+  });
+
+  it('editing sets a note on an item that had none, for both kinds', () => {
+    const c = course();
+    core.editItem(c, 'reading', 'r-1', { note: 'reading note' });
+    core.editItem(c, 'task', 't-1', { note: 'task note' });
+    expect(c.readings[0].note).toBe('reading note');
+    expect(c.tasks[0].note).toBe('task note');
+  });
+
+  it('a note survives a kind conversion (unlike dueDate, it is not kind-specific)', () => {
+    const c = course();
+    c.readings[0].note = 'travels with me';
+    const asTask = core.convertItemKind(c, 'r-1', 'task');
+    expect(asTask.note).toBe('travels with me');
+    expect(core.convertItemKind(c, 'r-1', 'reading').note).toBe('travels with me');
+  });
+});
+
 describe('convertItemKind', () => {
   it('moves a reading into tasks keeping its id, title and week', () => {
     const c = course();

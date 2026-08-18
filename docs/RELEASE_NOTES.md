@@ -1,5 +1,22 @@
 ## Unreleased
 
+- New: readings and tasks can now carry a short free-text note (capped at 280
+  characters). Core stores it only when non-empty and clamps it defensively, and
+  exports `MAX_NOTE_LENGTH` so every app enforces the same limit.
+- Fixed: exporting a course (or a semester) no longer strips item notes — the
+  export projection whitelists fields, and `note` had to be added to it.
+- New (desktop): each reading and task row now carries a small note icon that
+  opens a compact popover with a 280-character note field and a live counter.
+  The row never shows the note text — the icon just stays faint until a note
+  exists, then turns highlighted — so the board reads the same at a glance.
+  Clicking away or re-clicking the icon saves; Escape discards; clearing the
+  text removes the note. Works the same in By Week and By Type.
+- New (mobile): the reading/task form (long-press or swipe a row → Edit, and the
+  same form when adding one) now has a Note field, capped at 280 characters with
+  a live counter.
+- New (mobile): a row whose item has a note shows a small muted "note" label
+  beside its week/due-date metadata. Rows without one are unchanged, so the
+  course list gains no visual weight.
 - New (desktop): when a focus block or break ends, a small always-on-top popup
   now appears wherever you are — in another app, on another Space, or over a
   full-screen window — instead of only inside Lectio. It names the pomodoro

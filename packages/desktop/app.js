@@ -410,7 +410,7 @@ const {
   getReadingTags, getTaskTags,
   isProtectedTag, addTag, deleteTag, editTag, reorderTags,
   courseProgress, uid, addCourse, deleteCourse, addItem,
-  setItemStatus, convertItemKind,
+  setItemStatus, convertItemKind, MAX_NOTE_LENGTH,
 } = window.PlannerCore;
 
 // Pomodoro timer + study time. `isRunning`/`isPaused` are aliased because
@@ -493,6 +493,8 @@ const ICONS = {
     '<path d="M5 5m0 2a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2z" />',
   'player-skip-forward': '<path d="M4 5v14l12 -7z" /><path d="M20 5l0 14" />',
   'chart-pie': '<path d="M12 12l0 -9a9 9 0 1 0 9 9l-9 0" />',
+  note:
+    '<path d="M4 5m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" /><path d="M8 9l8 0" /><path d="M8 13l8 0" /><path d="M8 17l6 0" />',
 };
 
 function icon(name) {
@@ -1360,14 +1362,20 @@ function itemRow(item, type, course, options = {}) {
   trigger.addEventListener('click', (e) => {
     e.stopPropagation();
     const isOpen = !menu.classList.contains('hidden');
-    // Close all other open menus first.
+    // Close all other open menus first. The stopPropagation above means this
+    // click never reaches the document-level "click outside" listener, so any
+    // open note popover has to be committed and closed from here too — only
+    // one of these panels should ever be open at a time.
     document.querySelectorAll('.tag-menu').forEach((m) => m.classList.add('hidden'));
+    closeAllItemNotePopovers();
     if (!isOpen) menu.classList.remove('hidden');
   });
 
   wrapper.appendChild(trigger);
   wrapper.appendChild(menu);
   li.appendChild(wrapper);
+
+  li.appendChild(itemNoteControl(item, course, type));
 
   const del = document.createElement('button');
   del.className = 'icon-btn';
@@ -1385,6 +1393,108 @@ function itemRow(item, type, course, options = {}) {
   li.appendChild(del);
 
   return li;
+}
+
+// The note affordance for one item: a low-weight icon button (filled once a
+// note exists) that opens a small popover with a capped textarea. The row
+// itself never shows note text — only this control — so the board stays
+// uncluttered for the common case of no note. Mirrors the tag-dropdown
+// pattern just above (position:relative wrapper + position:absolute panel,
+// closed by the same document-level "click outside" listener already wired
+// for .tag-menu).
+function itemNoteControl(item, course, type) {
+  const wrap = document.createElement('div');
+  wrap.className = 'item-note-wrapper';
+
+  const btn = document.createElement('button');
+  btn.className = 'icon-btn item-note-btn' + (item.note ? ' item-note-btn--filled' : '');
+  btn.innerHTML = icon('note');
+  btn.title = item.note ? 'Edit note' : 'Add note';
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleItemNotePopover(wrap, btn, item, course, type);
+  });
+
+  wrap.appendChild(btn);
+  return wrap;
+}
+
+// Opens the popover if closed (committing and closing any other one first,
+// same as the tag-menu dropdown does), or commits and closes it if this
+// row's is already open — a second click on the icon is a natural "I'm
+// done" gesture, so it saves rather than discarding what was typed.
+function toggleItemNotePopover(wrap, btn, item, course, type) {
+  const existing = wrap.querySelector('.item-note-popover');
+  if (existing) {
+    commitItemNotePopover(existing, btn, item);
+    existing.remove();
+    return;
+  }
+
+  document.querySelectorAll('.tag-menu').forEach((m) => m.classList.add('hidden'));
+  closeAllItemNotePopovers();
+
+  const popover = document.createElement('div');
+  popover.className = 'item-note-popover';
+  // Keep clicks inside the popover from bubbling to the document-level
+  // "click outside closes everything" listener.
+  popover.addEventListener('click', (e) => e.stopPropagation());
+
+  const textarea = document.createElement('textarea');
+  textarea.className = 'item-note-textarea';
+  textarea.maxLength = MAX_NOTE_LENGTH;
+  textarea.value = item.note || '';
+  textarea.placeholder = 'Add a note…';
+
+  const counter = document.createElement('div');
+  counter.className = 'item-note-counter';
+  const updateCounter = () => {
+    counter.textContent = `${textarea.value.length}/${MAX_NOTE_LENGTH}`;
+  };
+  updateCounter();
+  textarea.addEventListener('input', updateCounter);
+
+  // Stored on the element so the document-level "click outside" listener
+  // (wired in setupEvents) can commit before removing it, the same way blur
+  // does for the inline title/due-date editors.
+  popover._commit = () => commitItemNotePopover(popover, btn, item);
+
+  textarea.addEventListener('keydown', (e) => {
+    // Escape discards, unlike blur/re-click which save — matches the
+    // existing title/due-date inline editors' Escape-cancels convention.
+    if (e.key === 'Escape') {
+      popover._commit = null;
+      popover.remove();
+    }
+  });
+
+  popover.appendChild(textarea);
+  popover.appendChild(counter);
+  wrap.appendChild(popover);
+  textarea.focus();
+}
+
+// Write the popover's text back onto the item, matching core's clamp
+// convention exactly (truncate to MAX_NOTE_LENGTH; an empty note removes the
+// key rather than storing ''), so a semester edited here and read by core —
+// tests, mobile, import/export — agrees on what "no note" looks like.
+// Mutates the item in place and persists, like editItemTitle/editItemDueDate.
+function commitItemNotePopover(popover, btn, item) {
+  const textarea = popover.querySelector('.item-note-textarea');
+  if (!textarea) return;
+  const trimmed = textarea.value.slice(0, MAX_NOTE_LENGTH);
+  if (trimmed) item.note = trimmed;
+  else delete item.note;
+  persist();
+  btn.classList.toggle('item-note-btn--filled', !!item.note);
+  btn.title = item.note ? 'Edit note' : 'Add note';
+}
+
+function closeAllItemNotePopovers() {
+  document.querySelectorAll('.item-note-popover').forEach((p) => {
+    if (typeof p._commit === 'function') p._commit();
+    p.remove();
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -2349,9 +2459,12 @@ async function init() {
     if (state.semesterId) deleteSemester(state.semesterId);
   });
 
-  // Close any open status dropdown when clicking outside of it.
+  // Close any open status dropdown, or note popover, when clicking outside
+  // of it. A note popover commits (rather than discards) on this path, same
+  // as clicking away from the title/due-date inline editors does via blur.
   document.addEventListener('click', () => {
     document.querySelectorAll('.tag-menu').forEach((m) => m.classList.add('hidden'));
+    closeAllItemNotePopovers();
   });
 
   setupViewToggle();
