@@ -6,6 +6,12 @@
   and mobile ways to write one land separately.
 - Fixed: exporting a course (or a semester) no longer strips item notes — the
   export projection whitelists fields, and `note` had to be added to it.
+- New (desktop): each reading and task row now carries a small note icon that
+  opens a compact popover with a 280-character note field and a live counter.
+  The row never shows the note text — the icon just stays faint until a note
+  exists, then turns highlighted — so the board reads the same at a glance.
+  Clicking away or re-clicking the icon saves; Escape discards; clearing the
+  text removes the note. Works the same in By Week and By Type.
 - New (desktop): when a focus block or break ends, a small always-on-top popup
   now appears wherever you are — in another app, on another Space, or over a
   full-screen window — instead of only inside Lectio. It names the pomodoro
