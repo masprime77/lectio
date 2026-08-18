@@ -1,5 +1,298 @@
 ## Unreleased
 
+## 1.1.2 — 2026-08-18
+
+- New: readings and tasks can now carry a short free-text note (capped at 280
+  characters). Core stores it only when non-empty and clamps it defensively, and
+  exports `MAX_NOTE_LENGTH` so every app enforces the same limit.
+- Fixed: exporting a course (or a semester) no longer strips item notes — the
+  export projection whitelists fields, and `note` had to be added to it.
+- New (desktop): each reading and task row now carries a small note icon that
+  opens a compact popover with a 280-character note field and a live counter.
+  The row never shows the note text — the icon just stays faint until a note
+  exists, then turns highlighted — so the board reads the same at a glance.
+  Clicking away or re-clicking the icon saves; Escape discards; clearing the
+  text removes the note. Works the same in By Week and By Type.
+- New (mobile): the reading/task form (long-press or swipe a row → Edit, and the
+  same form when adding one) now has a Note field, capped at 280 characters with
+  a live counter.
+- New (mobile): a row whose item has a note shows a small muted "note" label
+  beside its week/due-date metadata. Rows without one are unchanged, so the
+  course list gains no visual weight.
+- New (desktop): when a focus block or break ends, a small always-on-top popup
+  now appears wherever you are — in another app, on another Space, or over a
+  full-screen window — instead of only inside Lectio. It names the pomodoro
+  ("Pomodoro 2 of 4"), says what comes next, and takes focus so its button is
+  clickable straight away.
+- New (desktop): the completion popup's buttons drive the same session actions
+  as the in-window "move on?" modal (start the next phase, or stop the timer and
+  credit partial time), and the two stay in sync — resolving the question in
+  either place closes both. Dismissing the popup (× or Escape) leaves the
+  session parked exactly as before, ready to resume from the header button.
+- Fixed (desktop): the Pomodoro menu bar timer no longer freezes when the window
+  is minimized, occluded, or unfocused. Chromium was throttling the renderer's
+  tick loop, which stopped both the Tray countdown and phase-complete detection
+  (study-time credit, the system notification, the "move on?" modal) until the
+  window regained focus. Remaining time was never wrong — the session is
+  deadline-based — only its reporting was stalled.
+- Changed (mobile): a course's **By Type** sections no longer split into week
+  groups. Readings and Tasks are each one flat list ordered by week, since every
+  row already captions the week it belongs to — the header row and the caption
+  were saying the same thing twice.
+- Changed (mobile): a week in **By Week** now lists its items flat too. The
+  "Readings" and "Tasks" sub-headings inside a week are gone; each row carries a
+  small "reading"/"task" caption instead, in the same muted style as its week
+  and due-date captions.
+- New (mobile): "+ Reading" and "+ Task" buttons close each week's list in **By
+  Week**, and open the add form on that week — the sub-headings they used to sit
+  next to are gone. The buttons next to the "Weeks" header stay: a week with
+  nothing in it yet has no section, so they are the way to reach it.
+- Changed (mobile): dragging a row is now what the section it lands on stands
+  for — a week in **By Week** (kind untouched), a kind in **By Type** (week
+  untouched). Dragging inside **By Type** no longer changes an item's week; the
+  multi-select bar's "Week" action still does, in either mode.
+- Changed (mobile): with **By Type**'s week groups gone, "Expand all"/"Collapse
+  all" appears in **By Week** only — weeks are the only collapsible sections
+  left.
+- Changed (desktop): a week in **By Week** now lists its items flat. The
+  "Readings" and "Tasks" sub-headings inside a week are gone — one list per
+  week, readings first, then tasks — matching the shape By Type already used.
+- New (desktop): every row in that flat list carries a small **R / T** badge to
+  the left of its title, so the kind is still readable at a glance now that no
+  sub-heading says it. By Type is unchanged: its section header already names
+  the kind, and its rows keep the week number instead.
+- Changed (desktop): with a week's two lists merged, dragging an item onto a
+  week no longer converts it between reading and task — it only moves it to
+  that week (and course). Converting by drag is By Type's own sections, and
+  the multi-select bar's "Make readings"/"Make tasks" still does it in either
+  mode.
+- Changed (desktop): a course column's header is now two rows — the course name
+  alone on top, and the edit / export / import / Moodle-import / delete buttons
+  on a second, quieter row beneath it. The name had been sharing one row with
+  five icons and the studied time, which left it little room at the column's
+  normal width.
+- Changed (desktop): the studied-time label moved down to that button row, at
+  its right edge. Clicking it still opens the same inline editor.
+- Changed (desktop): the email-confirmation UI is off behind a kill switch
+  (`EMAIL_CONFIRMATION_UI_ENABLED` in `packages/desktop/auth.js`). With it off,
+  sign-up signs you straight in — no "check your inbox" state, no Resend button
+  and no confirm-your-email message on sign-in. Nothing was removed; flipping
+  the constant back to `true` restores the flow described below.
+- Changed (mobile): the same kill switch
+  (`EMAIL_CONFIRMATION_UI_ENABLED` in `src/auth/AuthProvider.tsx`) pins
+  `lastSignUpNeedsConfirmation` to false and hides the confirmation notice and
+  its Resend link on the sign-in screen.
+- Note: both flags only hide the apps' own UI. The Supabase project's
+  "Confirm email" toggle (Authentication → Providers → Email) is the
+  server-side authority and has to be turned off to match — if it stays on
+  while these flags are off, sign-in fails without an explanation.
+- Fixed (desktop): creating an account no longer looks like it did nothing when
+  the project requires email confirmation. Sign-up now reports that a
+  confirmation is pending, and the sign-in dialog switches to a "check your
+  inbox to confirm <your address>" state with a **Resend email** button and a
+  way back to the form. Resending surfaces the rate-limit message in plain
+  words when you ask for it too often.
+- New (desktop): signing in with an account that was never confirmed lands on
+  that same state, so the fix is one click away instead of just a sentence.
+  With email confirmation disabled, sign-up still signs you in immediately.
+- New (mobile): the Moodle import gained a **raw, per-item screen**. After the
+  content is fetched, the import now asks how to sort it — "By section" keeps
+  the existing per-section triage, "Every item" opens the new screen, which
+  lists every importable module of the course flat, one row per item, each
+  showing the section it came from with its own week number and its own
+  Skip / Read / Task choice. That's what a section mixing readings and tasks,
+  or spanning weeks, needs.
+- New (mobile): the raw screen carries the same batch helpers and week cascade
+  as the per-section one — Skip / Read / Task applied to every row (Skip being
+  the clear-all, since it creates nothing), and "Weeks from sections" to put
+  every row back on the week guessed from its section's date range. Typing a
+  week cascades down the list counted in sections rather than rows, so items
+  from one Moodle section stay in the same week. Rows left on Skip create
+  nothing, importing is blocked until the semester has loaded, and the existing
+  per-section screen is unchanged.
+- Fixed (mobile): backing out of the Moodle import after choosing "+ New
+  course" no longer creates a second empty course when you fetch again — the
+  form points at the course it just created instead of making another.
+- New (desktop): the Moodle import can now run in a **raw, per-item mode**. The
+  picker gained an "Import mode" toggle (By section / Every item), and Settings
+  a matching "Raw import…" button; both reuse the same account, course and
+  target selection. "Every item" lists every importable module of the course
+  flat — one row per item, each showing the Moodle section it came from, with
+  its own week number and its own Skip / Reading / Task choice, so a course
+  whose sections mix readings and tasks no longer has to be imported one
+  section at a time.
+- New (desktop): the raw import screen has batch helpers for long courses — a
+  name/section filter, Skip / Reading / Task applied to every row the filter
+  shows, and "Weeks from sections", which puts every shown row back on the week
+  guessed from its section's date range. Typing a week still cascades down the
+  list, counted in sections rather than rows, so items from one Moodle section
+  stay in the same week. Rows left on Skip create nothing, and the existing
+  per-section import is unchanged.
+- New (mobile): items can be **dragged between sections** on the course screen.
+  In editing mode, long-press a row to lift it and drag it onto another
+  section: By Week that moves it to that week, By Type it moves it to that week
+  *and* converts it between reading and task, since the section it lands under
+  is the kind. An empty Readings or Tasks section accepts a drop too (the item
+  keeps its week), the section under the finger is outlined, the list
+  auto-scrolls when the drag nears an edge, and the destination is expanded on
+  arrival. Tapping to select, the batch bar and swipe-to-edit/delete are all
+  unchanged.
+- New (desktop): readings and tasks can be **dragged between sections** on the
+  course board. By Week, dropping a row on another week moves it there — on the
+  week's Readings or Tasks list to change what it is at the same time, or on a
+  collapsed week's header, which opens on arrival. By Type, dropping on the
+  other section converts a reading into a task (or back). Dropping on any
+  section of another course's column moves the item to that course, and the
+  section under the pointer is outlined so it's clear where the item will land.
+  Dropping a `.lectio.json` file on the window still imports it as before.
+- New (desktop): a **select** button in the header puts the course board into
+  multi-select mode. Clicking a row selects it, Cmd/Ctrl-click toggles one, and
+  Shift-click takes a range within a list; Escape (or the button again) leaves
+  the mode. Selections may span weeks, sections and courses, and work the same
+  By Week and By Type.
+- New (desktop): while something is selected, a bar under the header sets a
+  **tag**, moves everything to a **week**, converts the selection between
+  **readings and tasks**, or deletes it — each as one save, not one per item.
+  Setting a tag waits until the selection is all readings or all tasks, since
+  the two have separate tag lists.
+- New (mobile): editing mode on the course screen can now change the selected
+  items, not just delete them. A bar at the bottom sets a **tag**, moves
+  everything to a **week**, or converts the selection between **readings and
+  tasks**, all in one save. Selections may span both sections and both
+  groupings; setting a tag waits until the selection is all readings or all
+  tasks, since the two tag lists are separate.
+- New (mobile): the course screen groups its readings and tasks **By Week** or
+  **By Type**, the same two groupings the desktop board offers, picked from a
+  header button next to the sort control. By Type is what the screen always
+  showed — a Readings section and a Tasks section, split into weeks. By Week
+  puts one "Week N · date range" section at the top level holding that week's
+  readings and then its tasks, with anything that has no week in a trailing
+  "No week" section. Selecting, swiping, tag-setting and adding items work the
+  same in both.
+- New (mobile): each grouping remembers which of its sections you had open, so
+  switching between them doesn't disturb the other one, and expand/collapse all
+  applies to whichever sections are on screen.
+- New (mobile): the chosen grouping is remembered on the device and restored
+  when you come back to a course or relaunch the app.
+- Changed (desktop): the header toggle now reads **By Week** / **By Type** and
+  chooses how each course column is grouped, instead of swapping between two
+  different layouts. The course-column board — with its per-course header,
+  focus mode, sort order and "+ Add course" column — is now the only layout;
+  By Week is exactly what All Courses showed before. The old Weekly view (one
+  card per course inside each week) is gone.
+- New (desktop): **By Type** groups a course column into two collapsible
+  sections, Readings and Tasks, each listing every item of that type across the
+  whole semester with its week number on the row. Rows follow the week sort, so
+  "Weeks: high to low" reads the list newest-first. Each grouping remembers
+  which of its sections you had open, so switching back and forth doesn't
+  disturb the other one; "expand current week only" applies to the week
+  grouping and is disabled while grouping by type.
+- Fixed (desktop): a semester restored with the old saved view lands in a valid
+  grouping instead of erroring — both former layouts map to By Week.
+- Fixed (desktop): the view no longer jumps when you edit an item. Changing a
+  tag, renaming an item, editing a due date, deleting an item, adding one, or
+  editing studied time rebuilt the whole planner and threw you back to the top.
+  Those edits now hold their place, and scroll is restored for all three
+  scrollers — the page, the All Courses board's horizontal scroll, and each
+  course column's own scroll — not just the page. Expanded weeks are unaffected
+  either way.
+- Changed (desktop): changing an item's tag, renaming it, or editing its due
+  date now updates just that item instead of re-rendering the planner, so the
+  edit lands without the surrounding view flickering.
+- Changed (desktop): each week in the Moodle import dialog now picks
+  **Skip / Reading / Task** with three segmented buttons instead of a
+  drop-down, matching the mobile import screen. The choice is readable without
+  opening a menu, and the "All weeks" buttons light up the matching button in
+  every row, so a batch change is visible where the decision is made.
+- Fixed (mobile): weeks left on **Skip** in the Moodle import screen were still
+  imported. The confirm step treated a week with no recorded decision as
+  importable while the rows drew it as skipped; both now read the same default,
+  so a row that looks skipped is skipped. Leaving every week on Skip explains
+  what to do instead of importing nothing under the banner of success, and
+  "Import selected" stays disabled until the semester has loaded, so tapping it
+  the instant the screen opens can no longer import against an empty decision
+  map.
+- Fixed (mobile): importing a course from a file no longer silently carries the
+  source semester's progress. The import now asks **Reset progress** or **Keep
+  progress**, the same choice the semester import offers. Resetting puts every
+  reading and task back on its pending tag and clears the task due dates, which
+  belonged to the semester the course came from; keeping preserves them. Either
+  way the course and its items get fresh ids, so an import still can't collide
+  with anything already in the semester.
+- Fixed (desktop): upgrading from a pre-cloud version re-opened the "Upload
+  local semesters to your account?" offer at **every** launch. "Not now" closed
+  the window without recording anything, and once the semesters were already in
+  the account every row read "Already in your account" — so a routine offer
+  looked like a conflict prompt about an existing semester. Answering it now
+  settles it for good.
+- Added (desktop): Settings → Profile → **Local semesters**, which re-opens the
+  local→cloud upload offer on demand, so declining it is never final. The upload
+  is unchanged: it never overwrites or deletes anything, and re-running it just
+  skips what is already in the account.
+- Fixed (desktop): a semester that is identical locally and in the cloud can no
+  longer raise the "Changed on another device" prompt. A save that would write
+  exactly what the cloud already holds is recognised as a non-conflict, so
+  nothing is written and no choice is asked for — genuine divergences still open
+  the prompt as before.
+- Fixed (desktop): packaged builds shipped without `moodle.js`,
+  `moodle-client.js` and `conflict.js` — three of the six core files the
+  renderer loads — because the electron-builder file allowlist had drifted from
+  the list `sync-core.js` vendors. Connecting a Moodle account failed with
+  "Could not verify the connection: Cannot read properties of undefined
+  (reading 'createMoodleClient')", and cloud saves threw on the missing
+  conflict detection. All six files are bundled again.
+- Changed (desktop): `sync-core` now fails (and with it start/dev/build) when a
+  file it vendors is missing from the packaging allowlist, so the two lists
+  cannot drift apart unnoticed again.
+- Changed (desktop): a missing vendored global now fails loudly instead of
+  silently. The Supabase adapter refuses to be constructed without
+  `window.PlannerConflict`, and the Moodle entry points check for the Moodle
+  globals up front and show a readable message rather than a `TypeError`.
+- Changed (mobile): the study timer and its study-time button moved to the
+  bottom-**left** corner, leaving the bottom-right "+" on its own. The timer now
+  sits level with the "+" instead of stacked above it, with study time above the
+  timer, and the running pill grows rightwards into the empty middle of the
+  screen rather than off the left edge. The column follows the safe area in
+  landscape, so nothing is clipped by a notch or the home indicator.
+- Changed (mobile): the semester and course screens shed the extra bottom
+  padding the old two-high stack needed, so their lists end closer to the
+  bottom of the screen.
+- New (core): a course can now carry an exam date (`examDate`, a `YYYY-MM-DD`
+  string or empty when unset — the same convention a task's due date uses),
+  set through the new `editCourseExamDate` and accepted as an optional field
+  by `addCourse`. Groundwork only: the desktop and mobile UIs for it land
+  separately.
+- New (core): a "nearest exam" course sort order (`exam-asc`) that lists the
+  soonest upcoming exam first. Courses with no exam date sort after every
+  dated one, and courses sharing a date fall back to A → Z, matching how the
+  existing orders break ties.
+- Fixed (core): exporting a course or semester to a `.lectio.json` file, and
+  importing one back, would have silently dropped the new exam date — both
+  sides whitelist which course fields survive, so `examDate` was added to
+  each. A course with no date round-trips as an empty one.
+- New (mobile): the course form gained an optional **Exam date** field, using
+  the same date picker a task's due date already uses. Editing a course
+  pre-fills the saved date, and Clear removes it.
+- New (mobile): a course card on the semester's course list shows
+  " · exam &lt;date&gt;" at the end of its meta line once a date is set, in the
+  same place the studied time appears.
+- New (mobile): "Nearest exam" joins the course sort menu, first in the list,
+  ordering the soonest exam first with undated courses last. The saved choice
+  already validates against the shared sort-order list, so it persists like
+  every other order with no extra work.
+- New (desktop): each course row in the New/Edit semester dialog gains an
+  optional exam-date field, saved with the course and pre-filled when the
+  dialog reopens. Clearing it removes the date. A course that has one shows a
+  muted "exam &lt;date&gt;" line under its name in the course column header.
+- New (desktop): "Nearest exam" joins the course sort dropdown, ordering
+  columns by the soonest exam first. Courses with no exam date come after
+  every dated one, and courses sharing a date stay in A → Z order. The choice
+  now survives a restart like the other sort orders do.
+- Fixed (desktop): exporting a course to a `.lectio.json` file and importing
+  it back dropped the exam date. The renderer keeps its own copy of the
+  export/import field list rather than using the shared one, so all three
+  places it appears needed the new field.
+
 ## 1.1.1 — 2026-08-11
 
 - Added (mobile): the course screen's Readings and Tasks sections each gained an

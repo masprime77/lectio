@@ -6,14 +6,22 @@
 const state = {
   semesterId: null,   // current semester file id (filename without .json)
   semester: null,     // loaded semester object
-  openWeeks: new Set(), // weeks currently expanded
-  openCourseWeeks: {}, // "courseId-week" -> true when that course-view week is expanded
+  openCourseWeeks: {}, // "courseId-week" -> true when that week section is expanded
+  openCourseTypes: {}, // "courseId-reading|task" -> true when that type section is expanded
   editingId: null,    // semester id being edited in the modal (null = create mode)
   editingSemester: null, // semester object the modal's Tags tab edits (live or draft)
-  view: restoreView(), // 'week' | 'course' — restored from last session
-  focusedCourseId: null, // null = normal All Courses layout; course id = focused mode
+  view: restoreView(), // grouping inside a course column: 'week' | 'type'
+  focusedCourseId: null, // null = the full course board; course id = focused mode
   sortOrder: restoreSort(), // course sort order — restored from last session
   breakdownOpen: false, // progress breakdown panel visibility
+  // Multi-select on the course board. `selecting` is the mode itself (rows
+  // become selection targets instead of edit targets); `selection` holds item
+  // ids, so a selection survives a re-render and the id-preserving kind
+  // conversion. `selectionAnchor` is the last row clicked without Shift — the
+  // other end of a Shift-click range.
+  selecting: false,
+  selection: new Set(),
+  selectionAnchor: null,
   tutorialStep: 0,   // current step index (0-based)
   tutorialActive: false, // whether the overlay is visible
   // Pomodoro study timer. `session` is core's deadline-based state; `settings`
@@ -49,10 +57,13 @@ function writePref(key, value) {
   }
 }
 
-// Restore the saved view, defaulting to "week" for missing/invalid values.
+// Restore the saved grouping mode, defaulting to "week" for missing/invalid
+// values. Pre-grouping releases stored a layout here instead ('week' for the
+// old Weekly view, 'course' for All Courses); both land on the week grouping,
+// which is what the course board showed either way.
 function restoreView() {
   const v = readPref('lastActiveView');
-  return v === 'week' || v === 'course' ? v : 'week';
+  return v === 'type' ? 'type' : 'week';
 }
 
 // Restore the saved course sort order, defaulting to "progress-desc".
@@ -62,6 +73,7 @@ function restoreSort() {
     'progress-desc', 'progress-asc',
     'alpha-asc',
     'week-asc', 'week-desc',
+    'exam-asc',
   ];
   return valid.includes(v) ? v : 'progress-desc';
 }
@@ -167,6 +179,19 @@ async function saveWithConflict(id, value) {
     return { applied: value };
   } catch (err) {
     if (err && err.code === 'CONFLICT') {
+      // A "conflict" whose remote copy already matches what we're about to write
+      // is not a real divergence: the row's `updated_at` moved, but the content
+      // is the same, so there is nothing to reconcile and nothing to write.
+      // This is the normal shape for a legacy (pre-cloud) semester that was just
+      // uploaded to the account from this machine — the upload bumped the
+      // timestamp behind the adapter's baseline, and the first edit-free save
+      // after opening it would otherwise pop the "Changed on another device"
+      // modal over two identical copies. Refresh the baseline from the cloud so
+      // the next save compares against the current timestamp, then carry on.
+      if (semestersEqual(value, err.remote)) {
+        await api.load(id).catch(() => {}); // refreshes the adapter's `seen` baseline
+        return { applied: value };
+      }
       const choice = await openConflictModal();
       if (choice === 'cancel') return { cancelled: true };
       if (choice === 'discard') return { applied: err.remote, reloaded: true };
@@ -178,6 +203,37 @@ async function saveWithConflict(id, value) {
     }
     throw err;
   }
+}
+
+// Are these two semester blobs the same data? The local side is JSON
+// round-tripped first so the comparison is against what would actually be
+// written (dropping undefined values, Dates, etc.) — i.e. "is the cloud copy
+// already byte-identical to this save?". Object key order is ignored, since the
+// remote copy comes back from JSON and need not preserve the in-memory order;
+// array order is significant (item order is user-visible).
+function semestersEqual(local, remote) {
+  if (remote == null) return false;
+  let normalized;
+  try {
+    normalized = JSON.parse(JSON.stringify(local));
+  } catch (e) {
+    return false; // not serializable — treat as different rather than guessing
+  }
+  return deepEqual(normalized, remote);
+}
+
+function deepEqual(a, b) {
+  if (a === b) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    return a.length === b.length && a.every((v, i) => deepEqual(v, b[i]));
+  }
+  const keys = Object.keys(a);
+  if (keys.length !== Object.keys(b).length) return false;
+  return keys.every(
+    (k) => Object.prototype.hasOwnProperty.call(b, k) && deepEqual(a[k], b[k])
+  );
 }
 
 // Save the remote (losing) version under a fresh, non-colliding id so the user
@@ -354,6 +410,7 @@ const {
   getReadingTags, getTaskTags,
   isProtectedTag, addTag, deleteTag, editTag, reorderTags,
   courseProgress, uid, addCourse, deleteCourse, addItem,
+  setItemStatus, convertItemKind, MAX_NOTE_LENGTH,
 } = window.PlannerCore;
 
 // Pomodoro timer + study time. `isRunning`/`isPaused` are aliased because
@@ -395,6 +452,8 @@ const ICONS = {
   'chevrons-down': '<path d="M7 7l5 5l5 -5" /><path d="M7 13l5 5l5 -5" />',
   'chevrons-up': '<path d="M7 11l5 -5l5 5" /><path d="M7 17l5 -5l5 5" />',
   x: '<path d="M18 6l-12 12" /><path d="M6 6l12 12" />',
+  'list-check':
+    '<path d="M3.5 5.5l1.5 1.5l2.5 -2.5" /><path d="M3.5 11.5l1.5 1.5l2.5 -2.5" /><path d="M3.5 17.5l1.5 1.5l2.5 -2.5" /><path d="M11 6l9 0" /><path d="M11 12l9 0" /><path d="M11 18l9 0" />',
   pencil:
     '<path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" /><path d="M13.5 6.5l4 4" />',
   trash:
@@ -434,6 +493,8 @@ const ICONS = {
     '<path d="M5 5m0 2a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2z" />',
   'player-skip-forward': '<path d="M4 5v14l12 -7z" /><path d="M20 5l0 14" />',
   'chart-pie': '<path d="M12 12l0 -9a9 9 0 1 0 9 9l-9 0" />',
+  note:
+    '<path d="M4 5m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" /><path d="M8 9l8 0" /><path d="M8 13l8 0" /><path d="M8 17l6 0" />',
 };
 
 function icon(name) {
@@ -482,10 +543,11 @@ async function populateSelector() {
 async function loadSemester(id) {
   state.semesterId = id;
   state.semester = await api.load(id);
-  state.openWeeks = new Set();
   state.focusedCourseId = null; // focus never persists across semester switches
-  const cw = currentWeek(state.semester);
-  if (cw) state.openWeeks.add(cw); // auto-expand current week
+  // Selected ids belong to the semester that was on screen — they mean nothing
+  // in the new one, so the selection is dropped with it.
+  state.selection.clear();
+  state.selectionAnchor = null;
   document.getElementById('semester-select').value = id;
   writePref('lastActiveSemesterId', id); // remember for next launch
   setSemesterActionsEnabled(true);
@@ -498,16 +560,60 @@ async function loadSemester(id) {
 function render() {
   renderDashboard();
   renderPlanner();
+  // Follows the board: the bar's contents depend on what is selected, and the
+  // rows it acts on were just rebuilt.
+  renderSelectionBar();
 }
 
-// Run a re-render while preserving the scroll position of the main content
-// area. Used by in-place mutations (e.g. adding an item) so the user isn't
-// yanked back to the top when the planner subtree is rebuilt.
+// Snapshot the scroll offset of every scroller a re-render can disturb. The
+// page itself is the outer scroller (`main.main` has no overflow of its own,
+// so the document scrolls); the Course view adds `.course-board` (horizontal)
+// and one `.course-column-body` per column (vertical, max-height: 75vh).
+// Columns are keyed by course id because the rebuilt elements are new nodes.
+function captureScroll() {
+  const doc = document.scrollingElement || document.documentElement;
+  const board = document.querySelector('.course-board');
+  const columns = {};
+  document.querySelectorAll('.course-column-body').forEach((body) => {
+    const id = body.parentElement && body.parentElement.dataset.courseId;
+    if (id) columns[id] = body.scrollTop;
+  });
+  return {
+    docTop: doc ? doc.scrollTop : 0,
+    docLeft: doc ? doc.scrollLeft : 0,
+    boardLeft: board ? board.scrollLeft : 0,
+    boardTop: board ? board.scrollTop : 0,
+    columns,
+  };
+}
+
+// Put back what captureScroll() recorded. Offsets that no longer exist (the
+// content shrank, a course was removed) are clamped by the browser.
+function restoreScroll(snap) {
+  if (!snap) return;
+  const doc = document.scrollingElement || document.documentElement;
+  if (doc) {
+    doc.scrollTop = snap.docTop;
+    doc.scrollLeft = snap.docLeft;
+  }
+  const board = document.querySelector('.course-board');
+  if (board) {
+    board.scrollLeft = snap.boardLeft;
+    board.scrollTop = snap.boardTop;
+  }
+  document.querySelectorAll('.course-column-body').forEach((body) => {
+    const id = body.parentElement && body.parentElement.dataset.courseId;
+    if (id && id in snap.columns) body.scrollTop = snap.columns[id];
+  });
+}
+
+// Run a re-render while preserving every scroll position. Used by in-place
+// mutations (adding or deleting an item, editing studied time) so the user
+// isn't yanked back to the top when the planner subtree is rebuilt.
 function renderPreservingScroll() {
-  const main = document.querySelector('main.main');
-  const top = main ? main.scrollTop : 0;
+  const snap = captureScroll();
   render();
-  if (main) main.scrollTop = top;
+  restoreScroll(snap);
 }
 
 // Return a sorted copy of `courses` per state.sortOrder. Pure: never mutates
@@ -525,19 +631,21 @@ function sortedCourses(courses) {
     return copy.sort(
       (a, b) => courseProgress(b, state.semester) - courseProgress(a, state.semester)
     );
+  if (state.sortOrder === 'exam-asc') {
+    // Mirrors core's exam-asc: soonest date first ('YYYY-MM-DD' compares as a
+    // string), undated courses after every dated one, alphabetical on ties.
+    return copy.sort((a, b) => {
+      const ea = a.examDate || '';
+      const eb = b.examDate || '';
+      if (ea && eb) return ea === eb ? a.name.localeCompare(b.name) : ea < eb ? -1 : 1;
+      if (ea && !eb) return -1;
+      if (!ea && eb) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }
   // alpha-asc, week-asc and week-desc all use alphabetical (A → Z) order.
   // Any unknown/removed order (e.g. a stale 'alpha-desc') also lands here.
   return copy.sort((a, b) => a.name.localeCompare(b.name));
-}
-
-// Course order for the Weekly view. Only week-based sorts reorder courses
-// here; progress and alpha sorts apply to the dashboard/columns only, so the
-// Weekly view keeps the original on-disk course order for them.
-function sortedCoursesForWeekView(courses) {
-  if (state.sortOrder === 'week-asc' || state.sortOrder === 'week-desc') {
-    return sortedCourses(courses);
-  }
-  return [...courses]; // preserve original order
 }
 
 // Returns { readings: {done, total}, tasks: {done, total} } for one course.
@@ -758,103 +866,53 @@ function addCourseButton(extraClass = '') {
 }
 
 // ---------------------------------------------------------------------------
-// Planner: dispatches to the selected layout
+// Planner: always the course board (one column per course). The header toggle
+// no longer swaps layouts — it only chooses how the items inside a column are
+// grouped, which is threaded down as the grouping mode.
 // ---------------------------------------------------------------------------
 function renderPlanner() {
   const root = document.getElementById('planner');
-  root.className = 'planner view-' + state.view;
-  if (state.view === 'course') renderCourseView();
-  else renderWeekView();
+  root.className = 'planner group-by-' + groupMode();
+  renderCourseBoard();
+}
+
+// The active grouping mode, normalised. Anything that isn't a known mode falls
+// back to weeks, so a stale persisted value can never break a render.
+function groupMode() {
+  return state.view === 'type' ? 'type' : 'week';
 }
 
 // ---------------------------------------------------------------------------
-// Week view: collapsible weeks, one course card per week
-// ---------------------------------------------------------------------------
-function renderWeekView() {
-  const sem = state.semester;
-  const root = document.getElementById('planner');
-  root.innerHTML = '';
-  const cw = currentWeek(sem);
-
-  // Week display order: ascending by default, descending for week-desc.
-  let weekNumbers = Array.from({ length: sem.weeks }, (_, i) => i + 1);
-  if (state.sortOrder === 'week-desc') weekNumbers = weekNumbers.reverse();
-
-  weekNumbers.forEach((week) => {
-    const isOpen = state.openWeeks.has(week);
-    const start = weekStart(sem.startDate, week);
-    const end = weekStart(sem.startDate, week);
-    end.setDate(end.getDate() + 6);
-
-    const weekEl = document.createElement('div');
-    weekEl.className = 'week' + (isOpen ? ' open' : '');
-
-    const header = document.createElement('div');
-    header.className = 'week-header';
-    header.innerHTML = `
-      <span class="chevron">${icon('chevron-right')}</span>
-      <span class="week-title">Week ${week}</span>
-      <span class="week-dates">${formatDate(start)} – ${formatDate(end)}</span>
-      ${week === cw ? '<span class="week-badge">Current</span>' : ''}
-    `;
-    header.addEventListener('click', () => toggleWeek(week));
-    weekEl.appendChild(header);
-
-    const body = document.createElement('div');
-    body.className = 'week-body';
-
-    if (sem.courses.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'week-empty';
-      empty.textContent = 'No courses yet.';
-      body.appendChild(empty);
-      body.appendChild(addCourseButton());
-    } else {
-      sortedCoursesForWeekView(sem.courses).forEach((course) => {
-        body.appendChild(renderCourseCard(course, week));
-      });
-    }
-
-    weekEl.appendChild(body);
-    root.appendChild(weekEl);
-  });
-}
-
-function toggleWeek(week) {
-  if (state.openWeeks.has(week)) state.openWeeks.delete(week);
-  else state.openWeeks.add(week);
-  renderPlanner();
-}
-
-// ---------------------------------------------------------------------------
-// Bulk expand/collapse for the active view's week sections.
-// Operates on state.openWeeks (Weekly view) or state.openCourseWeeks
-// (All Courses view) depending on which layout is showing.
+// Bulk expand/collapse for the sections inside every course column. Each mode
+// has its own open/closed map, so switching back and forth is stable.
 // ---------------------------------------------------------------------------
 function setAllWeeksOpen(mode) {
   const sem = state.semester;
   if (!sem) return;
-  const cw = currentWeek(sem);
 
-  if (state.view === 'course') {
+  if (groupMode() === 'type') {
+    // "Current week only" has no meaning when the sections are types rather
+    // than weeks — the control is disabled in this mode, so ignore it here.
+    if (mode === 'current') return;
+    const open = mode === 'all';
+    sem.courses.forEach((course) => {
+      ITEM_TYPES.forEach(({ type }) => {
+        state.openCourseTypes[course.id + '-' + type] = open;
+      });
+    });
+  } else {
+    const cw = currentWeek(sem);
     sem.courses.forEach((course) => {
       for (let w = 1; w <= sem.weeks; w++) {
         const open = mode === 'all' || (mode === 'current' && w === cw);
         state.openCourseWeeks[course.id + '-' + w] = open;
       }
     });
-  } else {
-    state.openWeeks = new Set();
-    if (mode === 'all') {
-      for (let w = 1; w <= sem.weeks; w++) state.openWeeks.add(w);
-    } else if (mode === 'current' && cw) {
-      state.openWeeks.add(cw);
-    }
   }
   renderPlanner();
 }
 
-// Exit focused single-course mode and return to the full All Courses layout.
+// Exit focused single-course mode and return to the full course board.
 function clearCourseFocus() {
   if (!state.focusedCourseId) return;
   state.focusedCourseId = null;
@@ -863,9 +921,11 @@ function clearCourseFocus() {
 }
 
 // ---------------------------------------------------------------------------
-// Course view: one column per course, entries grouped by week dividers
+// Course board: one column per course. The column body is filled by the
+// grouping mode's own renderer; everything around it (header actions, focused
+// mode, the "+ Add course" column) is shared by every mode.
 // ---------------------------------------------------------------------------
-function renderCourseView() {
+function renderCourseBoard() {
   const sem = state.semester;
   const root = document.getElementById('planner');
   root.innerHTML = '';
@@ -893,8 +953,13 @@ function renderCourseView() {
   courses.forEach((course) => {
     const col = document.createElement('div');
     col.className = focused ? 'course-column--focused' : 'course-column';
+    // Lets captureScroll()/restoreScroll() match a column to its replacement
+    // across a re-render.
+    col.dataset.courseId = course.id;
     col.style.borderTopColor = course.color;
 
+    // Two rows: the course name alone on top (it's the column's identity, so it
+    // gets the full width), then a secondary toolbar row beneath it.
     const header = document.createElement('div');
     header.className = 'course-column-header';
 
@@ -905,13 +970,33 @@ function renderCourseView() {
     nameSpan.style.color = course.color;
     header.appendChild(nameSpan);
 
-    // Total studied time (click to edit).
+    // Raw ISO string, like the item due-date badge — no locale formatting.
+    if (course.examDate) {
+      const examSpan = document.createElement('span');
+      examSpan.className = 'course-column-header-exam';
+      examSpan.textContent = 'exam ' + course.examDate;
+      examSpan.title = 'Exam date — edit in "Edit semester"';
+      header.appendChild(examSpan);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'course-column-header-actions';
+    header.appendChild(actions);
+
+    const btnGroup = document.createElement('div');
+    btnGroup.className = 'course-column-header-btns';
+    actions.appendChild(btnGroup);
+
+    // Total studied time (click to edit). Deliberately on the button row rather
+    // than next to the name: it's small, muted metadata like the icons, and at
+    // the 300px column width keeping it off the name row is what lets long
+    // course names render without truncating.
     const timeSpan = document.createElement('span');
     timeSpan.className = 'course-column-header-time';
     timeSpan.textContent = formatHoursMinutes(getCourseStudySeconds(course));
     timeSpan.title = 'Studied time — click to edit';
     timeSpan.addEventListener('click', () => editStudyTimeInline(timeSpan, course.id));
-    header.appendChild(timeSpan);
+    actions.appendChild(timeSpan);
 
     // Edit (opens the semester editor, the existing way to rename/recolor a course)
     const editBtn = document.createElement('button');
@@ -919,7 +1004,7 @@ function renderCourseView() {
     editBtn.innerHTML = icon('pencil');
     editBtn.title = 'Edit semester (to rename/recolor this course)';
     editBtn.addEventListener('click', () => openEditModal(state.semesterId, 'courses'));
-    header.appendChild(editBtn);
+    btnGroup.appendChild(editBtn);
 
     // Export
     const exportBtn = document.createElement('button');
@@ -927,7 +1012,7 @@ function renderCourseView() {
     exportBtn.innerHTML = icon('file-export');
     exportBtn.title = 'Export course';
     exportBtn.addEventListener('click', () => exportCourse(course));
-    header.appendChild(exportBtn);
+    btnGroup.appendChild(exportBtn);
 
     // Import (imports a course into this semester, not "replace this course")
     const importCourseBtn = document.createElement('button');
@@ -944,7 +1029,7 @@ function renderCourseView() {
         alert('Could not read file: ' + (err.message || err));
       }
     });
-    header.appendChild(importCourseBtn);
+    btnGroup.appendChild(importCourseBtn);
 
     // Import from Moodle (skips the target-course picker — this course is
     // already the target).
@@ -956,7 +1041,7 @@ function renderCourseView() {
       if (!(await ensureMoodleAccountOrPrompt())) return;
       openMoodleCourseModal({ presetCourseId: course.id });
     });
-    header.appendChild(moodleImportBtn);
+    btnGroup.appendChild(moodleImportBtn);
 
     // Delete
     const delBtn = document.createElement('button');
@@ -969,65 +1054,14 @@ function renderCourseView() {
       persist();
       render();
     });
-    header.appendChild(delBtn);
+    btnGroup.appendChild(delBtn);
 
     col.appendChild(header);
 
     const body = document.createElement('div');
     body.className = 'course-column-body';
-
-    // Week display order: ascending by default, descending for week-desc.
-    let weekNumbers = Array.from({ length: sem.weeks }, (_, i) => i + 1);
-    if (state.sortOrder === 'week-desc') weekNumbers = weekNumbers.reverse();
-
-    // Weeks (in display order) that have any reading or task for this course.
-    const weeks = [];
-    weekNumbers.forEach((w) => {
-      const readings = course.readings.filter((r) => r.week === w);
-      const tasks = course.tasks.filter((t) => t.week === w);
-      if (readings.length || tasks.length) weeks.push({ w, readings, tasks });
-    });
-
-    if (weeks.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'week-empty';
-      empty.textContent = 'No readings or tasks yet.';
-      body.appendChild(empty);
-      body.appendChild(addControls(course, currentWeek(sem) || 1));
-    } else {
-      weeks.forEach(({ w, readings, tasks }) => {
-        const key = course.id + '-' + w;
-        const isOpen = key in state.openCourseWeeks
-          ? state.openCourseWeeks[key]
-          : w === currentWeek(sem);
-        state.openCourseWeeks[key] = isOpen;
-
-        const start = weekStart(sem.startDate, w);
-        const end = weekStart(sem.startDate, w);
-        end.setDate(end.getDate() + 6);
-        const weekHeader = document.createElement('div');
-        weekHeader.className = 'course-week-header' + (isOpen ? ' open' : '');
-        weekHeader.innerHTML = `<span class="course-week-chevron">${icon('chevron-right')}</span>
-          <span class="week-divider-label">Week ${w}</span>
-          <span class="week-divider-dates">${formatDate(start)} – ${formatDate(end)}</span>`;
-        weekHeader.addEventListener('click', () => {
-          state.openCourseWeeks[key] = !state.openCourseWeeks[key];
-          renderCourseView();
-        });
-
-        const weekBody = document.createElement('div');
-        weekBody.className = 'course-week-body' + (isOpen ? ' open' : '');
-        weekBody.appendChild(sectionTitle('Readings'));
-        weekBody.appendChild(renderItemList(readings, 'reading', course, w));
-        weekBody.appendChild(sectionTitle('Tasks'));
-        weekBody.appendChild(renderItemList(tasks, 'task', course, w));
-        weekBody.appendChild(addControls(course, w));
-
-        body.appendChild(weekHeader);
-        body.appendChild(weekBody);
-      });
-      body.appendChild(addToWeekControl(course, sem));
-    }
+    if (groupMode() === 'type') fillColumnByType(body, course, sem);
+    else fillColumnByWeek(body, course, sem);
 
     col.appendChild(body);
     board.appendChild(col);
@@ -1039,6 +1073,136 @@ function renderCourseView() {
   root.appendChild(board);
 }
 
+// "By Week" grouping: one collapsible "Week N · date range" section per week
+// that has any item. A week lists its items flat — readings first, then tasks,
+// with no sub-headings — the same shape the type grouping uses, so each row
+// carries the R/T badge that its missing section header used to say.
+function fillColumnByWeek(body, course, sem) {
+  // Week display order: ascending by default, descending for week-desc.
+  let weekNumbers = Array.from({ length: sem.weeks }, (_, i) => i + 1);
+  if (state.sortOrder === 'week-desc') weekNumbers = weekNumbers.reverse();
+
+  // Weeks (in display order) that have any reading or task for this course.
+  const weeks = [];
+  weekNumbers.forEach((w) => {
+    const readings = course.readings.filter((r) => r.week === w);
+    const tasks = course.tasks.filter((t) => t.week === w);
+    if (readings.length || tasks.length) weeks.push({ w, readings, tasks });
+  });
+
+  if (weeks.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'week-empty';
+    empty.textContent = 'No readings or tasks yet.';
+    body.appendChild(empty);
+    body.appendChild(addControls(course, currentWeek(sem) || 1));
+    // A course with no items has no week sections, so the whole (empty) column
+    // body is the drop zone — it is the only way to drag the first item in.
+    markDropZone(body, course, { week: currentWeek(sem) || 1 });
+    return;
+  }
+
+  weeks.forEach(({ w, readings, tasks }) => {
+    const key = course.id + '-' + w;
+    const isOpen = key in state.openCourseWeeks
+      ? state.openCourseWeeks[key]
+      : w === currentWeek(sem);
+    state.openCourseWeeks[key] = isOpen;
+
+    const start = weekStart(sem.startDate, w);
+    const end = weekStart(sem.startDate, w);
+    end.setDate(end.getDate() + 6);
+    const weekHeader = document.createElement('div');
+    weekHeader.className = 'course-week-header' + (isOpen ? ' open' : '');
+    weekHeader.innerHTML = `<span class="course-week-chevron">${icon('chevron-right')}</span>
+      <span class="week-divider-label">Week ${w}</span>
+      <span class="week-divider-dates">${formatDate(start)} – ${formatDate(end)}</span>`;
+    weekHeader.addEventListener('click', () => {
+      state.openCourseWeeks[key] = !state.openCourseWeeks[key];
+      renderPlanner();
+    });
+
+    const weekBody = document.createElement('div');
+    weekBody.className = 'course-week-body' + (isOpen ? ' open' : '');
+    weekBody.appendChild(
+      renderMixedItemList(
+        [
+          ...readings.map((item) => ({ item, type: 'reading' })),
+          ...tasks.map((item) => ({ item, type: 'task' })),
+        ],
+        course
+      )
+    );
+    weekBody.appendChild(addControls(course, w));
+
+    // Two zones per week: the body is the week itself (a drop sets the week and
+    // leaves the kind alone), and the header is the only target a collapsed
+    // week has (its body is display:none). There is no per-kind zone here any
+    // more — a week is one list now; converting a reading into a task by drag
+    // is the type grouping's own sections.
+    markDropZone(weekHeader, course, { week: w });
+    markDropZone(weekBody, course, { week: w });
+
+    body.appendChild(weekHeader);
+    body.appendChild(weekBody);
+  });
+  body.appendChild(addToWeekControl(course, sem));
+}
+
+// The two kinds of item a course holds, in the order the type grouping shows
+// them. `key` is the course array each type lives in.
+const ITEM_TYPES = [
+  { type: 'reading', key: 'readings', label: 'Readings' },
+  { type: 'task', key: 'tasks', label: 'Tasks' },
+];
+
+// "By Type" grouping: two collapsible sections per column — every reading, then
+// every task, across the whole semester. The sections aren't weeks, so each row
+// carries its own week number and the rows are ordered by week (descending for
+// the week-desc sort, ascending otherwise).
+function fillColumnByType(body, course, sem) {
+  const byWeek = state.sortOrder === 'week-desc'
+    ? (a, b) => b.week - a.week
+    : (a, b) => a.week - b.week;
+
+  ITEM_TYPES.forEach(({ type, key, label }) => {
+    const items = [...course[key]].sort(byWeek);
+    const stateKey = course.id + '-' + type;
+    // Both sections start expanded: unlike weeks, there's no "current" one to
+    // single out, and a course's whole list is the point of this grouping.
+    const isOpen = stateKey in state.openCourseTypes
+      ? state.openCourseTypes[stateKey]
+      : true;
+    state.openCourseTypes[stateKey] = isOpen;
+
+    const header = document.createElement('div');
+    header.className = 'course-week-header' + (isOpen ? ' open' : '');
+    header.innerHTML = `<span class="course-week-chevron">${icon('chevron-right')}</span>
+      <span class="week-divider-label">${label}</span>
+      <span class="week-divider-dates">${items.length}</span>`;
+    header.addEventListener('click', () => {
+      state.openCourseTypes[stateKey] = !state.openCourseTypes[stateKey];
+      renderPlanner();
+    });
+
+    const section = document.createElement('div');
+    section.className = 'course-week-body' + (isOpen ? ' open' : '');
+    section.appendChild(renderItemList(items, type, course, { showWeek: true }));
+
+    // The sections are kinds here, so a drop converts the item and leaves its
+    // week alone. The header covers the section while it is collapsed.
+    markDropZone(header, course, { kind: type });
+    markDropZone(section, course, { kind: type });
+
+    body.appendChild(header);
+    body.appendChild(section);
+  });
+
+  // Per-week "+ Reading/+ Task" buttons don't apply here, so the week-picking
+  // control is the only way to add an item in this mode.
+  body.appendChild(addToWeekControl(course, sem));
+}
+
 // A dashed "add course" column placed at the end of the course board.
 function addCourseColumn() {
   const col = document.createElement('div');
@@ -1047,50 +1211,10 @@ function addCourseColumn() {
   return col;
 }
 
-// Horizontal divider with the week label and date range.
-function weekDivider(sem, week) {
-  const start = weekStart(sem.startDate, week);
-  const end = weekStart(sem.startDate, week);
-  end.setDate(end.getDate() + 6);
-  const el = document.createElement('div');
-  el.className = 'week-divider' + (week === currentWeek(sem) ? ' current' : '');
-  el.innerHTML = `<span class="week-divider-label">Week ${week}</span>
-    <span class="week-divider-dates">${formatDate(start)} – ${formatDate(end)}</span>`;
-  return el;
-}
-
-function renderCourseCard(course, week) {
-  const card = document.createElement('div');
-  card.className = 'course-card';
-  card.style.borderLeftColor = course.color;
-
-  const title = document.createElement('h4');
-  title.textContent = course.name;
-  title.style.color = course.color;
-  card.appendChild(title);
-
-  const readings = course.readings.filter((r) => r.week === week);
-  const tasks = course.tasks.filter((t) => t.week === week);
-
-  card.appendChild(sectionTitle('Readings'));
-  card.appendChild(renderItemList(readings, 'reading', course, week));
-  card.appendChild(addRow('reading', course, week));
-
-  card.appendChild(sectionTitle('Tasks'));
-  card.appendChild(renderItemList(tasks, 'task', course, week));
-  card.appendChild(addRow('task', course, week));
-
-  return card;
-}
-
-function sectionTitle(text) {
-  const el = document.createElement('p');
-  el.className = 'card-section-title';
-  el.textContent = text;
-  return el;
-}
-
-function renderItemList(items, type, course, week) {
+// One <ul> of readings or tasks, all of one kind. `options.showWeek` prefixes
+// each row with its week number — needed by groupings whose sections aren't
+// weeks themselves.
+function renderItemList(items, type, course, options = {}) {
   const ul = document.createElement('ul');
   ul.className = 'item-list';
   if (items.length === 0) {
@@ -1100,149 +1224,748 @@ function renderItemList(items, type, course, week) {
     ul.appendChild(empty);
     return ul;
   }
-  items.forEach((item) => {
-    const li = document.createElement('li');
-    li.className = 'item';
+  items.forEach((item) => ul.appendChild(itemRow(item, type, course, options)));
+  return ul;
+}
 
-    const titleSpan = document.createElement('span');
-    titleSpan.className = 'item-title';
-    titleSpan.textContent = item.title;
-    // Inline edit: click the title to rename
-    titleSpan.title = 'Click to rename';
-    titleSpan.style.cursor = 'text';
-    titleSpan.addEventListener('click', () => editItemTitle(titleSpan, item));
-    li.appendChild(titleSpan);
-
-    if (type === 'task') {
-      if (item.dueDate) {
-        // Existing due date — clickable to edit.
-        const due = document.createElement('span');
-        due.className = 'item-due';
-        due.textContent = 'due ' + item.dueDate;
-        due.title = 'Click to edit due date';
-        due.style.cursor = 'pointer';
-        due.addEventListener('click', () => editItemDueDate(due, item));
-        li.appendChild(due);
-      } else {
-        // No due date — show a hover affordance to add one.
-        const addDue = document.createElement('span');
-        addDue.className = 'item-add-due';
-        addDue.textContent = '＋ date';
-        addDue.title = 'Add due date';
-        addDue.addEventListener('click', () => editItemDueDate(addDue, item));
-        li.appendChild(addDue);
-      }
-    }
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'tag-dropdown-wrapper';
-
-    // The trigger button shows the current tag's name and color.
-    const trigger = document.createElement('button');
-    trigger.className = 'badge tag-trigger';
-    const tags = type === 'reading'
-      ? getReadingTags(state.semester)
-      : getTaskTags(state.semester);
-    const currentTag = tags.find((t) => t.id === item.status)
-      || { name: '-', color: '#999', section: 'pending' }; // ghost fallback
-    trigger.textContent = currentTag.name;
-    trigger.style.setProperty('--tag-color', currentTag.color);
-    trigger.title = 'Click to change status';
-
-    // The dropdown menu (hidden by default).
-    const menu = document.createElement('div');
-    menu.className = 'tag-menu hidden';
-
-    // Build two sections: Pending and Done.
-    ['pending', 'done'].forEach((section) => {
-      const sectionTags = tags.filter((t) => t.section === section);
-      if (sectionTags.length === 0) return;
-      const label = document.createElement('div');
-      label.className = 'tag-menu-section-label';
-      label.textContent = section === 'pending' ? 'Pending' : 'Done';
-      menu.appendChild(label);
-      sectionTags.forEach((tag) => {
-        const opt = document.createElement('button');
-        opt.className = 'tag-menu-option' + (tag.id === item.status ? ' active' : '');
-        opt.textContent = tag.name;
-        opt.style.setProperty('--tag-color', tag.color);
-        opt.addEventListener('click', (e) => {
-          e.stopPropagation();
-          item.status = tag.id;
-          persist();
-          render();
-        });
-        menu.appendChild(opt);
-      });
-    });
-
-    trigger.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isOpen = !menu.classList.contains('hidden');
-      // Close all other open menus first.
-      document.querySelectorAll('.tag-menu').forEach((m) => m.classList.add('hidden'));
-      if (!isOpen) menu.classList.remove('hidden');
-    });
-
-    wrapper.appendChild(trigger);
-    wrapper.appendChild(menu);
-    li.appendChild(wrapper);
-
-    const del = document.createElement('button');
-    del.className = 'icon-btn';
-    del.innerHTML = icon('x');
-    del.title = 'Delete';
-    del.addEventListener('click', () => {
-      const arr = type === 'reading' ? course.readings : course.tasks;
-      const idx = arr.indexOf(item);
-      if (idx > -1) arr.splice(idx, 1);
-      persist();
-      render();
-    });
-    li.appendChild(del);
-
-    ul.appendChild(li);
+// One <ul> mixing both kinds, from `{ item, type }` entries already in display
+// order — the flat list a week shows in the week grouping. Every row gets the
+// R/T badge, since no section header says which kind it is. Never empty in
+// practice: a week with no items has no section at all.
+function renderMixedItemList(entries, course) {
+  const ul = document.createElement('ul');
+  ul.className = 'item-list';
+  entries.forEach(({ item, type }) => {
+    ul.appendChild(itemRow(item, type, course, { showType: true }));
   });
   return ul;
 }
 
-// Replace a title span with an input for inline renaming.
+// One row: the item's own controls (rename, due date, tag menu, delete) plus
+// whatever its list needs it to carry — `options.showWeek` for the week number,
+// `options.showType` for the R/T badge. Shared by both list builders, so
+// selection and drag work identically in both groupings.
+function itemRow(item, type, course, options = {}) {
+  const li = document.createElement('li');
+  li.className = 'item';
+  // Selection mode turns the whole row into one target: the checkbox marks
+  // it, the click handler toggles it, and the row's own controls (rename,
+  // due date, tag menu, delete) are made inert in CSS so a stray click
+  // can't edit an item the user meant to select. An item with no id (only
+  // possible in hand-edited data) simply isn't selectable.
+  if (state.selecting && item.id) {
+    li.classList.add('item--selectable');
+    li.dataset.itemId = item.id;
+    if (state.selection.has(item.id)) li.classList.add('item--selected');
+    const box = document.createElement('span');
+    box.className = 'item-select-box';
+    box.setAttribute('aria-hidden', 'true');
+    li.appendChild(box);
+    li.addEventListener('click', (e) => onSelectRowClick(e, li, item));
+  }
+
+  // Rows are draggable outside selection mode only: there a row is a
+  // selection target, and the batch bar already moves items between weeks,
+  // kinds and (through the tag list) whole groups.
+  if (!state.selecting && item.id) {
+    li.draggable = true;
+    li.classList.add('item--draggable');
+    li.dataset.dragItemId = item.id;
+    li.dataset.dragKind = type;
+    li.dataset.dragCourseId = course.id;
+  }
+
+  if (options.showWeek) {
+    const weekSpan = document.createElement('span');
+    weekSpan.className = 'item-week';
+    weekSpan.textContent = 'W' + item.week;
+    weekSpan.title = 'Week ' + item.week;
+    li.appendChild(weekSpan);
+  }
+
+  // R/T marker for lists that mix the two kinds. The word is on the title
+  // attribute, not the box, so the row stays narrow.
+  if (options.showType) {
+    const label = type === 'reading' ? 'Reading' : 'Task';
+    const typeSpan = document.createElement('span');
+    typeSpan.className = 'item-type item-type--' + type;
+    typeSpan.textContent = label[0];
+    typeSpan.title = label;
+    typeSpan.setAttribute('aria-label', label);
+    li.appendChild(typeSpan);
+  }
+
+  const titleSpan = document.createElement('span');
+  titleSpan.className = 'item-title';
+  titleSpan.textContent = item.title;
+  // Inline edit: click the title to rename
+  titleSpan.title = 'Click to rename';
+  titleSpan.style.cursor = 'text';
+  titleSpan.addEventListener('click', () => editItemTitle(titleSpan, item));
+  li.appendChild(titleSpan);
+
+  if (type === 'task') li.appendChild(dueElement(item));
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'tag-dropdown-wrapper';
+
+  // The trigger button shows the current tag's name and color.
+  const trigger = document.createElement('button');
+  trigger.className = 'badge tag-trigger';
+  const tags = type === 'reading'
+    ? getReadingTags(state.semester)
+    : getTaskTags(state.semester);
+  const currentTag = tags.find((t) => t.id === item.status)
+    || { name: '-', color: '#999', section: 'pending' }; // ghost fallback
+  trigger.textContent = currentTag.name;
+  trigger.style.setProperty('--tag-color', currentTag.color);
+  trigger.title = 'Click to change status';
+
+  // The dropdown menu (hidden by default).
+  const menu = document.createElement('div');
+  menu.className = 'tag-menu hidden';
+
+  // Build two sections: Pending and Done.
+  ['pending', 'done'].forEach((section) => {
+    const sectionTags = tags.filter((t) => t.section === section);
+    if (sectionTags.length === 0) return;
+    const label = document.createElement('div');
+    label.className = 'tag-menu-section-label';
+    label.textContent = section === 'pending' ? 'Pending' : 'Done';
+    menu.appendChild(label);
+    sectionTags.forEach((tag) => {
+      const opt = document.createElement('button');
+      opt.className = 'tag-menu-option' + (tag.id === item.status ? ' active' : '');
+      opt.textContent = tag.name;
+      opt.style.setProperty('--tag-color', tag.color);
+      opt.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (item.status !== tag.id) {
+          item.status = tag.id;
+          persist();
+          // Only this badge and the dashboard's progress depend on an item's
+          // tag, so update them directly. Rebuilding the planner would reset
+          // the page, board and column scroll offsets for a one-word change.
+          trigger.textContent = tag.name;
+          trigger.style.setProperty('--tag-color', tag.color);
+          menu.querySelectorAll('.tag-menu-option').forEach((o) => {
+            o.classList.toggle('active', o === opt);
+          });
+          renderDashboard();
+        }
+        menu.classList.add('hidden');
+      });
+      menu.appendChild(opt);
+    });
+  });
+
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = !menu.classList.contains('hidden');
+    // Close all other open menus first. The stopPropagation above means this
+    // click never reaches the document-level "click outside" listener, so any
+    // open note popover has to be committed and closed from here too — only
+    // one of these panels should ever be open at a time.
+    document.querySelectorAll('.tag-menu').forEach((m) => m.classList.add('hidden'));
+    closeAllItemNotePopovers();
+    if (!isOpen) menu.classList.remove('hidden');
+  });
+
+  wrapper.appendChild(trigger);
+  wrapper.appendChild(menu);
+  li.appendChild(wrapper);
+
+  li.appendChild(itemNoteControl(item, course, type));
+
+  const del = document.createElement('button');
+  del.className = 'icon-btn';
+  del.innerHTML = icon('x');
+  del.title = 'Delete';
+  del.addEventListener('click', () => {
+    const arr = type === 'reading' ? course.readings : course.tasks;
+    const idx = arr.indexOf(item);
+    if (idx > -1) arr.splice(idx, 1);
+    persist();
+    // A full re-render: emptying a week removes its whole section in the
+    // Course view, so the subtree really does have to be rebuilt.
+    renderPreservingScroll();
+  });
+  li.appendChild(del);
+
+  return li;
+}
+
+// The note affordance for one item: a low-weight icon button (filled once a
+// note exists) that opens a small popover with a capped textarea. The row
+// itself never shows note text — only this control — so the board stays
+// uncluttered for the common case of no note. Mirrors the tag-dropdown
+// pattern just above (position:relative wrapper + position:absolute panel,
+// closed by the same document-level "click outside" listener already wired
+// for .tag-menu).
+function itemNoteControl(item, course, type) {
+  const wrap = document.createElement('div');
+  wrap.className = 'item-note-wrapper';
+
+  const btn = document.createElement('button');
+  btn.className = 'icon-btn item-note-btn' + (item.note ? ' item-note-btn--filled' : '');
+  btn.innerHTML = icon('note');
+  btn.title = item.note ? 'Edit note' : 'Add note';
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleItemNotePopover(wrap, btn, item, course, type);
+  });
+
+  wrap.appendChild(btn);
+  return wrap;
+}
+
+// Opens the popover if closed (committing and closing any other one first,
+// same as the tag-menu dropdown does), or commits and closes it if this
+// row's is already open — a second click on the icon is a natural "I'm
+// done" gesture, so it saves rather than discarding what was typed.
+function toggleItemNotePopover(wrap, btn, item, course, type) {
+  const existing = wrap.querySelector('.item-note-popover');
+  if (existing) {
+    commitItemNotePopover(existing, btn, item);
+    existing.remove();
+    return;
+  }
+
+  document.querySelectorAll('.tag-menu').forEach((m) => m.classList.add('hidden'));
+  closeAllItemNotePopovers();
+
+  const popover = document.createElement('div');
+  popover.className = 'item-note-popover';
+  // Keep clicks inside the popover from bubbling to the document-level
+  // "click outside closes everything" listener.
+  popover.addEventListener('click', (e) => e.stopPropagation());
+
+  const textarea = document.createElement('textarea');
+  textarea.className = 'item-note-textarea';
+  textarea.maxLength = MAX_NOTE_LENGTH;
+  textarea.value = item.note || '';
+  textarea.placeholder = 'Add a note…';
+
+  const counter = document.createElement('div');
+  counter.className = 'item-note-counter';
+  const updateCounter = () => {
+    counter.textContent = `${textarea.value.length}/${MAX_NOTE_LENGTH}`;
+  };
+  updateCounter();
+  textarea.addEventListener('input', updateCounter);
+
+  // Stored on the element so the document-level "click outside" listener
+  // (wired in setupEvents) can commit before removing it, the same way blur
+  // does for the inline title/due-date editors.
+  popover._commit = () => commitItemNotePopover(popover, btn, item);
+
+  textarea.addEventListener('keydown', (e) => {
+    // Escape discards, unlike blur/re-click which save — matches the
+    // existing title/due-date inline editors' Escape-cancels convention.
+    if (e.key === 'Escape') {
+      popover._commit = null;
+      popover.remove();
+    }
+  });
+
+  popover.appendChild(textarea);
+  popover.appendChild(counter);
+  wrap.appendChild(popover);
+  textarea.focus();
+}
+
+// Write the popover's text back onto the item, matching core's clamp
+// convention exactly (truncate to MAX_NOTE_LENGTH; an empty note removes the
+// key rather than storing ''), so a semester edited here and read by core —
+// tests, mobile, import/export — agrees on what "no note" looks like.
+// Mutates the item in place and persists, like editItemTitle/editItemDueDate.
+function commitItemNotePopover(popover, btn, item) {
+  const textarea = popover.querySelector('.item-note-textarea');
+  if (!textarea) return;
+  const trimmed = textarea.value.slice(0, MAX_NOTE_LENGTH);
+  if (trimmed) item.note = trimmed;
+  else delete item.note;
+  persist();
+  btn.classList.toggle('item-note-btn--filled', !!item.note);
+  btn.title = item.note ? 'Edit note' : 'Add note';
+}
+
+function closeAllItemNotePopovers() {
+  document.querySelectorAll('.item-note-popover').forEach((p) => {
+    if (typeof p._commit === 'function') p._commit();
+    p.remove();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Multi-select mode: pick several items across the board, then act on all of
+// them at once. The mode is a header toggle; the actions live in a contextual
+// bar that appears with the first selected row. Everything here works the same
+// in both groupings — it hangs off the item rows, which both of them build
+// through itemRow().
+// ---------------------------------------------------------------------------
+function setupSelectMode() {
+  const btn = document.getElementById('select-mode-btn');
+  btn.innerHTML = icon('list-check');
+  btn.addEventListener('click', () => setSelectMode(!state.selecting));
+
+  // Escape leaves the mode (and drops the selection), like the inline editors.
+  // A modal on top gets it first — its own handler must close the dialog, not
+  // the mode behind it — and so does anything being typed into.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !state.selecting) return;
+    if (isTypingTarget(e.target)) return;
+    if (document.querySelector('.modal-overlay:not(.hidden)')) return;
+    setSelectMode(false);
+  });
+}
+
+// Enter or leave selection mode. Leaving always drops the selection: it exists
+// only to be acted on from the bar, which goes with the mode.
+function setSelectMode(on) {
+  state.selecting = on;
+  state.selection.clear();
+  state.selectionAnchor = null;
+  const btn = document.getElementById('select-mode-btn');
+  if (btn) {
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-pressed', String(on));
+  }
+  // The rows themselves change (checkbox, inert controls), so this is a real
+  // re-render rather than a class flip.
+  if (state.semester) renderPreservingScroll();
+  else renderSelectionBar();
+}
+
+function clearSelection() {
+  state.selection.clear();
+  state.selectionAnchor = null;
+  syncSelectionClasses();
+  renderSelectionBar();
+}
+
+// A click on a row in selection mode. Plain click and Cmd/Ctrl-click both
+// toggle the one row (the plain click has nothing else to do in this mode, and
+// the modifier is what people arrive with from Finder/Explorer); Shift extends
+// from the last row clicked without Shift, within that row's own list — a range
+// across two different weeks or courses isn't a range the user can see.
+function onSelectRowClick(e, li, item) {
+  e.preventDefault();
+  e.stopPropagation();
+  const ids = [...li.parentElement.querySelectorAll('li.item[data-item-id]')].map(
+    (el) => el.dataset.itemId
+  );
+  const anchorIdx = ids.indexOf(state.selectionAnchor);
+  if (e.shiftKey && anchorIdx !== -1) {
+    const to = ids.indexOf(item.id);
+    const [from, until] = anchorIdx < to ? [anchorIdx, to] : [to, anchorIdx];
+    // A range adds; it never deselects what it passes over.
+    ids.slice(from, until + 1).forEach((id) => state.selection.add(id));
+  } else {
+    if (state.selection.has(item.id)) state.selection.delete(item.id);
+    else state.selection.add(item.id);
+    state.selectionAnchor = item.id;
+  }
+  syncSelectionClasses();
+  renderSelectionBar();
+}
+
+// Selecting a row only changes which rows are highlighted and what the bar
+// says, so both are updated in place — rebuilding the board would cost the
+// scroll positions of every column for a class flip.
+function syncSelectionClasses() {
+  document.querySelectorAll('.item--selectable').forEach((li) => {
+    li.classList.toggle('item--selected', state.selection.has(li.dataset.itemId));
+  });
+}
+
+// The selected items, each with the course and the kind of list it sits in.
+// Ids that match nothing are dropped rather than carried as phantoms (an item
+// can disappear under the selection when the cloud copy wins a conflict).
+function selectedEntries() {
+  const sem = state.semester;
+  if (!sem || state.selection.size === 0) return [];
+  const out = [];
+  sem.courses.forEach((course) => {
+    ITEM_TYPES.forEach(({ type, key }) => {
+      (course[key] || []).forEach((item) => {
+        if (item.id && state.selection.has(item.id)) out.push({ course, type, item });
+      });
+    });
+  });
+  return out;
+}
+
+// One save per batch, not one per item: persist() is debounced, so a single
+// call after the whole selection has been changed is one save cycle in the
+// header indicator.
+function commitBatch() {
+  persist();
+  renderPreservingScroll();
+}
+
+function batchSetTag(tagId) {
+  const entries = selectedEntries();
+  if (!tagId || entries.length === 0) return;
+  entries.forEach(({ course, type, item }) => setItemStatus(course, type, item.id, tagId));
+  commitBatch();
+}
+
+function batchSetWeek(week) {
+  const entries = selectedEntries();
+  if (!week || entries.length === 0) return;
+  entries.forEach(({ item }) => {
+    item.week = week;
+  });
+  commitBatch();
+}
+
+// Kind changes go through core's convertItemKind, which moves the item between
+// the two arrays and preserves its id — so the selection still points at the
+// same items afterwards and can be edited again.
+function batchSetKind(toKind) {
+  const entries = selectedEntries();
+  if (entries.length === 0) return;
+  entries.forEach(({ course, item }) => convertItemKind(course, item.id, toKind));
+  commitBatch();
+}
+
+function batchDeleteSelected() {
+  const entries = selectedEntries();
+  if (entries.length === 0) return;
+  const n = entries.length;
+  if (!confirm(`Delete ${n} selected ${n === 1 ? 'item' : 'items'}?`)) return;
+  entries.forEach(({ course, type, item }) => {
+    const arr = type === 'reading' ? course.readings : course.tasks;
+    const idx = arr.indexOf(item);
+    if (idx > -1) arr.splice(idx, 1);
+  });
+  state.selection.clear();
+  state.selectionAnchor = null;
+  commitBatch();
+}
+
+// The contextual action bar. Rebuilt on every render because its contents
+// depend on the selection (how many, which kinds) and on the semester (its tag
+// lists and week count).
+function renderSelectionBar() {
+  const bar = document.getElementById('selection-bar');
+  if (!bar) return;
+  const sem = state.semester;
+  const entries = selectedEntries();
+  bar.innerHTML = '';
+  if (!state.selecting || !sem || entries.length === 0) {
+    bar.classList.add('hidden');
+    return;
+  }
+  bar.classList.remove('hidden');
+
+  const count = document.createElement('span');
+  count.className = 'selection-count';
+  count.textContent = `${entries.length} selected`;
+  bar.appendChild(count);
+
+  // Reading tags and task tags are two separate lists, so a selection that
+  // mixes readings and tasks has no single list to offer — merging them would
+  // let a reading tag land on a task. The control is disabled until the
+  // selection is one kind rather than guessing; deselecting the odd rows (or
+  // converting them first) is the way through.
+  const kinds = new Set(entries.map((e) => e.type));
+  const oneKind = kinds.size === 1 ? entries[0].type : null;
+
+  const tagSel = document.createElement('select');
+  tagSel.className = 'selection-select';
+  tagSel.appendChild(new Option('Set tag…', ''));
+  if (oneKind) {
+    const tags = oneKind === 'reading' ? getReadingTags(sem) : getTaskTags(sem);
+    ['pending', 'done'].forEach((section) => {
+      const sectionTags = tags.filter((t) => t.section === section);
+      if (sectionTags.length === 0) return;
+      const group = document.createElement('optgroup');
+      group.label = section === 'pending' ? 'Pending' : 'Done';
+      sectionTags.forEach((tag) => group.appendChild(new Option(tag.name, tag.id)));
+      tagSel.appendChild(group);
+    });
+    tagSel.title = 'Set the tag of every selected item';
+  } else {
+    tagSel.disabled = true;
+    tagSel.title = 'Select only readings or only tasks to set a tag — the two have different tags';
+  }
+  tagSel.addEventListener('change', () => batchSetTag(tagSel.value));
+  bar.appendChild(tagSel);
+
+  const weekSel = document.createElement('select');
+  weekSel.className = 'selection-select';
+  weekSel.title = 'Move every selected item to a week';
+  weekSel.appendChild(new Option('Move to week…', ''));
+  for (let w = 1; w <= sem.weeks; w++) weekSel.appendChild(new Option('Week ' + w, String(w)));
+  weekSel.addEventListener('change', () => batchSetWeek(parseInt(weekSel.value, 10)));
+  bar.appendChild(weekSel);
+
+  const kindBtn = (toKind, label) => {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-small';
+    btn.textContent = label;
+    // Nothing to do when everything selected already is that kind.
+    btn.disabled = oneKind === toKind;
+    btn.title = `Turn every selected item into a ${toKind} (its tag resets to pending)`;
+    btn.addEventListener('click', () => batchSetKind(toKind));
+    return btn;
+  };
+  bar.appendChild(kindBtn('reading', 'Make readings'));
+  bar.appendChild(kindBtn('task', 'Make tasks'));
+
+  const del = document.createElement('button');
+  del.className = 'btn btn-small selection-delete';
+  del.textContent = 'Delete';
+  del.title = 'Delete every selected item';
+  del.addEventListener('click', batchDeleteSelected);
+  bar.appendChild(del);
+
+  const clear = document.createElement('button');
+  clear.className = 'btn btn-small selection-clear';
+  clear.textContent = 'Clear';
+  clear.title = 'Deselect everything (Esc leaves selection mode)';
+  clear.addEventListener('click', clearSelection);
+  bar.appendChild(clear);
+}
+
+// ---------------------------------------------------------------------------
+// Item drag and drop: drag a row onto a section to move it there. What a drop
+// changes depends on what the section is — a week (By Week) sets the week, a
+// type section (By Type) sets the kind, and the column it belongs to sets the
+// course — so the same gesture covers all three moves in either grouping.
+//
+// The drag carries a private dataTransfer type. That is what keeps it apart
+// from the window-wide file drop in setupDragAndDrop(): that handler bails on
+// anything wearing this type, and this one only ever acts on drags that do.
+// ---------------------------------------------------------------------------
+const ITEM_DND_TYPE = 'application/x-lectio-item';
+
+// The row in flight ({ courseId, itemId, kind }), and the zone currently lit up
+// under the pointer. Both are cleared by clearItemDrag() on every exit path —
+// a drop, an Escape, or a release outside any zone.
+let itemDrag = null;
+let itemDropZone = null;
+
+// True for our own item drags. `types` is readable during dragover, where
+// getData() is not, so the type doubles as the "this is internal" marker.
+function isItemDrag(e) {
+  return !!e.dataTransfer && [...e.dataTransfer.types].includes(ITEM_DND_TYPE);
+}
+
+// Tag an element as a place items can be dropped. A missing week or kind means
+// "whatever the dragged item already has", which is how a By Week section
+// leaves the kind alone and a By Type section leaves the week alone.
+function markDropZone(el, course, { week = null, kind = null } = {}) {
+  el.dataset.dropZone = '1';
+  el.dataset.dropCourseId = course.id;
+  if (week != null) el.dataset.dropWeek = String(week);
+  if (kind) el.dataset.dropKind = kind;
+  return el;
+}
+
+function setItemDropZone(el) {
+  if (itemDropZone === el) return;
+  if (itemDropZone) itemDropZone.classList.remove('drop-zone--over');
+  itemDropZone = el;
+  if (itemDropZone) itemDropZone.classList.add('drop-zone--over');
+}
+
+// The single exit path: no drag state and no leftover highlight survive it, so
+// an aborted drag (Escape, or a release over nothing) leaves the board clean.
+function clearItemDrag() {
+  setItemDropZone(null);
+  document
+    .querySelectorAll('.item--dragging')
+    .forEach((li) => li.classList.remove('item--dragging'));
+  itemDrag = null;
+}
+
+// Resolve a zone into the move dropping there would make, or null when there
+// is nothing to do — the zone belongs to a course or item that no longer
+// exists, or it is the group the item already sits in.
+function plannedItemMove(zone) {
+  const sem = state.semester;
+  if (!itemDrag || !sem || !zone) return null;
+  const fromCourse = sem.courses.find((c) => c.id === itemDrag.courseId);
+  const toCourse = sem.courses.find((c) => c.id === zone.dataset.dropCourseId);
+  if (!fromCourse || !toCourse) return null;
+  const fromKind = itemDrag.kind;
+  const fromArr = (fromKind === 'reading' ? fromCourse.readings : fromCourse.tasks) || [];
+  const item = fromArr.find((it) => it.id === itemDrag.itemId);
+  if (!item) return null;
+  const kind = zone.dataset.dropKind || fromKind;
+  const week = zone.dataset.dropWeek ? Number(zone.dataset.dropWeek) : item.week;
+  if (toCourse === fromCourse && kind === fromKind && week === item.week) return null;
+  return { fromCourse, toCourse, item, fromKind, kind, week };
+}
+
+// Apply a resolved move. The item leaves its source array and lands in the
+// destination course's list for the kind it still is; only then can
+// convertItemKind() change the kind, since it looks the item up inside the
+// course that owns it. One persist(), one re-render.
+function applyItemMove({ fromCourse, toCourse, item, fromKind, kind, week }) {
+  const fromArr = fromKind === 'reading' ? fromCourse.readings : fromCourse.tasks;
+  const idx = fromArr.indexOf(item);
+  if (idx === -1) return;
+  fromArr.splice(idx, 1);
+  const key = fromKind === 'reading' ? 'readings' : 'tasks';
+  if (!Array.isArray(toCourse[key])) toCourse[key] = [];
+  toCourse[key].push(item);
+  item.week = week;
+  if (kind !== fromKind) convertItemKind(toCourse, item.id, kind);
+
+  // Open the section the item just landed in — dropping onto a collapsed week
+  // header is a normal move, and the item would otherwise vanish from view.
+  state.openCourseWeeks[toCourse.id + '-' + week] = true;
+  state.openCourseTypes[toCourse.id + '-' + kind] = true;
+
+  persist();
+  renderPreservingScroll();
+}
+
+// Delegated on #planner (which outlives every board rebuild) so nothing has to
+// be rewired per render; the rows and zones only carry data attributes.
+function setupItemDragDrop() {
+  const root = document.getElementById('planner');
+  if (!root) return;
+
+  root.addEventListener('dragstart', (e) => {
+    const li = e.target.closest && e.target.closest('li.item[data-drag-item-id]');
+    if (!li) return;
+    itemDrag = {
+      courseId: li.dataset.dragCourseId,
+      itemId: li.dataset.dragItemId,
+      kind: li.dataset.dragKind,
+    };
+    li.classList.add('item--dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData(ITEM_DND_TYPE, JSON.stringify(itemDrag));
+  });
+
+  root.addEventListener('dragover', (e) => {
+    if (!isItemDrag(e)) return;
+    const zone = e.target.closest ? e.target.closest('[data-drop-zone]') : null;
+    // Zones nest (a week's item lists sit inside its body): closest() picks the
+    // innermost, which is always the most specific destination.
+    const move = plannedItemMove(zone);
+    setItemDropZone(move ? zone : null);
+    if (!move) return;
+    // Only a real move accepts the drop; anywhere else keeps the "no drop"
+    // cursor and releasing there does nothing.
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  });
+
+  // Leaving the planner entirely (moving between zones is handled above).
+  root.addEventListener('dragleave', (e) => {
+    if (!isItemDrag(e)) return;
+    if (!root.contains(e.relatedTarget)) setItemDropZone(null);
+  });
+
+  root.addEventListener('drop', (e) => {
+    if (!isItemDrag(e)) return;
+    e.preventDefault();
+    const zone = e.target.closest ? e.target.closest('[data-drop-zone]') : null;
+    const move = plannedItemMove(zone);
+    clearItemDrag();
+    if (move) applyItemMove(move);
+  });
+
+  // dragend is the catch-all for abandoned drags. It is bound to the document
+  // because a drop re-renders the board, detaching the source row before the
+  // event could bubble through #planner.
+  document.addEventListener('dragend', () => {
+    if (itemDrag || itemDropZone) clearItemDrag();
+  });
+}
+
+// Replace a title span with an input for inline renaming. Nothing outside the
+// span depends on an item's title, so committing swaps the same span back in
+// instead of re-rendering — the surrounding scroll positions never move.
 function editItemTitle(span, item) {
   const input = document.createElement('input');
   input.type = 'text';
   input.value = item.title;
   input.className = 'item-title';
+  // A draggable row would rather be dragged than let its input be selected, so
+  // the row stops being draggable for as long as the editor is open.
+  const row = span.closest('li.item');
+  const wasDraggable = !!row && row.draggable;
+  if (wasDraggable) row.draggable = false;
+  const restore = () => {
+    if (wasDraggable) row.draggable = true;
+    span.textContent = item.title;
+    input.replaceWith(span); // the span kept its click handler while detached
+  };
   const commit = () => {
     const v = input.value.trim();
-    if (v) item.title = v;
-    persist();
-    render();
+    if (v && v !== item.title) {
+      item.title = v;
+      persist();
+    }
+    restore();
   };
   input.addEventListener('blur', commit);
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') input.blur();
-    if (e.key === 'Escape') render();
+    if (e.key === 'Escape') {
+      // Remove the blur listener so it does not fire after replaceWith.
+      input.removeEventListener('blur', commit);
+      restore();
+    }
   });
   span.replaceWith(input);
   input.focus();
   input.select();
 }
 
+// The due-date label for a task: the date itself when set, or a low-weight
+// affordance to add one. Both open the inline editor on click.
+function dueElement(item) {
+  const el = document.createElement('span');
+  if (item.dueDate) {
+    el.className = 'item-due';
+    el.textContent = 'due ' + item.dueDate;
+    el.title = 'Click to edit due date';
+    el.style.cursor = 'pointer';
+  } else {
+    el.className = 'item-add-due';
+    el.textContent = '＋ date';
+    el.title = 'Add due date';
+  }
+  el.addEventListener('click', () => editItemDueDate(el, item));
+  return el;
+}
+
 // Replace the due-date span (or add-due affordance) with an inline
-// date input. originalSpan is the element to swap back on Escape.
+// date input. originalSpan is the element to swap back on Escape; committing
+// swaps in a freshly built label, since clearing a date changes which of the
+// two variants applies.
 function editItemDueDate(originalSpan, item) {
   const input = document.createElement('input');
   input.type = 'date';
   input.value = item.dueDate || '';
   input.className = 'item-due item-due-input';
 
+  // Same as the title editor: the row's drag would otherwise swallow clicks
+  // meant for the date input.
+  const row = originalSpan.closest('li.item');
+  const wasDraggable = !!row && row.draggable;
+  if (wasDraggable) row.draggable = false;
+
   const commit = () => {
+    if (wasDraggable) row.draggable = true;
     const v = input.value.trim();
-    item.dueDate = v || '';
-    persist();
-    render();
+    if (v !== (item.dueDate || '')) {
+      item.dueDate = v;
+      persist();
+    }
+    input.replaceWith(dueElement(item));
   };
   const cancel = () => {
+    if (wasDraggable) row.draggable = true;
     input.replaceWith(originalSpan);
   };
 
@@ -1435,9 +2158,9 @@ const TUTORIAL_STEPS = [
   },
   {
     id: 'views',
-    title: 'Two views',
+    title: 'Two groupings',
     description:
-      'Switch between Weekly view (readings and tasks grouped by week) and All Courses view (a column per course). Use the buttons in the header.',
+      'Every course gets its own column. The header buttons choose how a column is grouped: By Week shows one section per week, By Type shows all readings and then all tasks, with the week number on each row.',
     targetSelector: '.view-toggle',
     setup: null,
   },
@@ -1736,12 +2459,16 @@ async function init() {
     if (state.semesterId) deleteSemester(state.semesterId);
   });
 
-  // Close any open status dropdown when clicking outside of it.
+  // Close any open status dropdown, or note popover, when clicking outside
+  // of it. A note popover commits (rather than discards) on this path, same
+  // as clicking away from the title/due-date inline editors does via blur.
   document.addEventListener('click', () => {
     document.querySelectorAll('.tag-menu').forEach((m) => m.classList.add('hidden'));
+    closeAllItemNotePopovers();
   });
 
   setupViewToggle();
+  setupSelectMode();
   setupSort();
   setupPomodoro();
   setupTheme();
@@ -1756,6 +2483,7 @@ async function init() {
   setupAddItem();
   setupTutorial();
   setupDragAndDrop();
+  setupItemDragDrop();
 
   // Auto-launch on first run (no tutorial seen and at least one semester exists).
   if (!hasTutorialBeenSeen()) {
@@ -1945,7 +2673,7 @@ function setupTheme() {
   // Note: the click listener is on the segmented control in the Settings modal.
 }
 
-// View toggle (Week / Course), persisted to localStorage.
+// Grouping toggle (By Week / By Type), persisted to localStorage.
 function setupViewToggle() {
   document.querySelectorAll('.view-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -1963,6 +2691,17 @@ function updateViewToggle() {
     btn.classList.toggle('active', btn.dataset.view === state.view);
   });
   document.getElementById('sort-select').value = state.sortOrder;
+
+  // The sections of the type grouping aren't weeks, so "expand current week
+  // only" has nothing to act on there — disable it rather than guess.
+  const currentBtn = document.getElementById('expand-current-btn');
+  if (currentBtn) {
+    const byType = groupMode() === 'type';
+    currentBtn.disabled = byType;
+    currentBtn.title = byType
+      ? 'Expand current week only (available when grouping by week)'
+      : 'Expand current week only';
+  }
 }
 
 // Course sort control (Progress / Alpha / Week), persisted to localStorage.
@@ -2019,6 +2758,22 @@ async function setupPomodoro() {
     window.pomodoroTray.onStop(() => stopPomodoro(true));
     window.pomodoroTray.onOpenModal(openPomodoroModal);
   }
+
+  if (window.pomodoroPopup) {
+    window.pomodoroPopup.onConfirm(() => confirmPomodoroAdvance());
+    window.pomodoroPopup.onStop(() => stopPomodoro(true));
+  }
+
+  // Defensive resync: backgroundThrottling:false (see main.js) is the real
+  // fix, but if a tick is ever delayed right as the window is restored,
+  // this catches up immediately instead of waiting up to POMODORO_TICK_MS
+  // for the next natural tick — cheap, and never wrong since onPomodoroTick
+  // is idempotent when nothing has changed.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && state.pomodoro.intervalId) {
+      onPomodoroTick();
+    }
+  });
 
   const overlay = document.getElementById('pomodoro-overlay');
   const closeBtn = document.getElementById('pomodoro-close');
@@ -2174,6 +2929,7 @@ function handlePomodoroPhaseComplete() {
   stopPomodoroTicking();
   persistPomodoroSession();
   openPomodoroAdvanceModal();
+  showPomodoroCompletionPopup();
   renderPomodoroControl();
 }
 
@@ -2235,6 +2991,47 @@ function pomodoroAdvanceCopy(session) {
   };
 }
 
+// Effective light/dark for windows outside this document (the completion
+// popup): 'auto' has no data-theme attribute to read from a second window,
+// so fall back to the same media query the CSS itself would resolve.
+function resolveEffectiveTheme() {
+  const attr = document.documentElement.getAttribute('data-theme');
+  if (attr === 'light' || attr === 'dark') return attr;
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light';
+}
+
+// "Pomodoro N of {pomodorosUntilLongBreak}" — same modulo math as the
+// header button's dot indicator (see pomodoroDotsHtml below), so the two
+// never disagree. `session.completedPomodoros` hasn't been incremented yet
+// for the work phase that just finished, hence the +1 there.
+function pomodoroCycleStatusText(session) {
+  const count = clampPomodoroSettings(state.pomodoro.settings).pomodorosUntilLongBreak;
+  const done = session.phase === 'work' ? session.completedPomodoros + 1 : session.completedPomodoros;
+  const within = done % count;
+  const filled = within === 0 && done > 0 ? count : within;
+  return `Pomodoro ${filled} of ${count}`;
+}
+
+// Shows the always-on-top completion popup (main.js) with the same copy as
+// the in-window advance modal, so the two are never inconsistent. No-op if
+// the bridge isn't present or there is nothing awaiting a decision.
+function showPomodoroCompletionPopup() {
+  if (!window.pomodoroPopup) return;
+  const s = state.pomodoro.session;
+  if (!isAwaitingAdvance(s)) return;
+  const copy = pomodoroAdvanceCopy(s);
+  window.pomodoroPopup.show({
+    title: copy.title,
+    status: pomodoroCycleStatusText(s),
+    message: copy.message,
+    confirmLabel: copy.confirm,
+    canStop: copy.canStop,
+    theme: resolveEffectiveTheme(),
+  });
+}
+
 function openPomodoroAdvanceModal() {
   const overlay = document.getElementById('pomodoro-advance-overlay');
   if (!overlay || !isAwaitingAdvance(state.pomodoro.session)) return;
@@ -2251,6 +3048,7 @@ function openPomodoroAdvanceModal() {
 function closePomodoroAdvanceModal() {
   const overlay = document.getElementById('pomodoro-advance-overlay');
   if (overlay) overlay.classList.add('hidden');
+  if (window.pomodoroPopup) window.pomodoroPopup.hide();
 }
 
 // The user said yes: perform the transition core held back.
@@ -2286,7 +3084,11 @@ function creditStudySeconds(session, seconds) {
   persist();
   renderDashboard();
   renderStudyTimePanel();
-  if (state.view === 'course') renderPlanner();
+  // The column headers show studied time, so the board has to be rebuilt —
+  // without yanking the user's scroll position mid-session.
+  const snap = captureScroll();
+  renderPlanner();
+  restoreScroll(snap);
 }
 
 // Stop the session. `creditPartial` is true for the user-facing stop button so
@@ -2671,7 +3473,9 @@ function editStudyTimeInline(labelEl, courseId) {
     }
     setStudyTime(course, seconds);
     persist();
-    render();
+    // Studied time shows in the dashboard and in the course-column header, so
+    // a full render is the honest refresh — just not one that moves the view.
+    renderPreservingScroll();
   };
 
   const cancel = () => {
@@ -2853,6 +3657,7 @@ async function exportCourse(course) {
     id: course.id,
     name: course.name,
     color: course.color,
+    examDate: course.examDate || '',
     readings: course.readings.map(({ id, week, title, status }) => ({ id, week, title, status })),
     tasks: course.tasks.map(({ id, week, title, dueDate, status }) => ({ id, week, title, dueDate, status })),
   };
@@ -2887,6 +3692,7 @@ async function importCourse(parsedPayload) {
     id: uid('course'),
     name: incoming.name,
     color: incoming.color || '#4A90D9',
+    examDate: incoming.examDate || '',
     readings: (incoming.readings || []).map((r) => ({ ...r, id: uid('r') })),
     tasks: (incoming.tasks || []).map((t) => ({ ...t, id: uid('t') })),
   };
@@ -2925,6 +3731,7 @@ async function importCourseFromModal() {
     id: uid('course'),
     name: incoming.name,
     color: incoming.color || '#4A90D9',
+    examDate: incoming.examDate || '',
     readings: (incoming.readings || []).map((r) => ({ ...r, id: uid('r') })),
     tasks: (incoming.tasks || []).map((t) => ({ ...t, id: uid('t') })),
   };
@@ -2950,11 +3757,16 @@ async function importCourseFromModal() {
 // Accept .lectio.json files dropped anywhere on the window (semester or course).
 function setupDragAndDrop() {
   document.body.addEventListener('dragover', (e) => {
+    // An item being dragged around the board is not a file drop: leave it to
+    // setupItemDragDrop(), which decides where it may land. Claiming it here
+    // would force a "copy" cursor over the whole window.
+    if (isItemDrag(e)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
   });
 
   document.body.addEventListener('drop', async (e) => {
+    if (isItemDrag(e)) return;
     e.preventDefault();
     const file = e.dataTransfer.files[0];
     if (!file) return;
@@ -3249,6 +4061,12 @@ function addCourseField(course) {
   color.value = course ? course.color : DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
   color.className = 'ns-course-color';
 
+  const exam = document.createElement('input');
+  exam.type = 'date';
+  exam.className = 'ns-course-exam';
+  exam.title = 'Exam date (optional)';
+  if (course && course.examDate) exam.value = course.examDate;
+
   const remove = document.createElement('button');
   remove.type = 'button';
   remove.className = 'icon-btn';
@@ -3258,6 +4076,7 @@ function addCourseField(course) {
 
   row.appendChild(name);
   row.appendChild(color);
+  row.appendChild(exam);
   row.appendChild(remove);
   container.appendChild(row);
 }
@@ -3283,7 +4102,7 @@ function submitItemFromModal() {
   const dueDate = kind === 'task' ? document.getElementById('ni-due').value || '' : undefined;
   addItem(course, kind, { title, week, dueDate });
   persist();
-  render();
+  renderPreservingScroll();
   closeModal();
 }
 
@@ -3324,9 +4143,18 @@ async function submitSemesterFromModal() {
       const cname = row.querySelector('.ns-course-name').value.trim();
       if (!cname) return;
       const color = row.querySelector('.ns-course-color').value;
+      const examDate = row.querySelector('.ns-course-exam').value || '';
       const existing = byId.get(row.dataset.courseId);
-      if (existing) courses.push({ ...existing, name: cname, color });
-      else courses.push({ id: uid('course'), name: cname, color, readings: [], tasks: [] });
+      if (existing) courses.push({ ...existing, name: cname, color, examDate });
+      else
+        courses.push({
+          id: uid('course'),
+          name: cname,
+          color,
+          examDate,
+          readings: [],
+          tasks: [],
+        });
     });
 
     const semester = {
@@ -3364,9 +4192,18 @@ async function submitSemesterFromModal() {
     const cname = row.querySelector('.ns-course-name').value.trim();
     if (!cname) return;
     const color = row.querySelector('.ns-course-color').value;
+    const examDate = row.querySelector('.ns-course-exam').value || '';
     const drafted = draftById.get(row.dataset.courseId);
-    if (drafted) courses.push({ ...drafted, name: cname, color });
-    else courses.push({ id: uid('course'), name: cname, color, readings: [], tasks: [] });
+    if (drafted) courses.push({ ...drafted, name: cname, color, examDate });
+    else
+      courses.push({
+        id: uid('course'),
+        name: cname,
+        color,
+        examDate,
+        readings: [],
+        tasks: [],
+      });
   });
 
   const existing = await api.list();
@@ -3711,6 +4548,15 @@ async function withBusy(btn, busyLabel, fn) {
 // multi-account store + SSO capture, Phase 16 Part 0). Any number of accounts
 // can be connected at once, one per Moodle base URL.
 // ---------------------------------------------------------------------------
+// window.LectioMoodleClient / window.LectioMoodle come from the core files
+// vendored by sync-core.js. If a build ever ships without them, every call site
+// dies on "Cannot read properties of undefined" — check first and hand back a
+// message that says what is actually wrong. Returns null when both are present.
+function missingMoodleGlobals() {
+  if (window.LectioMoodleClient && window.LectioMoodle) return null;
+  return 'Moodle support is missing from this build of Lectio. Reinstall or update the app.';
+}
+
 function setMoodleStatusLine(msg, isError) {
   const el = document.getElementById('set-moodle-status-line');
   if (!el) return;
@@ -3761,10 +4607,12 @@ function renderMoodleAccountRow(account) {
 }
 
 // Re-reads the account list from storage and re-renders it, showing/hiding
-// the "Import courses…" button depending on whether any account exists.
+// the "Import courses…" / "Raw import…" buttons depending on whether any
+// account exists.
 async function refreshMoodleAccounts() {
   const listEl = document.getElementById('set-moodle-accounts-list');
   const importBtn = document.getElementById('set-moodle-import');
+  const rawImportBtn = document.getElementById('set-moodle-import-raw');
   if (!window.moodleAuth) {
     listEl.textContent = 'Unavailable';
     return [];
@@ -3787,6 +4635,7 @@ async function refreshMoodleAccounts() {
     accounts.forEach((a) => listEl.appendChild(renderMoodleAccountRow(a)));
   }
   if (importBtn) importBtn.classList.toggle('hidden', accounts.length === 0);
+  if (rawImportBtn) rawImportBtn.classList.toggle('hidden', accounts.length === 0);
   return accounts;
 }
 
@@ -3817,6 +4666,11 @@ function setupMoodleSettings() {
     const cleanUrl = baseUrl.trim().replace(/\/+$/, '');
     if (!/^https?:\/\//i.test(cleanUrl)) {
       setMoodleStatusLine('Enter a full URL, starting with https://', true);
+      return;
+    }
+    const missing = missingMoodleGlobals();
+    if (missing) {
+      setMoodleStatusLine(missing, true);
       return;
     }
 
@@ -3886,6 +4740,10 @@ function setupMoodleSettings() {
 // than a live semester: the target course lives in state.editingSemester.courses
 // keyed to a course row, and nothing is persisted until Create is clicked.
 // The triage step must read it before writing items anywhere.
+// `raw` picks which triage screen the fetched content lands in: the per-section
+// one (false) or the per-item raw one (true). It's a property of this session,
+// not of the entry point, so the picker's own mode toggle can flip it right up
+// until "Fetch content".
 const moodleImport = {
   accountBaseUrl: null,
   client: null,
@@ -3893,6 +4751,7 @@ const moodleImport = {
   selectedCourseId: null,
   mapped: null,
   draft: false,
+  raw: false,
   returnToSemesterModal: false,
 };
 
@@ -3907,6 +4766,11 @@ async function ensureMoodleAccountOrPrompt() {
     accounts = await window.moodleAuth.listAccounts();
   } catch (e) {
     accounts = [];
+  }
+  const missing = missingMoodleGlobals();
+  if (missing) {
+    alert(missing);
+    return false;
   }
   if (accounts.length > 0) return true;
   if (confirm('No Moodle account is connected yet. Connect one in Settings now?')) {
@@ -3931,6 +4795,14 @@ async function loadMoodleCoursesForAccount(baseUrl) {
   nextBtn.disabled = true;
   moodleImport.client = null;
   moodleImport.courses = [];
+
+  const missing = missingMoodleGlobals();
+  if (missing) {
+    loadingEl.classList.add('hidden');
+    errorEl.textContent = missing;
+    errorEl.classList.remove('hidden');
+    return;
+  }
 
   let stored;
   try {
@@ -3988,7 +4860,7 @@ function closeMoodleCourseModal() {
   }
 }
 
-async function openMoodleCourseModal({ presetCourseId, draftMode = false } = {}) {
+async function openMoodleCourseModal({ presetCourseId, draftMode = false, raw = false } = {}) {
   const overlay = document.getElementById('moodle-course-overlay');
   const errorEl = document.getElementById('moodle-course-error');
   const loadingEl = document.getElementById('moodle-course-loading');
@@ -3996,6 +4868,7 @@ async function openMoodleCourseModal({ presetCourseId, draftMode = false } = {})
   const selectRow = document.getElementById('moodle-course-select-row');
   const targetRow = document.getElementById('moodle-course-target-row');
   const newNameRow = document.getElementById('moodle-course-newname-row');
+  const modeRow = document.getElementById('moodle-course-mode-row');
   const nextBtn = document.getElementById('moodle-course-next');
 
   errorEl.classList.add('hidden');
@@ -4003,13 +4876,16 @@ async function openMoodleCourseModal({ presetCourseId, draftMode = false } = {})
   selectRow.classList.add('hidden');
   targetRow.classList.add('hidden');
   newNameRow.classList.add('hidden');
+  modeRow.classList.add('hidden');
   nextBtn.disabled = true;
   moodleImport.accountBaseUrl = null;
   moodleImport.client = null;
   moodleImport.courses = [];
   moodleImport.mapped = null;
   moodleImport.draft = draftMode;
+  moodleImport.raw = raw;
   moodleImport.returnToSemesterModal = draftMode;
+  syncMoodleModeToggle();
 
   overlay.classList.remove('hidden');
   loadingEl.textContent = 'Loading your Moodle accounts…';
@@ -4049,6 +4925,7 @@ async function openMoodleCourseModal({ presetCourseId, draftMode = false } = {})
   accountRow.classList.toggle('hidden', accounts.length <= 1);
 
   targetRow.classList.remove('hidden');
+  modeRow.classList.remove('hidden');
   populateMoodleTargetSelect(draftMode);
   const targetSelect = document.getElementById('moodle-course-target');
   if (presetCourseId) {
@@ -4093,6 +4970,19 @@ function draftCourseRows() {
     .filter(Boolean);
 }
 
+// Lights the picker's "By section" / "Every item" button that matches
+// moodleImport.raw. The single place that decides which one is active, so a
+// click, an entry point's preset and a reopen can't disagree.
+function syncMoodleModeToggle() {
+  const toggle = document.getElementById('moodle-course-mode');
+  if (!toggle) return;
+  [...toggle.querySelectorAll('.moodle-mode-btn')].forEach((btn) => {
+    const active = (btn.dataset.mode === 'raw') === moodleImport.raw;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', String(active));
+  });
+}
+
 function setupMoodleImport() {
   const importBtn = document.getElementById('set-moodle-import');
   if (importBtn) {
@@ -4101,6 +4991,22 @@ function setupMoodleImport() {
       openMoodleCourseModal();
     });
   }
+
+  // Same picker, same client, same mapper — only the triage screen differs.
+  const rawImportBtn = document.getElementById('set-moodle-import-raw');
+  if (rawImportBtn) {
+    rawImportBtn.addEventListener('click', () => {
+      closeSettingsModal();
+      openMoodleCourseModal({ raw: true });
+    });
+  }
+
+  document.getElementById('moodle-course-mode').addEventListener('click', (e) => {
+    const btn = e.target.closest('.moodle-mode-btn');
+    if (!btn) return;
+    moodleImport.raw = btn.dataset.mode === 'raw';
+    syncMoodleModeToggle();
+  });
 
   document.getElementById('moodle-course-cancel').addEventListener('click', closeMoodleCourseModal);
   document.getElementById('moodle-course-overlay').addEventListener('click', (e) => {
@@ -4210,10 +5116,11 @@ function setupMoodleImport() {
       }
 
       closeMoodleCourseModal();
-      // Hand the mapped weeks to the triage screen, which owns turning them
-      // into readings/tasks. closeMoodleCourseModal() runs first so a
+      // Hand the mapped weeks to the chosen triage screen, which owns turning
+      // them into readings/tasks. closeMoodleCourseModal() runs first so a
       // create-mode import's New Semester modal is already restored behind it.
-      openMoodleTriageModal(targetCourse, moodleImport.mapped, moodleImport.accountBaseUrl);
+      const openTriage = moodleImport.raw ? openMoodleRawModal : openMoodleTriageModal;
+      openTriage(targetCourse, moodleImport.mapped, moodleImport.accountBaseUrl);
     });
   });
 }
@@ -4268,10 +5175,19 @@ function suggestWeekFromDateRange(semester, dateRange) {
   return Math.max(1, Math.min(semester.weeks, week));
 }
 
+// The three triage choices, in the order they're shown. `value` is what
+// getDecision() reports and what the modal's "All weeks" buttons pass to
+// setMode(), so it stays the same vocabulary the import step already reads.
+const MOODLE_TRIAGE_MODES = [
+  { value: 'skip', label: 'Skip' },
+  { value: 'reading', label: 'Reading' },
+  { value: 'task', label: 'Task' },
+];
+
 // One row per mapped Moodle week: a disclosure chevron, section name, item
 // count, a week-number input pre-filled from suggestWeekFromDateRange
 // (editable — the user has the final say, especially when dateRange was null
-// or the guess landed outside the semester), and a mode select
+// or the guess landed outside the semester), and a mode toggle
 // (Skip / Reading / Task). Expanding the row reveals every item in the week
 // with its own checkbox, all ticked by default so an untouched row behaves
 // exactly as it did before per-item selection existed (Part D).
@@ -4315,19 +5231,42 @@ function renderMoodleTriageRow(week, semester) {
   weekInput.value = suggested || '';
   weekInput.placeholder = 'Wk';
 
-  const modeSelect = document.createElement('select');
-  modeSelect.style.cssText =
-    'padding:0.3rem 0.4rem;border:1px solid var(--border);border-radius:6px;' +
-    'font-size:0.85rem;color:var(--text);background:var(--surface);';
-  modeSelect.innerHTML =
-    '<option value="skip">Skip</option>' +
-    '<option value="reading">Reading</option>' +
-    '<option value="task">Task</option>';
+  // Three buttons rather than a <select>: the decision is what this row is
+  // for, so it stays readable without opening a menu, and it matches the
+  // mobile triage screen. Skip is active by default, the same default the
+  // confirm step filters on.
+  const modeToggle = document.createElement('div');
+  modeToggle.className = 'moodle-mode-toggle';
+  modeToggle.setAttribute('role', 'group');
+  modeToggle.setAttribute('aria-label', 'Import this week as');
+  let mode = 'skip';
+  const modeBtns = MOODLE_TRIAGE_MODES.map((m) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'moodle-mode-btn';
+    btn.textContent = m.label;
+    btn.addEventListener('click', () => setMode(m.value));
+    modeToggle.appendChild(btn);
+    return btn;
+  });
+
+  // The only place the active button is decided, so a click, the row's
+  // default and the modal's "All weeks" buttons can't disagree about which
+  // one is lit.
+  function setMode(next) {
+    mode = next;
+    modeBtns.forEach((btn, i) => {
+      const active = MOODLE_TRIAGE_MODES[i].value === next;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-pressed', String(active));
+    });
+  }
+  setMode(mode);
 
   header.appendChild(toggle);
   header.appendChild(info);
   header.appendChild(weekInput);
-  header.appendChild(modeSelect);
+  header.appendChild(modeToggle);
   el.appendChild(header);
 
   // Per-item checkboxes, collapsed by default so a long course stays scannable.
@@ -4389,13 +5328,11 @@ function renderMoodleTriageRow(week, semester) {
     setExpanded,
     getDecision: () => ({
       week,
-      mode: modeSelect.value,
+      mode,
       targetWeek: parseInt(weekInput.value, 10),
       items: week.items.filter((_, i) => checkboxes[i].checked),
     }),
-    setMode: (mode) => {
-      modeSelect.value = mode;
-    },
+    setMode,
     getWeekValue: () => parseInt(weekInput.value, 10),
     setWeekValue: (n) => {
       weekInput.value = String(n);
@@ -4420,11 +5357,19 @@ function renderMoodleTriageRow(week, semester) {
 // type every one. Only rows *below* the edited one move — anything already
 // corrected above it stays put — and editing an earlier row re-runs the
 // cascade from there.
-function cascadeMoodleTriageWeeks(rows, fromIndex, maxWeeks) {
+//
+// `stepOf(row, index)` says how far apart two rows are in weeks; it defaults to
+// the row's own index, which is the per-section list's one-row-per-week case.
+// The raw per-item list passes the row's section index instead, so items from
+// the same Moodle section all land in the same week and the next section is the
+// one that advances — the same cascade, counted in sections rather than rows.
+function cascadeMoodleTriageWeeks(rows, fromIndex, maxWeeks, stepOf) {
   const base = rows[fromIndex].getWeekValue();
   if (!Number.isInteger(base) || base < 1) return; // mid-edit or cleared
+  const step = stepOf || ((row, i) => i);
+  const from = step(rows[fromIndex], fromIndex);
   for (let j = fromIndex + 1; j < rows.length; j += 1) {
-    rows[j].setWeekValue(Math.min(maxWeeks, base + (j - fromIndex)));
+    rows[j].setWeekValue(Math.min(maxWeeks, base + (step(rows[j], j) - from)));
   }
 }
 
@@ -4537,7 +5482,7 @@ function openMoodleTriageModal(targetCourse, mapped, accountBaseUrl) {
       // that work when the user submits the form.
       if (!isDraft) {
         persist();
-        render();
+        renderPreservingScroll();
       }
       closeMoodleTriageModal();
       // Importing several courses in a row is the common case, so offer to go
@@ -4555,6 +5500,273 @@ function openMoodleTriageModal(targetCourse, mapped, accountBaseUrl) {
     });
   };
 
+  overlay.classList.remove('hidden');
+}
+
+// ---------------------------------------------------------------------------
+// Moodle import, raw per-item triage (Phase 16 Part E). The per-section screen
+// above makes one decision per Moodle section; this one makes one decision per
+// *item* — every importable module of the course, flat, each row carrying its
+// own week number and its own Skip/Reading/Task choice. Same mapped input, same
+// suggestWeekFromDateRange seeding, same addItem/persist confirm path; only the
+// granularity of the decision differs.
+//
+// A course can easily reach 60 items, so the batch helpers (filter, set every
+// shown row's type, re-seed every shown row's week) are what make the screen
+// usable — a row-at-a-time pass is the fallback, not the expected workflow.
+// ---------------------------------------------------------------------------
+
+// mapped.weeks[].items → one flat entry per item, each keeping the section it
+// came from (for the row's context line and for grouping) plus that section's
+// week suggestion, which every item in it starts on.
+function flattenMoodleRawItems(mapped, semester) {
+  const entries = [];
+  (mapped.weeks || []).forEach((week, sectionIndex) => {
+    const suggestedWeek = suggestWeekFromDateRange(semester, week.dateRange);
+    week.items.forEach((item) => {
+      entries.push({ item, week, sectionIndex, suggestedWeek });
+    });
+  });
+  return entries;
+}
+
+// One row per Moodle item: its name, the section it came from as context, its
+// own week input (seeded from the section's suggestion) and its own type
+// toggle. Skip is the default, the same default the confirm step filters on, so
+// an untouched row creates nothing.
+//
+// Like renderMoodleTriageRow, the returned object is the row's whole API — the
+// modal drives filtering, batch changes and the week cascade through it rather
+// than reaching into the DOM. `onWeekInput` / `onModeChange` are mutable hooks
+// the modal fills in once the full row list exists.
+function renderMoodleRawRow(entry, semester) {
+  const el = document.createElement('div');
+  el.className = 'moodle-raw-row';
+
+  const info = document.createElement('div');
+  info.className = 'moodle-raw-info';
+  const name = document.createElement('div');
+  name.className = 'moodle-raw-name';
+  name.textContent = entry.item.name;
+  name.title = entry.item.name; // the row ellipsises; the full name stays reachable
+  const section = document.createElement('div');
+  section.className = 'moodle-raw-section';
+  section.textContent = entry.week.sectionName || ('Section ' + entry.week.moodleSection);
+  info.appendChild(name);
+  info.appendChild(section);
+
+  const weekInput = document.createElement('input');
+  weekInput.type = 'number';
+  weekInput.className = 'moodle-raw-week';
+  weekInput.min = '1';
+  weekInput.max = String(semester.weeks);
+  weekInput.placeholder = 'Wk';
+  weekInput.value = entry.suggestedWeek || '';
+  weekInput.setAttribute('aria-label', `Week for ${entry.item.name}`);
+
+  const modeToggle = document.createElement('div');
+  modeToggle.className = 'moodle-mode-toggle';
+  modeToggle.setAttribute('role', 'group');
+  modeToggle.setAttribute('aria-label', 'Import this item as');
+  let mode = 'skip';
+  const modeBtns = MOODLE_TRIAGE_MODES.map((m) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'moodle-mode-btn';
+    btn.textContent = m.label;
+    btn.addEventListener('click', () => {
+      setMode(m.value);
+      if (api.onModeChange) api.onModeChange();
+    });
+    modeToggle.appendChild(btn);
+    return btn;
+  });
+
+  function setMode(next) {
+    mode = next;
+    modeBtns.forEach((btn, i) => {
+      const active = MOODLE_TRIAGE_MODES[i].value === next;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-pressed', String(active));
+    });
+  }
+  setMode(mode);
+
+  el.appendChild(info);
+  el.appendChild(weekInput);
+  el.appendChild(modeToggle);
+
+  const api = {
+    el,
+    entry,
+    onWeekInput: null,
+    onModeChange: null,
+    // Section name is searchable too, so one query can isolate a whole section
+    // and the batch buttons can then be aimed at just that section.
+    matches: (query) =>
+      !query ||
+      entry.item.name.toLowerCase().includes(query) ||
+      String(entry.week.sectionName || '').toLowerCase().includes(query),
+    isVisible: () => !el.classList.contains('hidden'),
+    setVisible: (visible) => el.classList.toggle('hidden', !visible),
+    getMode: () => mode,
+    setMode,
+    getWeekValue: () => parseInt(weekInput.value, 10),
+    setWeekValue: (n) => {
+      weekInput.value = String(n);
+    },
+    // Back to the row's section suggestion — the "Weeks from sections" reset.
+    // A section whose name held no parseable date range has no suggestion, so
+    // the field goes empty rather than to a made-up number.
+    resetWeek: () => {
+      weekInput.value = entry.suggestedWeek || '';
+    },
+    getDecision: () => ({
+      item: entry.item,
+      sectionName: entry.week.sectionName,
+      mode,
+      targetWeek: parseInt(weekInput.value, 10),
+    }),
+  };
+
+  weekInput.addEventListener('input', () => {
+    if (api.onWeekInput) api.onWeekInput();
+  });
+
+  return api;
+}
+
+function closeMoodleRawModal() {
+  document.getElementById('moodle-raw-overlay').classList.add('hidden');
+}
+
+function openMoodleRawModal(targetCourse, mapped, accountBaseUrl) {
+  const overlay = document.getElementById('moodle-raw-overlay');
+  const listEl = document.getElementById('moodle-raw-list');
+  const errorEl = document.getElementById('moodle-raw-error');
+  const emptyEl = document.getElementById('moodle-raw-empty');
+  const sourceEl = document.getElementById('moodle-raw-source');
+  const summaryEl = document.getElementById('moodle-raw-summary');
+  const filterEl = document.getElementById('moodle-raw-filter');
+  const confirmBtn = document.getElementById('moodle-raw-confirm');
+
+  errorEl.classList.add('hidden');
+  sourceEl.textContent = accountBaseUrl ? `From ${accountBaseUrl}` : '';
+  listEl.innerHTML = '';
+  filterEl.value = '';
+  confirmBtn.textContent = 'Import selected';
+
+  const sem = moodleTriageSemesterContext();
+  const isDraft = moodleImport.draft;
+  const rows = flattenMoodleRawItems(mapped, sem).map((entry) => {
+    const row = renderMoodleRawRow(entry, sem);
+    listEl.appendChild(row.el);
+    return row;
+  });
+  confirmBtn.disabled = rows.length === 0;
+
+  // Counts every row, not just the shown ones: the filter is a view, and a row
+  // it hides keeps its decision and is still imported. Saying so out loud here
+  // is what stops a filtered import from looking like it did the wrong thing.
+  const syncSummary = () => {
+    const readings = rows.filter((r) => r.getMode() === 'reading').length;
+    const tasks = rows.filter((r) => r.getMode() === 'task').length;
+    const shown = rows.filter((r) => r.isVisible()).length;
+    const parts = [`${readings} reading(s), ${tasks} task(s) of ${rows.length} item(s)`];
+    if (shown !== rows.length) parts.push(`showing ${shown}`);
+    summaryEl.textContent = parts.join(' · ');
+  };
+
+  const applyFilter = () => {
+    const query = filterEl.value.trim().toLowerCase();
+    rows.forEach((r) => r.setVisible(r.matches(query)));
+    // An empty list means one of two different things — a course with nothing
+    // importable in it, or a filter that matched nothing — and a blank panel
+    // explains neither.
+    emptyEl.textContent =
+      rows.length === 0
+        ? 'This Moodle course has no importable items.'
+        : 'No items match that filter.';
+    emptyEl.classList.toggle('hidden', rows.some((r) => r.isVisible()));
+    syncSummary();
+  };
+
+  // The cascade runs over the whole list, filtered or not, and counts in
+  // sections rather than rows — Moodle sections are consecutive weeks, the
+  // items inside one are not.
+  rows.forEach((row, i) => {
+    row.onWeekInput = () =>
+      cascadeMoodleTriageWeeks(rows, i, sem.weeks, (r) => r.entry.sectionIndex);
+    row.onModeChange = syncSummary;
+  });
+  syncSummary();
+
+  // Assigned (not addEventListener) so re-running the import replaces these
+  // handlers instead of stacking them, mirroring openMoodleTriageModal.
+  document.getElementById('moodle-raw-cancel').onclick = () => closeMoodleRawModal();
+  overlay.onclick = (e) => {
+    if (e.target === overlay) closeMoodleRawModal();
+  };
+  filterEl.oninput = applyFilter;
+
+  // Batch helpers act on the rows the filter currently shows, so "Reading" can
+  // be aimed at a search result instead of the whole course.
+  const shownRows = () => rows.filter((r) => r.isVisible());
+  const setShownModes = (mode) => {
+    shownRows().forEach((r) => r.setMode(mode));
+    syncSummary();
+  };
+  document.getElementById('moodle-raw-all-skip').onclick = () => setShownModes('skip');
+  document.getElementById('moodle-raw-all-reading').onclick = () => setShownModes('reading');
+  document.getElementById('moodle-raw-all-task').onclick = () => setShownModes('task');
+  document.getElementById('moodle-raw-reset-weeks').onclick = () =>
+    shownRows().forEach((r) => r.resetWeek());
+
+  confirmBtn.onclick = async () => {
+    errorEl.classList.add('hidden');
+    const decisions = rows.map((r) => r.getDecision()).filter((d) => d.mode !== 'skip');
+
+    // Every row defaults to Skip, so without this a click here would "succeed"
+    // at creating nothing — same reasoning as the per-section screen.
+    if (decisions.length === 0) {
+      errorEl.textContent = 'Choose Reading or Task for at least one item before importing.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    // Validate every contributing row up front so a bad week number can never
+    // leave a half-finished import behind.
+    const invalid = decisions.find(
+      (d) => !Number.isInteger(d.targetWeek) || d.targetWeek < 1 || d.targetWeek > sem.weeks
+    );
+    if (invalid) {
+      errorEl.textContent = `Enter a valid week (1–${sem.weeks}) for "${invalid.item.name}".`;
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    await withBusy(confirmBtn, 'Importing…', async () => {
+      decisions.forEach((d) => {
+        addItem(targetCourse, d.mode, { title: d.item.name, week: d.targetWeek });
+      });
+      // A create-mode import writes into the unsaved draft course, which the
+      // New Semester modal still owns — Create does the saving and rendering.
+      if (!isDraft) {
+        persist();
+        renderPreservingScroll();
+      }
+      closeMoodleRawModal();
+      const again = confirm(
+        `Imported ${decisions.length} item(s) into "${targetCourse.name}".\n\nImport another course?`
+      );
+      if (again) {
+        if (isDraft) closeModal();
+        openMoodleCourseModal({ draftMode: isDraft, raw: true });
+      }
+    });
+  };
+
+  applyFilter();
   overlay.classList.remove('hidden');
 }
 
@@ -4625,6 +5837,33 @@ async function openProfileModal() {
         setAccountStatus('Password updated.', false);
       } catch (e) {
         setAccountStatus(lectioAuth.friendlyAuthError(e), true);
+      }
+    });
+  });
+
+  // Local semesters → re-open the local→cloud upload offer on demand. The
+  // automatic offer is shown only until it's answered once (uploaded or "Not
+  // now"), so this is the way back to it. The account windows are hidden first
+  // so the import modal isn't stacked on top of them.
+  rewireButton('set-local-upload', (btn) => {
+    const cloud = window.lectioSupabaseStorage;
+    const userId = session && session.user && session.user.id;
+    if (!cloud || !window.LocalImport || !userId) {
+      setAccountStatus('Cloud storage is unavailable right now.', true);
+      return;
+    }
+    withBusy(btn, 'Opening…', async () => {
+      try {
+        const local = await window.LocalImport.getLocalSemesters();
+        if (!local.length) {
+          setAccountStatus('No semesters are stored on this computer.', false);
+          return;
+        }
+        hideAccountWindows();
+        await openLocalImportModal(cloud, userId);
+      } catch (e) {
+        console.error('Local upload offer failed:', e);
+        setAccountStatus('Could not read the semesters on this computer.', true);
       }
     });
   });
@@ -4888,8 +6127,8 @@ function clearPlannerState() {
   state.semesterId = null;
   state.semester = null;
   state.focusedCourseId = null;
-  state.openWeeks = new Set();
   state.openCourseWeeks = {};
+  state.openCourseTypes = {};
   markDirty(false);
   setStorageOnline(true); // fs fallback is always "online"; clear any notice
   const sel = document.getElementById('semester-select');
@@ -4900,10 +6139,16 @@ function clearPlannerState() {
   if (dashboard) dashboard.innerHTML = '';
 }
 
+// Set by setupSignIn(): puts the overlay back on the credentials form. The
+// overlay can reappear after a sign-out while the confirm-your-email state is
+// still showing, so it is reset every time it is opened.
+let resetSignInView = () => {};
+
 function showSignIn() {
   clearPlannerState();
   const errEl = document.getElementById('signin-error');
   if (errEl) errEl.classList.add('hidden');
+  resetSignInView();
   document.getElementById('signin-overlay').classList.remove('hidden');
 }
 
@@ -4940,17 +6185,74 @@ function setupSignIn() {
   const errEl = document.getElementById('signin-error');
   const submitBtn = document.getElementById('signin-submit');
   const createBtn = document.getElementById('signin-create');
+  const titleEl = document.getElementById('signin-title');
+  const formArea = document.getElementById('signin-form-area');
+  const confirmEl = document.getElementById('signin-confirm');
+  const confirmNoteEl = document.getElementById('signin-confirm-note');
+  const confirmEmailEl = document.getElementById('signin-confirm-email');
+  const confirmStatusEl = document.getElementById('signin-confirm-status');
+  const resendBtn = document.getElementById('signin-confirm-resend');
+  const backBtn = document.getElementById('signin-confirm-back');
+
+  // The address the confirm state (and its Resend button) is about.
+  let pendingEmail = '';
+
+  // Kill switch, owned by auth.js (see EMAIL_CONFIRMATION_UI_ENABLED there):
+  // when false, no confirm-your-email state, no Resend button and no blocked
+  // sign-in message — sign-up and sign-in behave as they did before the
+  // confirmation flow existed. Keep it in sync with the Supabase project's
+  // "Confirm email" toggle; it only hides this app's UI, it does not override
+  // Supabase's server-side enforcement.
+  const confirmationUi = lectioAuth.EMAIL_CONFIRMATION_UI_ENABLED;
 
   function showError(msg) {
     errEl.textContent = msg;
     errEl.classList.remove('hidden');
   }
+
+  function setConfirmStatus(msg, isError) {
+    confirmStatusEl.textContent = msg || '';
+    confirmStatusEl.classList.toggle('hidden', !msg);
+    confirmStatusEl.classList.toggle('is-error', !!isError);
+  }
+
+  // Swap the form area for "check your inbox". `note` is an optional lead-in
+  // (used on the sign-in path, where the user did not just create the account).
+  function showConfirm(email, note) {
+    pendingEmail = email;
+    confirmEmailEl.textContent = email;
+    confirmNoteEl.textContent = note || '';
+    confirmNoteEl.classList.toggle('hidden', !note);
+    setConfirmStatus('', false);
+    errEl.classList.add('hidden');
+    pwEl.value = '';
+    titleEl.textContent = 'Confirm your email';
+    formArea.classList.add('hidden');
+    confirmEl.classList.remove('hidden');
+  }
+
+  function showForm() {
+    pendingEmail = '';
+    setConfirmStatus('', false);
+    titleEl.textContent = 'Sign in to Lectio';
+    confirmEl.classList.add('hidden');
+    formArea.classList.remove('hidden');
+  }
+  resetSignInView = showForm;
+
   function setBusy(busy) {
     submitBtn.disabled = busy;
     createBtn.disabled = busy;
     emailEl.disabled = busy;
     pwEl.disabled = busy;
     submitBtn.textContent = busy ? 'Please wait…' : 'Sign in';
+  }
+
+  // Supabase's "Email not confirmed" sign-in rejection — the same string
+  // friendlyAuthError() maps, matched here to pick the confirm state instead.
+  function isEmailNotConfirmed(e) {
+    const msg = e && e.message ? String(e.message).toLowerCase() : '';
+    return msg.includes('email not confirmed');
   }
 
   async function run(action) {
@@ -4963,17 +6265,56 @@ function setupSignIn() {
     }
     setBusy(true);
     try {
-      await action(email, password);
-      // On success, onAuthChange → handleSession() hides the overlay and inits.
-      // (With email confirmation OFF — today's default — sign-up returns a
-      // session immediately; nothing more to do here.)
+      const result = await action(email, password);
       pwEl.value = '';
+      // With email confirmation OFF, sign-up returns a session immediately and
+      // onAuthChange → handleSession() hides the overlay and inits — nothing
+      // more to do here. With it ON, signUp reports needsConfirmation instead
+      // and no session arrives until the emailed link is opened. The kill
+      // switch (auth.js) also forces needsConfirmation false when the whole
+      // confirmation UI is disabled.
+      if (confirmationUi && result && result.needsConfirmation) showConfirm(email);
     } catch (e) {
-      showError(lectioAuth.friendlyAuthError(e));
+      const msg = lectioAuth.friendlyAuthError(e);
+      // Signing in on an account that never confirmed: same dead end as a
+      // pending sign-up, so offer the same Resend instead of a bare message.
+      if (isEmailNotConfirmed(e)) {
+        if (confirmationUi) showConfirm(email, msg);
+        // Kill switch off: neither the confirm state nor friendlyAuthError's
+        // "confirm your email" text should surface. Reaching here means the
+        // Supabase "Confirm email" toggle is still ON while the flag is off (the
+        // two are meant to stay in sync), so fall back to a generic failure
+        // rather than pointing at a flow the app currently hides.
+        else showError('Something went wrong. Please try again.');
+      } else showError(msg);
     } finally {
       setBusy(false);
     }
   }
+
+  async function resend() {
+    if (!pendingEmail) return;
+    setConfirmStatus('', false);
+    resendBtn.disabled = true;
+    backBtn.disabled = true;
+    const label = resendBtn.textContent;
+    resendBtn.textContent = 'Sending…';
+    try {
+      await lectioAuth.resendConfirmation(pendingEmail);
+      setConfirmStatus('Sent — check your inbox (and your spam folder).', false);
+    } catch (e) {
+      // Supabase rate-limits resends; friendlyAuthError turns that into
+      // "Too many attempts. Please wait a minute and try again."
+      setConfirmStatus(lectioAuth.friendlyAuthError(e), true);
+    } finally {
+      resendBtn.disabled = false;
+      backBtn.disabled = false;
+      resendBtn.textContent = label;
+    }
+  }
+
+  resendBtn.addEventListener('click', resend);
+  backBtn.addEventListener('click', showForm);
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -5015,9 +6356,17 @@ function setupSignIn() {
 // ---------------------------------------------------------------------------
 // One-time local→cloud upload (Phase 11.3). The first time an account signs in
 // with semesters in local fs-storage, offer to upload them to the cloud —
-// explicit, confirmed, idempotent, and non-destructive. The "handled" flag is
-// keyed BY USER in localStorage (`localUploadDone:<userId>`) so a different
-// account on the same machine still gets its own offer.
+// explicit, confirmed, idempotent, and non-destructive. Both flags are keyed BY
+// USER in localStorage so a different account on the same machine still gets its
+// own offer:
+//   - `localUploadDone:<userId>`      — an upload ran (or there was nothing to upload)
+//   - `localUploadDismissed:<userId>` — the user answered "Not now"
+// Either one suppresses the AUTOMATIC offer. Without the second flag, "Not now"
+// closed the modal without recording anything, so a user upgrading from a
+// pre-cloud build was re-asked at every single launch — and once the semesters
+// were already in the account each row read "Already in your account", making a
+// routine offer look like a conflict prompt. The offer stays reachable by hand
+// from Settings → Profile → Local semesters, so declining it is never final.
 // ---------------------------------------------------------------------------
 function isLocalUploadDone(userId) {
   return readPref(`localUploadDone:${userId}`) === 'true';
@@ -5025,13 +6374,19 @@ function isLocalUploadDone(userId) {
 function setLocalUploadDone(userId) {
   writePref(`localUploadDone:${userId}`, 'true');
 }
+function isLocalUploadDismissed(userId) {
+  return readPref(`localUploadDismissed:${userId}`) === 'true';
+}
+function setLocalUploadDismissed(userId) {
+  writePref(`localUploadDismissed:${userId}`, 'true');
+}
 
 async function maybeOfferLocalUpload(session) {
   const userId = session && session.user && session.user.id;
   if (!userId) return;
   const cloud = window.lectioSupabaseStorage;
   if (!cloud || !window.LocalImport) return; // not signed into cloud storage
-  if (isLocalUploadDone(userId)) return;
+  if (isLocalUploadDone(userId) || isLocalUploadDismissed(userId)) return;
 
   let local;
   try {
@@ -5106,9 +6461,14 @@ async function openLocalImportModal(cloud, userId) {
     return { semester: item.semester, getAction: row.getAction };
   });
 
-  // "Not now": close without setting the flag, so the offer can return later
-  // (and 11.4's Settings → Profile can re-open it).
-  skipBtn.onclick = () => overlay.classList.add('hidden');
+  // "Not now": record the dismissal so the offer stops coming back on its own.
+  // It's still reachable on demand from Settings → Profile → Local semesters.
+  // (After a successful upload the button becomes "Done" and the flag is already
+  // set by the upload handler, so this stays correct for that path too.)
+  skipBtn.onclick = () => {
+    setLocalUploadDismissed(userId);
+    overlay.classList.add('hidden');
+  };
 
   uploadBtn.onclick = async () => {
     const decisions = rows.map((r) => ({ semester: r.semester, action: r.getAction() }));

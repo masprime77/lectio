@@ -24,6 +24,9 @@
   --track: #eceff2;
   --danger: #c0392b;
   --danger-bg: #fdecea;
+  /* Multi-select: the tint of a selected item row and of the batch action bar */
+  --select-bg: #e7f0fb;
+  --select-border: #b7d4f0;
   --overlay: rgba(0, 0, 0, 0.45);
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 
@@ -65,6 +68,8 @@
   --track: #2a3138;
   --danger: #e57368;
   --danger-bg: #3a2522;
+  --select-bg: #22344a;
+  --select-border: #3d5b7d;
   --overlay: rgba(0, 0, 0, 0.6);
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 
@@ -93,6 +98,8 @@
     --track: #2a3138;
     --danger: #e57368;
     --danger-bg: #3a2522;
+    --select-bg: #22344a;
+    --select-border: #3d5b7d;
     --overlay: rgba(0, 0, 0, 0.6);
     --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 
@@ -232,7 +239,6 @@ body.electron-app .header-inner { padding-left: 80px; }
 .logo,
 .dashboard h2,
 .modal h2,
-.course-card h4,
 .course-column-header {
   font-family: var(--font-heading);
   letter-spacing: -0.01em;
@@ -628,6 +634,8 @@ body.electron-app .header-inner { padding-left: 80px; }
 }
 .collapse-btn + .collapse-btn { border-left: 1px solid var(--border); }
 .collapse-btn:hover { background: var(--hover); color: var(--text); }
+.collapse-btn:disabled { opacity: 0.4; cursor: default; }
+.collapse-btn:disabled:hover { background: var(--surface); color: var(--muted); }
 .collapse-btn .ti { width: 16px; height: 16px; }
 .btn-danger { color: var(--danger); border: none; background: none; }
 .btn-danger:hover { background: var(--danger-bg); }
@@ -803,63 +811,9 @@ body.electron-app .header-inner { padding-left: 80px; }
 }
 .bd-summary .bd-pct { color: var(--text); }
 
-/* Weeks */
-.week {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  margin-bottom: 0.6rem;
-  overflow: hidden;
-  box-shadow: var(--shadow);
-}
-.week-header {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.75rem 1rem;
-  cursor: pointer;
-  user-select: none;
-}
-.week-header:hover { background: var(--hover); }
-.week-header .chevron {
-  transition: transform 0.2s;
-  color: var(--muted);
-  display: inline-flex;
-  align-items: center;
-}
-.week-header .chevron .ti { width: 18px; height: 18px; }
-.week.open .week-header .chevron { transform: rotate(90deg); }
-.week-title { font-weight: 600; font-size: 0.95rem; }
-.week-dates { color: var(--muted); font-size: 0.8rem; }
-.week-badge {
-  margin-left: auto;
-  font-size: 0.72rem;
-  background: var(--primary);
-  color: var(--on-accent);
-  padding: 0.1rem 0.5rem;
-  border-radius: 20px;
-}
-.week-body { padding: 0 1rem 1rem; display: none; }
-.week.open .week-body { display: block; }
+/* Empty-state line shared by the dashboard, columns and item lists */
 .week-empty { color: var(--muted); font-size: 0.85rem; padding: 0.5rem 0; }
 
-/* Course cards */
-.course-card {
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--primary);
-  border-radius: 8px;
-  padding: 0.75rem 0.9rem;
-  margin-top: 0.75rem;
-  background: var(--surface);
-}
-.course-card h4 { margin: 0 0 0.5rem; font-size: 0.95rem; }
-.card-section-title {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-  margin: 0.6rem 0 0.3rem;
-}
 .item-list { list-style: none; margin: 0; padding: 0; }
 .item {
   display: flex;
@@ -870,6 +824,145 @@ body.electron-app .header-inner { padding-left: 80px; }
 }
 .item:last-child { border-bottom: none; }
 .item-title { flex: 1; font-size: 0.9rem; }
+
+/* -------------------------------------------------------------------------
+   Drag and drop: a row can be dragged onto another week, kind or course. The
+   grab cursor only shows on the row's own surface — its title, due date and
+   buttons keep the cursors their own interactions need.
+   ------------------------------------------------------------------------- */
+.item--draggable { cursor: grab; }
+.item--draggable:active { cursor: grabbing; }
+.item--dragging { opacity: 0.4; }
+/* The section under the pointer, drawn as an outline so nothing shifts while
+   the drag passes over it. */
+.drop-zone--over {
+  outline: 2px dashed var(--primary);
+  outline-offset: 2px;
+  border-radius: 6px;
+  background: var(--select-bg);
+}
+
+/* -------------------------------------------------------------------------
+   Multi-select mode: a row is one selection target, so its own controls stop
+   responding and the whole row lights up instead.
+   ------------------------------------------------------------------------- */
+.item--selectable {
+  cursor: pointer;
+  padding-left: 0.35rem;
+  padding-right: 0.35rem;
+  border-radius: 6px;
+}
+.item--selectable:hover { background: var(--hover); }
+.item--selectable .item-title,
+.item--selectable .item-due,
+.item--selectable .item-add-due,
+.item--selectable .tag-dropdown-wrapper,
+.item--selectable .icon-btn {
+  pointer-events: none;
+}
+/* The row's own edit affordances read as unavailable while selecting; the tag
+   badge keeps its full weight, since it's what a batch tag change is aimed at. */
+.item--selectable .item-title { cursor: pointer; }
+.item--selectable .icon-btn { opacity: 0.35; }
+.item--selected,
+.item--selected:hover {
+  background: var(--select-bg);
+  box-shadow: inset 0 0 0 1px var(--select-border);
+}
+.item-select-box {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--muted);
+  border-radius: 4px;
+  background: var(--surface);
+  position: relative;
+}
+.item--selected .item-select-box {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+/* The tick: two borders of an empty box, rotated. */
+.item--selected .item-select-box::after {
+  content: "";
+  position: absolute;
+  left: 3.5px;
+  top: 0.5px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--on-accent);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* The batch action bar, pinned under the header controls while a selection
+   exists. */
+.selection-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--select-bg);
+  border-top: 1px solid var(--select-border);
+}
+.selection-count {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-right: 0.25rem;
+}
+.selection-select {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.selection-select:disabled { color: var(--muted); cursor: not-allowed; }
+.selection-bar .btn { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+.selection-bar .btn:disabled { color: var(--muted); cursor: not-allowed; }
+.selection-bar .btn:disabled:hover { background: var(--surface); }
+.selection-delete { color: var(--danger); }
+.selection-delete:hover { background: var(--danger-bg); border-color: var(--danger); }
+/* The header toggle, lit while the mode is on. The :hover pair is needed
+   because .icon-btn:hover is defined further down the file and would otherwise
+   win at equal specificity. */
+.select-mode-btn.active { background: var(--primary); color: var(--on-accent); }
+.select-mode-btn.active:hover { background: var(--primary-hover); color: var(--on-accent); }
+/* Week number on a row, shown when the section itself isn't a week (By Type) */
+.item-week {
+  flex: none;
+  min-width: 1.9rem;
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--hover);
+  border-radius: 4px;
+  padding: 0.05rem 0.3rem;
+}
+/* R/T marker, shown when the section itself isn't a kind (By Week). Sized off
+   the week chip so the two line up, and filled with two accents that stay
+   distinct from each other — and from the tag badge's own colors — in both
+   themes. */
+.item-type {
+  flex: none;
+  width: 1.05rem;
+  height: 1.05rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--on-accent);
+  border-radius: 4px;
+}
+.item-type--reading { background: var(--primary); }
+.item-type--task { background: var(--st-reviewed); }
 /* Due date on tasks */
 .item-due {
   font-size: 0.75rem;
@@ -972,6 +1065,44 @@ body.electron-app .header-inner { padding-left: 80px; }
   background: var(--tag-color, transparent);
   margin-right: 0.5rem;
   vertical-align: middle;
+}
+
+/* Per-item note affordance. Structurally the same as .tag-dropdown-wrapper
+   above: a relative wrapper holding an absolute panel. The icon stays faint
+   until a note exists, so the board reads unchanged at a glance. */
+.item-note-wrapper { position: relative; display: inline-flex; }
+.item-note-btn { opacity: 0.55; }
+.item-note-btn:hover { opacity: 1; }
+.icon-btn.item-note-btn--filled { opacity: 1; color: var(--primary); }
+.item-note-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 100;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  width: 220px;
+  padding: 0.5rem;
+}
+.item-note-textarea {
+  width: 100%;
+  min-height: 70px;
+  resize: vertical;
+  padding: 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--text);
+  background: var(--bg);
+}
+.item-note-counter {
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-align: right;
+  margin-top: 0.25rem;
 }
 .icon-btn {
   border: none;
@@ -1088,16 +1219,42 @@ body.electron-app .header-inner { padding-left: 80px; }
   border-radius: var(--radius) var(--radius) 0 0;
   min-width: 0;
   display: flex;
-  align-items: center;
-  gap: 0.35rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.15rem;
 }
 .course-column-header-name {
-  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Muted metadata under the name, styled like .course-column-header-time. */
+.course-column-header-exam {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--muted);
+  white-space: nowrap;
+}
+/* Second row: icon toolbar on the left, studied time trailing on the right. */
+.course-column-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.course-column-header-btns {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+  /* Pull the first icon's padding back so the row lines up with the name. */
+  margin-left: -0.25rem;
+}
+/* Smaller and more muted than the name above them. */
+.course-column-header-btns .icon-btn { padding: 0.1rem 0.25rem; opacity: 0.7; }
+.course-column-header-btns .icon-btn:hover { opacity: 1; }
+.course-column-header-btns .icon-btn .ti { width: 14px; height: 14px; }
 .course-column-header-time {
   font-size: 0.72rem;
   font-weight: 400;
@@ -1111,20 +1268,11 @@ body.electron-app .header-inner { padding-left: 80px; }
   padding: 0 0.9rem 0.9rem;
   overflow-y: auto;
 }
-.week-divider {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  margin-top: 0.9rem;
-  padding-top: 0.6rem;
-  border-top: 1px solid var(--border);
-}
-.week-divider:first-child { border-top: none; }
+/* Section labels inside course columns (week number / type name) */
 .week-divider-label { font-weight: 600; font-size: 0.85rem; }
 .week-divider-dates { font-size: 0.75rem; color: var(--muted); }
-.week-divider.current .week-divider-label { color: var(--primary); }
 
-/* Collapsible week sections inside course columns */
+/* Collapsible sections inside course columns */
 .course-week-header {
   cursor: pointer;
   user-select: none;
@@ -1226,6 +1374,15 @@ body.electron-app .header-inner { padding-left: 80px; }
   border: 1px solid var(--border);
   border-radius: 6px;
   background: none;
+}
+.ns-course-row input[type="date"] {
+  width: 130px;
+  padding: 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--surface);
+  flex-shrink: 0;
 }
 .modal-actions {
   display: flex;
@@ -1329,6 +1486,32 @@ body.electron-app .header-inner { padding-left: 80px; }
   -webkit-mask: url('assets/apple-logo.svg') no-repeat center / contain;
   mask: url('assets/apple-logo.svg') no-repeat center / contain;
 }
+
+/* Confirm-your-email state (signin-overlay) — replaces the form area after a
+   sign-up that needs the emailed link, or a sign-in on an unconfirmed account. */
+.signin-confirm-note {
+  margin: 0 0 0.6rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius);
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+.signin-confirm-text {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.signin-confirm-text strong { overflow-wrap: anywhere; }
+.signin-confirm-status {
+  display: block;
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.signin-confirm-status.is-error { color: var(--danger); }
 
 /* Modal tabs */
 .modal-tabs {
@@ -1647,3 +1830,76 @@ body.electron-app .header-inner { padding-left: 80px; }
   margin-top: 0.4rem;
   cursor: pointer;
 }
+
+/* Moodle triage: per-week Skip/Reading/Task segmented control.
+   Same pattern and the same variables as .view-toggle / .view-btn, but with
+   its own classes: those are sized for the header and the 600px breakpoint
+   stretches them to fill it, which would pull this row apart. */
+.moodle-mode-toggle {
+  display: inline-flex;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.moodle-mode-btn {
+  border: none;
+  background: var(--surface);
+  color: var(--muted);
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.moodle-mode-btn + .moodle-mode-btn { border-left: 1px solid var(--border); }
+.moodle-mode-btn:hover { background: var(--hover); }
+.moodle-mode-btn.active { background: var(--primary); color: var(--on-accent); }
+
+/* Moodle raw import: one row per Moodle module, each carrying its own week and
+   its own type. The per-section triage list styles its rows inline; this list
+   is denser and can run to dozens of rows, so it gets real classes instead. */
+.moodle-raw-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.moodle-raw-filter {
+  flex: 1;
+  min-width: 9rem;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: var(--text);
+  background: var(--surface);
+}
+.moodle-raw-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.moodle-raw-info { flex: 1; min-width: 0; }
+.moodle-raw-name,
+.moodle-raw-section {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.moodle-raw-name { font-size: 0.9rem; color: var(--text); }
+.moodle-raw-section { font-size: 0.75rem; color: var(--muted); }
+.moodle-raw-week {
+  flex: none;
+  width: 4.5rem;
+  padding: 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: var(--surface);
+}
+.moodle-raw-summary { font-size: 0.75rem; color: var(--muted); padding-top: 0.5rem; margin: 0; }
+.moodle-raw-empty { font-size: 0.85rem; color: var(--muted); padding: 1rem 0; margin: 0; text-align: center; }

@@ -9,6 +9,7 @@ const {
   parseSemesterFile,
   parseCourseFile,
   withResetStatuses,
+  withResetCourseItems,
   slugify,
   uniqueSemesterId,
   prepareImportedCourse,
@@ -66,6 +67,38 @@ describe('build (export) envelopes', () => {
     const clean = cleanCourse({ id: 'c2', name: 'Empty', color: '#000' });
     expect(clean.readings).toEqual([]);
     expect(clean.tasks).toEqual([]);
+  });
+
+  it('keeps the course exam date through cleanCourse/buildCourseFile', () => {
+    const clean = cleanCourse({ ...sampleCourse(), examDate: '2026-05-01' });
+    expect(clean.examDate).toBe('2026-05-01');
+    const file = buildCourseFile({ ...sampleCourse(), examDate: '2026-05-01' });
+    expect(file.course.examDate).toBe('2026-05-01');
+  });
+
+  it('cleanCourse defaults a missing exam date to empty string, not an absent key', () => {
+    const clean = cleanCourse(sampleCourse());
+    expect(clean.examDate).toBe('');
+    expect(clean).toHaveProperty('examDate');
+  });
+
+  it('keeps item notes through cleanCourse/buildCourseFile', () => {
+    const withNotes = sampleCourse();
+    withNotes.readings[0].note = 'skim the proofs';
+    withNotes.tasks[0].note = 'submit as a pair';
+    const clean = cleanCourse(withNotes);
+    expect(clean.readings[0].note).toBe('skim the proofs');
+    expect(clean.tasks[0].note).toBe('submit as a pair');
+    const file = buildCourseFile(withNotes);
+    expect(file.course.readings[0].note).toBe('skim the proofs');
+    expect(file.course.tasks[0].note).toBe('submit as a pair');
+  });
+
+  it('cleanCourse leaves the note key off items that have none', () => {
+    const clean = cleanCourse(sampleCourse());
+    expect(clean.readings[0]).not.toHaveProperty('note');
+    expect(clean.tasks[0]).not.toHaveProperty('note');
+    expect(clean.readings[0]).toEqual({ id: 'r-1', week: 1, title: 'Intro', status: 'r-studied' });
   });
 
   it('a built course file round-trips through parse', () => {
@@ -130,6 +163,35 @@ describe('withResetStatuses', () => {
   });
 });
 
+describe('withResetCourseItems', () => {
+  it('resets item statuses and clears task due dates without mutating input', () => {
+    const course = sampleCourse();
+    const reset = withResetCourseItems(course);
+    expect(reset.readings[0].status).toBe('r-pending');
+    expect(reset.tasks[0].status).toBe('t-pending');
+    expect(reset.tasks[0].dueDate).toBe('');
+    // input untouched
+    expect(course.readings[0].status).toBe('r-studied');
+    expect(course.tasks[0].status).toBe('t-done');
+    expect(course.tasks[0].dueDate).toBe('2025-04-14');
+  });
+
+  it('preserves every other field (ids, titles, weeks, course identity)', () => {
+    const reset = withResetCourseItems(sampleCourse());
+    expect(reset.id).toBe('c1');
+    expect(reset.name).toBe('Algorithms');
+    expect(reset.color).toBe('#4A90D9');
+    expect(reset.readings[0]).toMatchObject({ id: 'r-1', week: 1, title: 'Intro' });
+    expect(reset.tasks[0]).toMatchObject({ id: 't-1', week: 2, title: 'PS1' });
+  });
+
+  it('tolerates a course missing readings/tasks', () => {
+    const course = { id: 'c2', name: 'Empty' };
+    expect(() => withResetCourseItems(course)).not.toThrow();
+    expect(withResetCourseItems(course)).toEqual(course);
+  });
+});
+
 describe('slugify / uniqueSemesterId', () => {
   it('slugifies names and falls back to "semester"', () => {
     expect(slugify('Summer Semester 2025')).toBe('summer-semester-2025');
@@ -160,12 +222,46 @@ describe('prepareImportedCourse', () => {
     expect(out.tasks[0].dueDate).toBe('2025-04-14');
   });
 
+  it('preserves item notes untouched (they already ride along on the spread)', () => {
+    const makeId = (p) => `${p}-x`;
+    const withNotes = sampleCourse();
+    withNotes.readings[0].note = 'skim the proofs';
+    withNotes.tasks[0].note = 'submit as a pair';
+    const out = prepareImportedCourse(withNotes, makeId);
+    expect(out.readings[0].note).toBe('skim the proofs');
+    expect(out.tasks[0].note).toBe('submit as a pair');
+  });
+
+  it('an exported course round-trips its item notes back through import', () => {
+    const makeId = (p) => `${p}-x`;
+    const withNotes = sampleCourse();
+    withNotes.readings[0].note = 'skim the proofs';
+    const imported = prepareImportedCourse(parseCourseFile(buildCourseFile(withNotes)), makeId);
+    expect(imported.readings[0].note).toBe('skim the proofs');
+    expect(imported.tasks[0]).not.toHaveProperty('note');
+  });
+
   it('defaults the color and tolerates missing arrays', () => {
     const makeId = (p) => `${p}-x`;
     const out = prepareImportedCourse({ name: 'Bare' }, makeId);
     expect(out.color).toBe('#4A90D9');
     expect(out.readings).toEqual([]);
     expect(out.tasks).toEqual([]);
+  });
+
+  it('preserves the exam date, defaulting a missing one to empty string', () => {
+    const makeId = (p) => `${p}-x`;
+    const dated = prepareImportedCourse({ ...sampleCourse(), examDate: '2026-05-01' }, makeId);
+    expect(dated.examDate).toBe('2026-05-01');
+    const bare = prepareImportedCourse({ name: 'Bare' }, makeId);
+    expect(bare.examDate).toBe('');
+  });
+
+  it('an exported course round-trips its exam date back through import', () => {
+    const makeId = (p) => `${p}-x`;
+    const file = buildCourseFile({ ...sampleCourse(), examDate: '2026-05-01' });
+    const imported = prepareImportedCourse(parseCourseFile(file), makeId);
+    expect(imported.examDate).toBe('2026-05-01');
   });
 
   it('uses core uid when no id maker is supplied', () => {

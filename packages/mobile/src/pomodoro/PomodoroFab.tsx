@@ -5,9 +5,12 @@
 // for a phase that finished and is waiting on the "what's next?" answer —
 // tapping it re-opens that question.
 //
-// Sits above the "+" Fab (which keeps its own bottom offset), so the hosting
-// screen's list needs enough bottom padding for both — see the paddingBottom
-// bump in the screens that use it.
+// Lives in the bottom-LEFT corner, its own column: the timer button on the
+// baseline (level with the bottom-right "+" Fab, never overlapping it) and the
+// smaller study-time button stacked above it. The running pill is anchored by
+// its left edge only, so it grows rightwards into the empty middle of the
+// screen. The hosting screen's list still needs bottom padding to clear the
+// column — see the paddingBottom in the screens that use it.
 //
 // Every glyph here is drawn from plain Views (clock face, pause bars, play
 // triangle, stop square) rather than an emoji or an icon library, matching the
@@ -42,8 +45,11 @@ export function PomodoroFab({
 
   const idle = session.phase === 'idle';
   const focus = session.phase === 'work';
-  // Sits one FAB-height plus a gap above the "+" button.
-  const bottom = insets.bottom + 24 + 56 + 12;
+  // Baseline of the left column: the same 24pt above the safe area the "+" Fab
+  // uses on the right, so the two sit level.
+  const bottom = insets.bottom + 24;
+  // insets.left is 0 in portrait and picks up the notch in landscape.
+  const left = insets.left + 20;
 
   // How far through the current phase, 0..1. A paused session freezes because
   // `remaining` does; a finished one waiting on an answer reads as full.
@@ -71,7 +77,8 @@ export function PomodoroFab({
   // A smaller satellite above the timer button, in every state — the pill is
   // already carrying tap-to-pause, long-press-to-skip and stop, and study time
   // has to stay reachable while a session runs (that is where the course
-  // switcher lives).
+  // switcher lives). Nudged 6pt right of the column edge so its 44pt circle is
+  // centred over the 56pt timer button below it.
   const studyButton = (
     <Pressable
       onPress={() => setDashboardOpen(true)}
@@ -83,6 +90,7 @@ export function PomodoroFab({
         styles.studyFab,
         {
           bottom: bottom + 56 + 10,
+          left: left + 6,
           backgroundColor: theme.surface,
           borderColor: theme.border,
           borderWidth: StyleSheet.hairlineWidth,
@@ -132,6 +140,7 @@ export function PomodoroFab({
             styles.round,
             {
               bottom,
+              left,
               backgroundColor: theme.surface,
               borderColor: theme.border,
               borderWidth: StyleSheet.hairlineWidth,
@@ -163,7 +172,7 @@ export function PomodoroFab({
           style={({ pressed }) => [
             styles.fab,
             styles.pill,
-            { bottom, backgroundColor: DONE, borderWidth: 0 },
+            { bottom, left, backgroundColor: DONE, borderWidth: 0 },
             pressed && { opacity: 0.8 },
           ]}
         >
@@ -211,6 +220,7 @@ export function PomodoroFab({
           styles.pill,
           {
             bottom,
+            left,
             backgroundColor: onAccent ? theme.accent : theme.surface,
             borderColor: theme.accent,
             borderWidth: onAccent ? 0 : StyleSheet.hairlineWidth,
@@ -338,7 +348,12 @@ const DONE = '#e0952f';
 const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
-    right: 20,
+    // Left-anchored only: the pill's width follows its content and grows
+    // rightwards, into the gap before the bottom-right "+" Fab. Its widest form
+    // is an H:MM:SS clock (~160pt incl. glyph, stop square and padding), which
+    // still clears the "+" on a 320pt screen. The components override `left`
+    // with the safe-area-aware value.
+    left: 20,
     height: 56,
     alignItems: 'center',
     justifyContent: 'center',
@@ -349,8 +364,9 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   round: { width: 56, borderRadius: 28 },
-  // Smaller than the timer button and centred over it (right: 20 + (56-44)/2).
-  studyFab: { width: 44, height: 44, right: 26, borderRadius: 22 },
+  // Smaller than the timer button and centred over it (left + (56-44)/2, set
+  // inline alongside the safe-area offset).
+  studyFab: { width: 44, height: 44, borderRadius: 22 },
   barsWrap: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 15 },
   bar: { width: 4, borderRadius: 1.5 },
   pill: { flexDirection: 'row', gap: 10, borderRadius: 28, paddingHorizontal: 18 },

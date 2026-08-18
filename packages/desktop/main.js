@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, dialog, shell, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, dialog, shell, safeStorage, screen } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log/main');
 const fs = require('fs');
@@ -39,6 +39,15 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // Without this, Chromium throttles/suspends the renderer's timers
+      // (including the Pomodoro's setInterval tick loop in app.js) once the
+      // window is minimized, occluded, or unfocused — freezing both the
+      // header countdown and the Tray display, and delaying phase-complete
+      // detection (study-time credit, notification, advance modal) until
+      // the window regains focus. The session itself is deadline-based
+      // (see pomodoro-core.js), so this only affects how promptly ticks
+      // fire, never the correctness of the remaining time.
+      backgroundThrottling: false,
     },
   });
 
@@ -268,6 +277,107 @@ ipcMain.on('pomodoro-tray-report', (event, payload) => {
     paused: !!payload.paused,
   };
   refreshTray();
+});
+
+// ---------------------------------------------------------------------------
+// Pomodoro phase-complete popup
+//
+// The in-window "phase done — move on?" modal (pomodoro-advance-overlay in
+// index.html) only appears if the main window happens to be visible and
+// frontmost. This small always-on-top window makes sure the same question
+// reaches the user even when they're in another app or Space when a focus
+// block or break ends. It carries no session logic of its own — the
+// renderer computes the copy (see app.js's pomodoroAdvanceCopy) and passes
+// it over IPC; a button click here is relayed back to the renderer, which
+// is the only place confirmAdvance()/stopPomodoro() are actually called.
+// ---------------------------------------------------------------------------
+let popupWindow = null;
+let pendingPopupPayload = null;
+
+function closePomodoroPopup() {
+  if (popupWindow && !popupWindow.isDestroyed()) popupWindow.close();
+  popupWindow = null;
+  pendingPopupPayload = null;
+}
+
+// Steals focus from whatever app currently has it (macOS suppresses focus
+// stealing by default, so without this the popup can open behind the
+// active app) and brings the popup window to the front.
+function focusPomodoroPopup() {
+  if (!popupWindow || popupWindow.isDestroyed()) return;
+  if (process.platform === 'darwin') app.focus({ steal: true });
+  popupWindow.show();
+  popupWindow.focus();
+  popupWindow.moveTop();
+}
+
+function showPomodoroPopup(payload) {
+  pendingPopupPayload = payload;
+
+  if (popupWindow && !popupWindow.isDestroyed()) {
+    popupWindow.webContents.send('pomodoro-popup-data', payload);
+    focusPomodoroPopup();
+    return;
+  }
+
+  const width = 380;
+  const height = 260;
+  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const x = Math.round(display.bounds.x + (display.bounds.width - width) / 2);
+  const y = Math.round(display.bounds.y + (display.bounds.height - height) / 2);
+
+  popupWindow = new BrowserWindow({
+    width,
+    height,
+    x,
+    y,
+    frame: false,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    show: false,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload-pomodoro-popup.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      backgroundThrottling: false,
+    },
+  });
+
+  // Floats above other apps' windows too, not just Lectio's own — this is
+  // meant to read as a system alert, not a regular document window.
+  // macOS/Linux-only knobs; no-ops on Windows.
+  popupWindow.setAlwaysOnTop(true, 'floating');
+  popupWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
+  popupWindow.loadFile('pomodoro-popup.html');
+
+  popupWindow.webContents.once('did-finish-load', () => {
+    if (pendingPopupPayload) popupWindow.webContents.send('pomodoro-popup-data', pendingPopupPayload);
+    popupWindow.show();
+    focusPomodoroPopup();
+  });
+
+  popupWindow.on('closed', () => {
+    popupWindow = null;
+    pendingPopupPayload = null;
+  });
+}
+
+ipcMain.on('pomodoro-popup-show', (event, payload) => showPomodoroPopup(payload));
+ipcMain.on('pomodoro-popup-hide', () => closePomodoroPopup());
+ipcMain.on('pomodoro-popup-dismiss', () => closePomodoroPopup());
+ipcMain.on('pomodoro-popup-confirm', () => {
+  closePomodoroPopup();
+  sendToRenderer('popup-pomodoro-confirm');
+});
+ipcMain.on('pomodoro-popup-stop', () => {
+  closePomodoroPopup();
+  sendToRenderer('popup-pomodoro-stop');
 });
 
 // ---------------------------------------------------------------------------

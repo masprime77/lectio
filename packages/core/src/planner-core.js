@@ -111,6 +111,7 @@
     'alpha-asc',
     'week-asc',
     'week-desc',
+    'exam-asc',
   ];
 
   // Return a NEW sorted array of courses (never mutates input). Progress sorts
@@ -122,6 +123,19 @@
       return copy.sort((a, b) => courseProgress(a, semester) - courseProgress(b, semester));
     if (sortOrder === 'progress-desc')
       return copy.sort((a, b) => courseProgress(b, semester) - courseProgress(a, semester));
+    if (sortOrder === 'exam-asc') {
+      // Soonest exam first ('YYYY-MM-DD' compares correctly as a string);
+      // courses with no exam date sort after every dated one, and ties fall
+      // back to alphabetical like every other order here.
+      return copy.sort((a, b) => {
+        const ea = a.examDate || '';
+        const eb = b.examDate || '';
+        if (ea && eb) return ea === eb ? a.name.localeCompare(b.name) : ea < eb ? -1 : 1;
+        if (ea && !eb) return -1;
+        if (!ea && eb) return 1;
+        return a.name.localeCompare(b.name);
+      });
+    }
     // alpha-asc, week-asc and week-desc all use alphabetical (A → Z) order.
     // Any unknown/removed order (e.g. a stale 'alpha-desc') also lands here.
     return copy.sort((a, b) => a.name.localeCompare(b.name));
@@ -138,10 +152,18 @@
     return item;
   }
 
-  // Add a course with a generated unique id; returns the new course.
-  function addCourse(semester, { name, color }) {
+  // Add a course with a generated unique id; returns the new course. `examDate`
+  // is optional and defaults to '' (no exam date set).
+  function addCourse(semester, { name, color, examDate }) {
     if (!Array.isArray(semester.courses)) semester.courses = [];
-    const course = { id: uid('course'), name, color, readings: [], tasks: [] };
+    const course = {
+      id: uid('course'),
+      name,
+      color,
+      examDate: examDate || '',
+      readings: [],
+      tasks: [],
+    };
     semester.courses.push(course);
     return course;
   }
@@ -171,6 +193,15 @@
     return course;
   }
 
+  // Sets a course's exam date ('' clears it); returns the updated course,
+  // or null if not found. Mirrors editCourseColor.
+  function editCourseExamDate(semester, courseId, examDate) {
+    const course = getCourses(semester).find((c) => c.id === courseId);
+    if (!course) return null;
+    course.examDate = examDate || '';
+    return course;
+  }
+
   // Reorder courses to match the given ordered array of ids. Ids not present
   // are dropped; any courses missing from the list are appended (safety net).
   // Mirrors reorderTags.
@@ -185,30 +216,52 @@
     arr.splice(0, arr.length, ...reordered);
   }
 
+  // Character cap for an item's note (readings and tasks). Enforced here
+  // defensively (never trust a caller) and again live in each UI via a
+  // maxlength-style input constraint — this constant is the single source
+  // of truth for both.
+  const MAX_NOTE_LENGTH = 280;
+
+  // Clamp/normalize a note string: truncates to MAX_NOTE_LENGTH, and
+  // anything non-string or empty-after-truncation becomes ''. Never throws.
+  function clampNote(note) {
+    return typeof note === 'string' ? note.slice(0, MAX_NOTE_LENGTH) : '';
+  }
+
   // Add a reading or task to a course. Readings get status 'r-pending',
-  // tasks 't-pending' and a dueDate ('' when none). Returns the new item.
-  function addItem(course, kind, { title, week, dueDate }) {
+  // tasks 't-pending' and a dueDate ('' when none). An optional note rides
+  // along on either kind, present only when non-empty. Returns the new item.
+  function addItem(course, kind, { title, week, dueDate, note }) {
+    const trimmedNote = clampNote(note);
     if (kind === 'reading') {
       if (!Array.isArray(course.readings)) course.readings = [];
       const item = { id: uid('r'), week, title, status: 'r-pending' };
+      if (trimmedNote) item.note = trimmedNote;
       course.readings.push(item);
       return item;
     }
     if (!Array.isArray(course.tasks)) course.tasks = [];
     const item = { id: uid('t'), week, title, dueDate: dueDate || '', status: 't-pending' };
+    if (trimmedNote) item.note = trimmedNote;
     course.tasks.push(item);
     return item;
   }
 
-  // Patch an item's title / week / dueDate. Only provided fields change; an
-  // empty-string dueDate clears it (tasks only). Returns the item or null.
-  function editItem(course, kind, itemId, { title, week, dueDate }) {
+  // Patch an item's title / week / dueDate / note. Only provided fields
+  // change; an empty-string dueDate clears it (tasks only), and an
+  // empty-string note removes the note key entirely (both kinds).
+  function editItem(course, kind, itemId, { title, week, dueDate, note }) {
     const arr = (kind === 'reading' ? course.readings : course.tasks) || [];
     const item = arr.find((it) => it.id === itemId);
     if (!item) return null;
     if (typeof title === 'string' && title.trim()) item.title = title.trim();
     if (typeof week === 'number') item.week = week;
     if (kind === 'task' && dueDate !== undefined) item.dueDate = dueDate || '';
+    if (note !== undefined) {
+      const trimmed = clampNote(note);
+      if (trimmed) item.note = trimmed;
+      else delete item.note;
+    }
     return item;
   }
 
@@ -219,6 +272,37 @@
     if (idx === -1) return false;
     arr.splice(idx, 1);
     return true;
+  }
+
+  // Move an item between a course's readings and tasks — the transform behind
+  // the mobile batch "change kind" action. `toKind` is the kind the item should
+  // end up as; returns the moved item, or null when the id is unknown or the
+  // item already is that kind (both are no-ops).
+  //
+  // The id and title travel with the item, so anything holding the id (a batch
+  // selection, an export) still points at it. The tag cannot travel: reading
+  // tags and task tags are separate lists, so the item lands on the destination
+  // kind's pending tag and any ghost marker goes with the tag it belonged to.
+  // dueDate is task-only: a reading becoming a task starts with an empty one
+  // (like addItem), a task becoming a reading drops it.
+  function convertItemKind(course, itemId, toKind) {
+    const from = (toKind === 'reading' ? course.tasks : course.readings) || [];
+    const idx = from.findIndex((it) => it.id === itemId);
+    if (idx === -1) return null;
+    const [item] = from.splice(idx, 1);
+    if (toKind === 'reading') {
+      if (!Array.isArray(course.readings)) course.readings = [];
+      delete item.dueDate;
+      item.status = 'r-pending';
+      course.readings.push(item);
+    } else {
+      if (!Array.isArray(course.tasks)) course.tasks = [];
+      item.dueDate = typeof item.dueDate === 'string' ? item.dueDate : '';
+      item.status = 't-pending';
+      course.tasks.push(item);
+    }
+    delete item._ghostSection;
+    return item;
   }
 
   // Add a custom tag to a semester's tag list (`type` is 'reading' or 'task').
@@ -294,15 +378,18 @@
     courseProgress,
     courseBreakdown,
     SORT_ORDERS,
+    MAX_NOTE_LENGTH,
     sortedCourses,
     setItemStatus,
     addCourse,
     deleteCourse,
     editCourseName,
     editCourseColor,
+    editCourseExamDate,
     reorderCourses,
     addItem,
     editItem,
     deleteItem,
+    convertItemKind,
   };
 });
