@@ -80,6 +80,44 @@
     if (error) throw error;
   }
 
+  // Sends a password-reset code to `email`, if an account exists for it.
+  // Supabase deliberately does not reveal whether the address has an account —
+  // this resolves the same way either way (to prevent account enumeration), so
+  // any UI built on this must phrase the result as "if an account exists…",
+  // never as confirmation that one does.
+  //
+  // No redirectTo is passed: this app uses the OTP-code path, not the
+  // magic-link path. A reset link clicked from the user's own mail client is a
+  // real OS-level deep link, which would need lectio:// registered as a
+  // protocol handler — unlike the OAuth flow, where the app opens the URL in
+  // its own BrowserWindow and intercepts it. So the emailed link is never
+  // followed and there is no reason to point it anywhere. The Supabase
+  // project's "Reset Password" template must include {{ .Token }} for the user
+  // to see the code this flow asks them to type.
+  async function requestPasswordReset(email) {
+    const c = client();
+    if (!c) throw new Error('Cannot reach the server. Check your connection and try again.');
+    const { error } = await c.auth.resetPasswordForEmail(email);
+    if (error) throw error;
+  }
+
+  // Verifies the emailed code (establishing a recovery session for `email`)
+  // and immediately sets `newPassword`. Note: the moment verifyOtp() resolves,
+  // onAuthChange's listener sees a real session and the caller's UI may react
+  // to being signed in — independent of, and possibly before, this function's
+  // own updateUser() call finishes. That's fine: the user is correctly signed
+  // in either way, and if updateUser() rejects (e.g. a too-weak or breached
+  // password, if the project has that check enabled), the error still reaches
+  // the caller normally.
+  async function confirmPasswordReset(email, code, newPassword) {
+    const c = client();
+    if (!c) throw new Error('Cannot reach the server. Check your connection and try again.');
+    const { error: otpErr } = await c.auth.verifyOtp({ email, token: code, type: 'recovery' });
+    if (otpErr) throw otpErr;
+    const { error: pwErr } = await c.auth.updateUser({ password: newPassword });
+    if (pwErr) throw pwErr;
+  }
+
   // Mirror of the mobile AuthProvider account methods (same Supabase calls).
   // Supabase emails the new address; the change applies after the user confirms.
   async function updateEmail(newEmail) {
@@ -228,6 +266,10 @@
       return 'That email address looks invalid.';
     if (m.includes('for security purposes') || m.includes('rate limit') || status === 429)
       return 'Too many attempts. Please wait a minute and try again.';
+    if ((err && err.code === 'otp_expired') || m.includes('token has expired') || m.includes('otp_expired'))
+      return 'That code has expired. Request a new one.';
+    if (m.includes('token') && m.includes('invalid'))
+      return 'That code isn’t right. Double-check it and try again.';
     if (m.includes('signups not allowed'))
       return 'Account creation is currently disabled.';
     if (m.includes('manual linking is disabled'))
@@ -246,6 +288,8 @@
     signIn,
     signUp,
     signOut,
+    requestPasswordReset,
+    confirmPasswordReset,
     resendConfirmation,
     signInWithProvider,
     linkProvider,
