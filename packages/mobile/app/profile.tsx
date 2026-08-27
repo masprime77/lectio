@@ -1,10 +1,12 @@
 // Account hub: the signed-in email, change email, change password, delete account,
 // and sign out. Account deletion runs through a Supabase Edge Function (the anon key
 // can't delete its own auth user).
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { UserIdentity } from '@supabase/supabase-js';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,7 +21,8 @@ import { useTheme } from '../src/theme';
 
 export default function ProfileScreen() {
   const theme = useTheme();
-  const { session, signOut, updateEmail, updatePassword, deleteAccount } = useAuth();
+  const { session, signOut, updateEmail, updatePassword, deleteAccount, linkGoogle, linkApple, listIdentities, unlinkIdentity } =
+    useAuth();
 
   const currentEmail = session?.user?.email ?? 'Unknown account';
 
@@ -34,6 +37,73 @@ export default function ProfileScreen() {
   const [pwOpen, setPwOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  // Linked accounts
+  const [identities, setIdentities] = useState<UserIdentity[]>([]);
+  const [identitiesLoading, setIdentitiesLoading] = useState(true);
+  const [linkBusy, setLinkBusy] = useState<'google' | 'apple' | null>(null);
+
+  async function loadIdentities() {
+    setIdentitiesLoading(true);
+    try {
+      const list = await listIdentities();
+      setIdentities(list);
+    } catch (e) {
+      setError(friendlyAuthError(e));
+    } finally {
+      setIdentitiesLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadIdentities();
+  }, []);
+
+  // Supabase requires at least 2 identities to unlink one — mirror that rule
+  // here so Disconnect is never offered when it would just fail server-side.
+  const canUnlink = identities.length > 1;
+
+  async function handleLink(provider: 'google' | 'apple') {
+    setError(null);
+    setLinkBusy(provider);
+    try {
+      if (provider === 'google') await linkGoogle();
+      else await linkApple();
+      await loadIdentities();
+    } catch (e) {
+      setError(friendlyAuthError(e));
+    } finally {
+      setLinkBusy(null);
+    }
+  }
+
+  function handleUnlink(provider: 'google' | 'apple') {
+    const identity = identities.find((i) => i.provider === provider);
+    if (!identity) return;
+    Alert.alert(
+      'Disconnect account',
+      `Stop signing in with ${provider === 'google' ? 'Google' : 'Apple'}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Disconnect',
+          style: 'destructive',
+          onPress: async () => {
+            setError(null);
+            setLinkBusy(provider);
+            try {
+              await unlinkIdentity(identity);
+              await loadIdentities();
+            } catch (e) {
+              setError(friendlyAuthError(e));
+            } finally {
+              setLinkBusy(null);
+            }
+          },
+        },
+      ]
+    );
+  }
 
   async function handleChangeEmail() {
     setError(null);
@@ -203,6 +273,48 @@ export default function ProfileScreen() {
         </Pressable>
       )}
 
+      {/* Linked accounts */}
+      <Text style={[styles.sectionTitle, { color: theme.muted }]}>Linked accounts</Text>
+      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+        {identitiesLoading ? (
+          <ActivityIndicator color={theme.accent} />
+        ) : (
+          <>
+            {identities.find((i) => i.provider === 'email') ? (
+              <View style={styles.identityRow}>
+                <Text style={[styles.rowText, { color: theme.text }]}>Email &amp; password</Text>
+                <Text style={[styles.identityStatus, { color: theme.muted }]}>Active</Text>
+              </View>
+            ) : null}
+            {(['google', 'apple'] as const)
+              .filter((provider) => provider !== 'apple' || Platform.OS === 'ios')
+              .map((provider) => {
+                const identity = identities.find((i) => i.provider === provider);
+                const label = provider === 'google' ? 'Google' : 'Apple';
+                const busy = linkBusy === provider;
+                return (
+                  <View key={provider} style={styles.identityRow}>
+                    <Text style={[styles.rowText, { color: theme.text }]}>{label}</Text>
+                    {busy ? (
+                      <ActivityIndicator color={theme.accent} />
+                    ) : identity ? (
+                      <Pressable onPress={() => handleUnlink(provider)} disabled={!canUnlink} hitSlop={8}>
+                        <Text style={[styles.link, { color: canUnlink ? '#ef4444' : theme.muted }]}>
+                          Disconnect
+                        </Text>
+                      </Pressable>
+                    ) : (
+                      <Pressable onPress={() => handleLink(provider)} hitSlop={8}>
+                        <Text style={[styles.link, { color: theme.accent }]}>Connect</Text>
+                      </Pressable>
+                    )}
+                  </View>
+                );
+              })}
+          </>
+        )}
+      </View>
+
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {busy ? <ActivityIndicator color={theme.accent} style={{ marginTop: 4 }} /> : null}
 
@@ -255,6 +367,13 @@ const styles = StyleSheet.create({
   },
   rowText: { fontSize: 16, fontWeight: '600' },
   chevron: { fontSize: 20, fontWeight: '600' },
+  identityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  identityStatus: { fontSize: 13 },
   error: { color: '#e53e3e', fontSize: 13, textAlign: 'center' },
   dangerBtn: {
     height: 48,
