@@ -16,7 +16,7 @@
 #   MAC_CSC_P12_BASE64   ← the base64 blob
 #   MAC_CSC_PASSWORD     ← the .p12 password
 # The release workflow imports them and signs each build (see
-# .github/workflows/release.yml + docs/MACOS_SIGNING.md).
+# .github/workflows/release.yml + docs/guides/MACOS_SIGNING.md).
 #
 # Keep the generated .p12 safe and DO NOT commit it. If the cert is ever lost
 # or regenerated, the identity changes and users must reinstall once manually

@@ -105,7 +105,7 @@ is **not** yet possible on mobile.
 ## Desktop (`@lectio/desktop`)
 
 The desktop app is feature-complete for its own scope (see
-[`README.md`](../README.md) features and [`USER_STORIES.md`](USER_STORIES.md)).
+[`README.md`](../../README.md) features and [`USER_STORIES.md`](USER_STORIES.md)).
 The gaps are all about the new cross-device direction:
 
 - [ ] **Not wired to Supabase.** Desktop uses `fs-storage` only, so it does not
@@ -140,11 +140,11 @@ The gaps are all about the new cross-device direction:
 ## Moodle integration (Track C)
 
 Auto-populate a semester from a student's real Moodle courses instead of
-typing everything by hand. See `docs/MOODLE_INTEGRATION_SPIKE.md` for the
+typing everything by hand. See `docs/planning/MOODLE_INTEGRATION_SPIKE.md` for the
 design decision.
 
 - [x] **Phase 13 — design spike** — decision doc
-      (`docs/MOODLE_INTEGRATION_SPIKE.md`) and a throwaway PoC
+      (`docs/planning/MOODLE_INTEGRATION_SPIKE.md`) and a throwaway PoC
       (`spikes/moodle-poc/`), **validated live** against
       `moodle.informatik.tu-darmstadt.de` on two contrasting real courses
       (id 10, topic-structured; id 1998, date-range-structured). All Web

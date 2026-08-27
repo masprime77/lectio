@@ -18,7 +18,7 @@ branch is **`dev`**, with `main` reserved for releases.
   pipeline (desktop already; mobile via EAS once set up).
 - Keep: Conventional Commits, one concern per commit, append to
   `docs/RELEASE_NOTES.md` under `## Unreleased` in the last commit of each task,
-  and keep `docs/PENDING_FEATURES.md` updated (tick items as they land).
+  and keep `docs/planning/PENDING_FEATURES.md` updated (tick items as they land).
 
 Current baseline (verified): monorepo with `@lectio/core`, `@lectio/desktop`
 (Electron, fs-storage, feature-complete), `@lectio/mobile` (Expo SDK 56, Expo
