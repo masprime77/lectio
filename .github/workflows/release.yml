@@ -37,7 +37,7 @@ jobs:
       # afterPack via MAC_SIGN_IDENTITY. This gives every release a STABLE
       # signing identity, which is what lets Squirrel.Mac auto-update between
       # builds. Without the secret this step is skipped and the build falls back
-      # to ad-hoc signing. See docs/MACOS_SIGNING.md.
+      # to ad-hoc signing. See docs/guides/MACOS_SIGNING.md.
       #
       # Skipped entirely when CSC_LINK is configured: on the real Developer ID
       # path afterPack no-ops, so MAC_SIGN_IDENTITY would go unused anyway, and
@@ -98,7 +98,7 @@ jobs:
           # automatically — downloads open with no Gatekeeper warning for any
           # user. When unset (e.g. secrets not configured), afterPack.js falls
           # back automatically to the persistent self-signed identity (or
-          # ad-hoc) — see docs/MACOS_SIGNING.md.
+          # ad-hoc) — see docs/guides/MACOS_SIGNING.md.
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}

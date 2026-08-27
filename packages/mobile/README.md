@@ -26,4 +26,4 @@ From the repo root: `npm run mobile` (or `npm run mobile:ios` /
 
 Early preview — browse semesters/courses, view progress, and tap items to cycle
 tags. Content editing and the other desktop features are not ported yet; gaps
-are tracked in [`../../docs/PENDING_FEATURES.md`](../../docs/PENDING_FEATURES.md).
+are tracked in [`../../docs/planning/PENDING_FEATURES.md`](../../docs/planning/PENDING_FEATURES.md).

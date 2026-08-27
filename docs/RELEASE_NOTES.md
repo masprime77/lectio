@@ -1,5 +1,36 @@
 ## Unreleased
 
+- Changed (docs): reorganized the 11 loose Markdown files under `docs/` into
+  three themed subfolders — `planning/` (roadmap, pending features, user
+  stories, tutorial steps, testing checklist, Moodle spike), `guides/`
+  (macOS signing, updating the icon), and `archive/` (pre-launch changelog,
+  GitHub release template). Purely structural: no document contents changed.
+
+- Changed (docs): `RELEASE_NOTES.md`, `index.html`, `.nojekyll`,
+  `brand_images/`, and `legal/` deliberately stay at the `docs/` root —
+  GitHub Pages serves `index.html` from that folder, `brand_images/` is
+  referenced relatively from it, `legal/` is read at runtime by the desktop
+  main process and copied via `extraResources`, and the repo's task
+  convention appends to `docs/RELEASE_NOTES.md` at that exact path.
+
+- Fixed (docs): repointed every cross-reference to the moved files across
+  `README.md` (including its repo-tree diagram) and `CLAUDE.md`, the moved
+  docs themselves, `packages/mobile/README.md`,
+  `packages/core/src/integrations/moodle{,-sso,-client}.js`,
+  `packages/desktop/build/afterPack.js` / `afterSign.js`,
+  `.github/workflows/release.yml`, `scripts/gen-macos-signing-cert.sh`, and
+  `spikes/moodle-poc/`. Source-code changes are comment/log text only.
+
+- Fixed (docs): relative links that broke from the extra directory level —
+  `PENDING_FEATURES.md` → `README.md`, `UPDATING_THE_ICON.md` → three
+  `packages/desktop/assets/` scripts, `MOODLE_INTEGRATION_SPIKE.md` →
+  `CLAUDE.md`, and `CHANGELOG_PRE_LAUNCH.md` → `RELEASE_NOTES.md` now carry
+  the correct number of `../` segments.
+
+- Fixed (docs): `archive/GITHUB_RELEASE.md`'s "Full changelog" link pointed
+  at `docs/RELEASE_NOTES.md` from inside `docs/` itself, so it never
+  resolved — it now points at `../RELEASE_NOTES.md`.
+
 - Changed (desktop): the app icon is now the new brand artwork (a light rounded
   square with four colored progress-bar rows), replacing the navy notebook.
   `assets/icon.png` was swapped for the 1024x1024 source in `docs/brand_images/`
@@ -18,7 +49,7 @@
   the desktop icon: iOS and Android apply their own corner mask and reject/flatten
   transparency, so the mobile icon is the artwork composited onto an opaque
   `#F5F6F8` square (full-bleed, no alpha, no pre-rounded corners). The artwork
-  pixels themselves are unchanged. Documented in `docs/UPDATING_THE_ICON.md`.
+  pixels themselves are unchanged. Documented in `docs/guides/UPDATING_THE_ICON.md`.
 
 ## 1.1.3 — 2026-08-18
 
@@ -637,7 +668,7 @@ _Released: 2026-08-08_
 
 - Official 1.0.0 public launch of Lectio.
 - Archived the pre-1.0 development history (tags v1.0.0–v1.9.0) to
-  `docs/CHANGELOG_PRE_LAUNCH.md`.
+  `docs/archive/CHANGELOG_PRE_LAUNCH.md`.
 - Reset `version` to `1.0.0` in both the root `package.json` and
   `packages/desktop/package.json` ahead of the public launch.
-- Rewrote `docs/GITHUB_RELEASE.md` as the v1.0.0 release description.
+- Rewrote `docs/archive/GITHUB_RELEASE.md` as the v1.0.0 release description.
