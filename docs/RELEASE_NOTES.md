@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 1.1.4 — 2026-08-28
+
 - Added (desktop): a forgot-password flow on the sign-in screen. A "Forgot
   password?" link under the password field opens two new states in the same
   modal — request a code for an email address, then enter that code with a new
