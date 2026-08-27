@@ -10,9 +10,9 @@
   <meta property="og:title" content="Lectio — Plan your semester" />
   <meta property="og:description" content="A minimal desktop app for planning a university semester. Free for macOS and Windows." />
   <meta property="og:type" content="website" />
-  <meta property="og:image" content="icon.png" />
+  <meta property="og:image" content="brand_images/icon-512.png" />
 
-  <link rel="icon" href="icon.png" />
+  <link rel="icon" href="brand_images/icon-32.png" />
 
   <!-- Same fonts as the app: Inter (body) + Outfit (headings) -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -170,27 +170,6 @@
     .dl-btn .dl-text { display: flex; flex-direction: column; line-height: 1.15; text-align: left; }
     .dl-btn .dl-text small { font-weight: 500; font-size: 0.72rem; opacity: 0.85; }
 
-    /* ---- macOS warning ---- */
-    .mac-note {
-      max-width: 620px;
-      margin: 1.75rem auto 0;
-      background: var(--warn-bg);
-      border: 1px solid var(--warn-border);
-      border-radius: var(--radius);
-      padding: 1rem 1.15rem;
-      text-align: left;
-      font-size: 0.92rem;
-      color: var(--text);
-    }
-    .mac-note strong { color: var(--warn); }
-    .mac-note p { margin: 0.5rem 0 0; }
-    .mac-note code {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      background: rgba(127, 127, 127, 0.16);
-      padding: 0.1rem 0.4rem;
-      border-radius: 5px;
-      font-size: 0.85em;
-    }
     /* ---- Windows warning ---- */
     .win-note {
       max-width: 620px;
@@ -205,15 +184,6 @@
     }
     .win-note strong { color: var(--warn); }
     .win-note p { margin: 0.5rem 0 0; }
-    /* Placeholder block — replace the content, then optionally drop the dashed border. */
-    .placeholder {
-      margin-top: 0.75rem;
-      padding: 0.7rem 0.9rem;
-      border: 1px dashed var(--warn-border);
-      border-radius: 8px;
-      color: var(--muted);
-      font-size: 0.88rem;
-    }
 
     /* ---- Features ---- */
     .features {
@@ -272,7 +242,7 @@
 
   <header class="site-header">
     <div class="wrap">
-      <img src="icon.png" alt="Lectio logo" />
+      <img src="brand_images/icon-64.png" alt="Lectio logo" />
       <span class="name">Lectio</span>
       <span class="spacer"></span>
       <a class="gh-link" href="https://github.com/masprime77/lectio">GitHub ↗</a>
@@ -282,7 +252,7 @@
   <main>
     <section class="hero">
       <div class="wrap">
-        <img class="app-icon" src="icon.png" alt="Lectio app icon" />
+        <img class="app-icon" src="brand_images/icon-256.png" alt="Lectio app icon" />
         <h1>Plan your semester, calmly.</h1>
         <p class="tagline">
           A minimal desktop app for tracking courses, weekly readings, and tasks —
@@ -333,29 +303,6 @@
             font-weight: 600;
             cursor: pointer;
           ">Copy</button>
-        </div>
-
-        <!-- TODO: Delete this .mac-note block once (a) all five Apple
-             signing secrets are set in GitHub Actions and (b) a new release has
-             been cut with them in place, so downloads are actually notarized.
-             Until then this warning is accurate and should stay. -->
-        <div class="mac-note">
-          <strong>⚠️ macOS: one extra step on first launch.</strong>
-          <p>
-            Lectio isn't notarized by Apple, so Gatekeeper blocks it the first time.
-            After downloading, you'll need to explicitly allow it.
-          </p>
-          <div class="placeholder">
-            <strong>Option A — System Settings (recommended):</strong>
-            Open <em>System Settings → Privacy &amp; Security</em>, scroll down to the
-            Security section, and click <strong>"Open Anyway"</strong> next to the
-            Lectio message. Then launch the app again and confirm.
-            <p style="margin: 0.6rem 0 0;">
-              <strong>Option B — Terminal:</strong> If the button doesn't appear, run
-              <code>xattr -cr /Applications/Lectio.app</code> in Terminal, then open
-              the app normally.
-            </p>
-          </div>
         </div>
 
         <div class="win-note">

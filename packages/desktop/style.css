@@ -77,6 +77,9 @@
   --oauth-apple-bg: #ffffff;
   --oauth-apple-text: #000000;
 }
+[data-theme="dark"] .app-lockup { display: none; }
+[data-theme="dark"] .app-logo,
+[data-theme="dark"] .logo { display: block; }
 
 /* Auto — follow the system preference when no explicit theme is chosen. */
 @media (prefers-color-scheme: dark) {
@@ -107,6 +110,9 @@
     --oauth-apple-bg: #ffffff;
     --oauth-apple-text: #000000;
   }
+  :root:not([data-theme]) .app-lockup { display: none; }
+  :root:not([data-theme]) .app-logo,
+  :root:not([data-theme]) .logo { display: block; }
 }
 
 * { box-sizing: border-box; }
@@ -215,6 +221,7 @@ body {
 .header label,
 .header .logo,
 .header .app-logo,
+.header .app-lockup,
 .header .save-status,
 .header .view-toggle,
 .header .collapse-toggle,
@@ -244,12 +251,24 @@ body.electron-app .header-inner { padding-left: 80px; }
   letter-spacing: -0.01em;
 }
 
-.logo { font-size: 1.2rem; margin: 0; }
+.logo { font-size: 1.2rem; margin: 0; display: none; }
 .app-logo {
   width: 28px;
   height: 28px;
   border-radius: 7px;
   flex-shrink: 0;
+  display: none;
+}
+/* Combined logo + wordmark art (docs/brand_images/lockup.png).
+   Shown in Light theme (and Auto resolving to light). Its
+   "Lectio" wordmark is fixed dark text with no dark-theme
+   variant, so Dark theme (and Auto resolving to dark) falls
+   back to .app-logo + .logo instead, which use theme-aware
+   colors — see the [data-theme="dark"] and
+   prefers-color-scheme blocks near the top of this file. */
+.app-lockup {
+  height: 28px;
+  width: auto;
   display: block;
 }
 .header-left { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
@@ -1404,6 +1423,23 @@ body.electron-app .header-inner { padding-left: 80px; }
 .legal-notice a { color: var(--primary); text-decoration: none; }
 .legal-notice a:hover { text-decoration: underline; }
 
+/* Plain-text button that reads as a link — used for "Forgot password?" under
+   the sign-in password field. No existing class strips native <button> chrome
+   down to link styling. */
+.text-link-btn {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: -0.5rem 0 0.8rem;
+  color: var(--primary);
+  font-size: 0.8rem;
+  text-align: right;
+  cursor: pointer;
+}
+.text-link-btn:hover { text-decoration: underline; }
+
 .oauth-divider {
   display: flex;
   align-items: center;
@@ -1619,6 +1655,42 @@ body.electron-app .header-inner { padding-left: 80px; }
 .settings-row:last-child { border-bottom: none; }
 .settings-label { font-size: 0.95rem; }
 .settings-value { color: var(--muted); font-size: 0.9rem; }
+
+/* Linked accounts (Profile) — one compact row per identity: the account's
+   email/password identity (status only, no action — managed via the
+   Change email/password fields above) and each OAuth provider (Connect /
+   Disconnect). Deliberately smaller than .oauth-buttons/.btn-oauth, which
+   are sized as full-width primary actions for the sign-in screen. */
+.linked-accounts-list { display: flex; flex-direction: column; }
+.linked-account-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.linked-account-row:last-child { border-bottom: none; }
+.linked-account-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.linked-account-icon img { width: 18px; height: 18px; display: block; }
+/* .apple-icon paints itself with --oauth-apple-text, which is inverted for
+   the black/white sign-in button (white in light theme, black in dark) and so
+   would be invisible on the modal surface. Repaint it in the body text color. */
+.linked-account-icon .apple-icon {
+  width: 14px;
+  height: 17px;
+  background-color: var(--text);
+}
+.linked-account-label { font-size: 0.9rem; flex: 1; }
+.linked-account-status { color: var(--muted); font-size: 0.8rem; }
 
 /* Feedback modal */
 .feedback-type-toggle { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
