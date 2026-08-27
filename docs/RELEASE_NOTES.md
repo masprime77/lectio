@@ -51,6 +51,20 @@
   `#F5F6F8` square (full-bleed, no alpha, no pre-rounded corners). The artwork
   pixels themselves are unchanged. Documented in `docs/guides/UPDATING_THE_ICON.md`.
 
+- Changed (mobile): the sign-in screen now shows `lockup.png` — the combined
+  icon + "Lectio" wordmark artwork — in place of the plain "Lectio" text
+  title. This is the app's only "Lectio"-branded header moment; the
+  navigation header shows per-screen titles and the `Lectio v{version}` lines
+  in Settings/Feedback are version metadata, so neither changed.
+
+- Changed (mobile): the lockup's wordmark is baked-in dark text with no dark
+  variant, so it renders only when `useColorScheme()` is not `'dark'`; dark
+  mode keeps the existing `<Text>` title with its theme-aware color. This
+  follows the light/dark swap the screen already uses for the Google sign-in
+  button — a runtime tint of an opaque bitmap wordmark isn't possible in
+  React Native. Sized with `aspectRatio` off the source's 1636:224 ratio, so
+  a single asset (no @2x/@3x) covers a 40px-tall render.
+
 ## 1.1.3 — 2026-08-18
 
 - Fixed: the "Changed on another device" conflict dialog no longer appears on
