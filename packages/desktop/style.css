@@ -1423,6 +1423,23 @@ body.electron-app .header-inner { padding-left: 80px; }
 .legal-notice a { color: var(--primary); text-decoration: none; }
 .legal-notice a:hover { text-decoration: underline; }
 
+/* Plain-text button that reads as a link — used for "Forgot password?" under
+   the sign-in password field. No existing class strips native <button> chrome
+   down to link styling. */
+.text-link-btn {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: -0.5rem 0 0.8rem;
+  color: var(--primary);
+  font-size: 0.8rem;
+  text-align: right;
+  cursor: pointer;
+}
+.text-link-btn:hover { text-decoration: underline; }
+
 .oauth-divider {
   display: flex;
   align-items: center;
