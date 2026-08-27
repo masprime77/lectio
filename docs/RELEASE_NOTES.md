@@ -1,5 +1,17 @@
 ## Unreleased
 
+- Added (desktop): password recovery in the renderer auth layer —
+  `lectioAuth.requestPasswordReset(email)` emails a 6-digit code, and
+  `confirmPasswordReset(email, code, newPassword)` verifies it and sets the new
+  password in one step. Uses Supabase's OTP-code path rather than the emailed
+  magic link, which would require registering `lectio://` as an OS-level
+  protocol handler; the code path works identically in dev and packaged builds
+  on every OS. Not yet called by any UI. Needs `{{ .Token }}` added to the
+  Supabase project's "Reset Password" email template.
+
+- Added (desktop): `friendlyAuthError()` now maps the two OTP failures — an
+  expired code and an incorrect one.
+
 - Added (desktop): a "Linked accounts" row in Settings → Profile listing every
   sign-in method on the account — the email/password identity (status only)
   plus Google and Apple, each with a Connect or Disconnect button. This is also
