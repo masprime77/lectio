@@ -1,5 +1,16 @@
 ## Unreleased
 
+- Added (desktop): identity-linking primitives in the renderer auth layer —
+  `lectioAuth.linkProvider(provider)` links a Google/Apple identity to the
+  signed-in account (reusing the same captured-BrowserWindow OAuth flow as
+  sign-in, so `main.js`/`preload.js` are untouched), `listIdentities()` reports
+  every sign-in method on the account, and `unlinkProvider(identity)` removes
+  one. Not yet called by any UI.
+
+- Added (desktop): `friendlyAuthError()` now maps the three linking-specific
+  Supabase failures — manual linking disabled for the project, an identity
+  already linked elsewhere, and refusing to remove the last remaining identity.
+
 - Changed (docs): reorganized the 11 loose Markdown files under `docs/` into
   three themed subfolders — `planning/` (roadmap, pending features, user
   stories, tutorial steps, testing checklist, Moodle spike), `guides/`

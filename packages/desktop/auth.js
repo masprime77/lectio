@@ -145,6 +145,68 @@
     throw new Error('Sign-in did not return a session.');
   }
 
+  // Links an OAuth identity to the CURRENTLY SIGNED-IN user. Same
+  // captured-BrowserWindow flow as signInWithProvider() above — linkIdentity()
+  // accepts the same credentials shape as signInWithOAuth() and returns the
+  // same { data: { url } } to redirect through, so this reuses
+  // window.providerAuth.captureRedirect unchanged. Requires "Enable Manual
+  // Linking" to be on in the Supabase project's Auth settings; if it's off,
+  // this rejects and friendlyAuthError() below reports that clearly. Requires
+  // an active session (always true here — only called from the Profile
+  // window).
+  async function linkProvider(provider) {
+    const c = client();
+    if (!c) throw new Error('Cannot reach the server. Check your connection and try again.');
+
+    const redirectTo = 'lectio://auth-callback';
+    const { data, error } = await c.auth.linkIdentity({
+      provider,
+      options: { redirectTo, skipBrowserRedirect: true },
+    });
+    if (error) throw error;
+    if (!data || !data.url) throw new Error('Could not start linking.');
+
+    const result = await window.providerAuth.captureRedirect(data.url);
+
+    if (result.type === 'code') {
+      const { error: exErr } = await c.auth.exchangeCodeForSession(result.code);
+      if (exErr) throw exErr;
+      return;
+    }
+    if (result.type === 'tokens') {
+      const { error: sErr } = await c.auth.setSession({
+        access_token: result.access_token,
+        refresh_token: result.refresh_token,
+      });
+      if (sErr) throw sErr;
+      return;
+    }
+    throw new Error('Linking did not complete.');
+  }
+
+  // All identities linked to the signed-in user, e.g.
+  // [{ provider: 'email', ... }, { provider: 'google', ... }]. Used by the
+  // Profile window to show which sign-in methods are active.
+  async function listIdentities() {
+    const c = client();
+    if (!c) return [];
+    const { data, error } = await c.auth.getUserIdentities();
+    if (error) throw error;
+    return (data && data.identities) || [];
+  }
+
+  // Unlinks one identity (pass an entry returned by listIdentities()).
+  // Supabase itself requires the user to have at least 2 linked identities
+  // before it allows removing one — calling this on the last one rejects
+  // server-side. The Profile UI also disables the button in that case; this is
+  // a second line of defense, not the only guard.
+  async function unlinkProvider(identity) {
+    const c = client();
+    if (!c) throw new Error('Cannot reach the server. Check your connection and try again.');
+    const { error } = await c.auth.unlinkIdentity(identity);
+    if (error) throw error;
+  }
+
   // Mirror of packages/mobile/src/auth/auth-errors.ts — kept identical by hand so
   // the two apps say the same thing (the desktop must not import from mobile).
   function friendlyAuthError(err) {
@@ -168,6 +230,12 @@
       return 'Too many attempts. Please wait a minute and try again.';
     if (m.includes('signups not allowed'))
       return 'Account creation is currently disabled.';
+    if (m.includes('manual linking is disabled'))
+      return 'Account linking isn’t turned on for this project yet.';
+    if (m.includes('already linked'))
+      return 'That account is already linked to a Lectio account — sign in with it directly instead.';
+    if (m.includes('must have at least') && m.includes('identit'))
+      return 'You need another way to sign in before removing this one.';
     return msg || 'Something went wrong. Please try again.';
   }
 
@@ -180,6 +248,9 @@
     signOut,
     resendConfirmation,
     signInWithProvider,
+    linkProvider,
+    listIdentities,
+    unlinkProvider,
     updateEmail,
     updatePassword,
     deleteAccount,
