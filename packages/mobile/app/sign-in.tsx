@@ -19,6 +19,7 @@ import { useTheme } from '../src/theme';
 
 const googleSignInLight = require('../assets/google-signin-light.png');
 const googleSignInDark = require('../assets/google-signin-dark.png');
+const lockup = require('../assets/lockup.png');
 
 // Supabase's "Email not confirmed" sign-in rejection — the same string
 // friendlyAuthError() maps, matched here so the kill switch can suppress it.
@@ -109,7 +110,16 @@ export default function SignInScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.card}>
-        <Text style={[styles.title, { color: theme.text }]}>Lectio</Text>
+        {scheme === 'dark' ? (
+          <Text style={[styles.title, { color: theme.text }]}>Lectio</Text>
+        ) : (
+          <Image
+            source={lockup}
+            style={styles.lockup}
+            resizeMode="contain"
+            accessibilityLabel="Lectio"
+          />
+        )}
         <Text style={[styles.subtitle, { color: theme.muted }]}>Sign in to sync your semesters</Text>
 
         <TextInput
@@ -231,6 +241,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   card: { width: '100%', maxWidth: 360, gap: 12 },
   title: { fontSize: 32, fontWeight: '700', textAlign: 'center', marginBottom: 4 },
+  lockup: { height: 40, aspectRatio: 1636 / 224, alignSelf: 'center', marginBottom: 4 },
   subtitle: { fontSize: 14, textAlign: 'center', marginBottom: 8 },
   input: {
     height: 48,
