@@ -77,6 +77,9 @@
   --oauth-apple-bg: #ffffff;
   --oauth-apple-text: #000000;
 }
+[data-theme="dark"] .app-lockup { display: none; }
+[data-theme="dark"] .app-logo,
+[data-theme="dark"] .logo { display: block; }
 
 /* Auto — follow the system preference when no explicit theme is chosen. */
 @media (prefers-color-scheme: dark) {
@@ -107,6 +110,9 @@
     --oauth-apple-bg: #ffffff;
     --oauth-apple-text: #000000;
   }
+  :root:not([data-theme]) .app-lockup { display: none; }
+  :root:not([data-theme]) .app-logo,
+  :root:not([data-theme]) .logo { display: block; }
 }
 
 * { box-sizing: border-box; }
@@ -215,6 +221,7 @@ body {
 .header label,
 .header .logo,
 .header .app-logo,
+.header .app-lockup,
 .header .save-status,
 .header .view-toggle,
 .header .collapse-toggle,
@@ -244,12 +251,24 @@ body.electron-app .header-inner { padding-left: 80px; }
   letter-spacing: -0.01em;
 }
 
-.logo { font-size: 1.2rem; margin: 0; }
+.logo { font-size: 1.2rem; margin: 0; display: none; }
 .app-logo {
   width: 28px;
   height: 28px;
   border-radius: 7px;
   flex-shrink: 0;
+  display: none;
+}
+/* Combined logo + wordmark art (docs/brand_images/lockup.png).
+   Shown in Light theme (and Auto resolving to light). Its
+   "Lectio" wordmark is fixed dark text with no dark-theme
+   variant, so Dark theme (and Auto resolving to dark) falls
+   back to .app-logo + .logo instead, which use theme-aware
+   colors — see the [data-theme="dark"] and
+   prefers-color-scheme blocks near the top of this file. */
+.app-lockup {
+  height: 28px;
+  width: auto;
   display: block;
 }
 .header-left { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }

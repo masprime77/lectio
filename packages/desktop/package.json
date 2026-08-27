@@ -110,6 +110,7 @@
       "moodle-client.js",
       "semesters/",
       "assets/icon.png",
+      "assets/lockup.png",
       "assets/pomodoro-tray-icon.png",
       "assets/pomodoro-tray-icon@2x.png",
       "assets/google-logo.svg",
