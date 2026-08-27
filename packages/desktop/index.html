@@ -39,6 +39,7 @@
             <input type="password" id="signin-password" autocomplete="current-password"
                    placeholder="Password" required />
           </label>
+          <button type="button" id="signin-forgot-link" class="text-link-btn">Forgot password?</button>
           <span id="signin-error" class="hidden"
                 style="display:block;font-size:0.8rem;color:var(--danger);margin-top:0.4rem;"></span>
           <p class="legal-notice">
@@ -80,6 +81,51 @@
         <div class="modal-actions">
           <button type="button" id="signin-confirm-back" class="btn">Back to sign in</button>
           <button type="button" id="signin-confirm-resend" class="btn btn-primary">Resend email</button>
+        </div>
+      </div>
+      <!-- Forgot password, step 1: request a code emailed to the address. -->
+      <div id="signin-recover" class="signin-confirm hidden">
+        <p class="signin-confirm-text">
+          Enter your account email. If an account exists for that address,
+          we'll send a 6-digit code to reset your password.
+        </p>
+        <label>
+          Email
+          <input type="email" id="recover-email" autocomplete="username" placeholder="you@example.com" />
+        </label>
+        <span id="signin-recover-status" class="signin-confirm-status hidden"></span>
+        <div class="modal-actions">
+          <button type="button" id="signin-recover-back" class="btn">Back to sign in</button>
+          <button type="button" id="signin-recover-send" class="btn btn-primary">Send code</button>
+        </div>
+      </div>
+
+      <!-- Forgot password, step 2: enter the emailed code + a new password. -->
+      <div id="signin-recover-code" class="signin-confirm hidden">
+        <p class="signin-confirm-text">
+          If an account exists for
+          <strong id="signin-recover-code-email"></strong>,
+          a code was just sent. Enter it below along with a new password.
+        </p>
+        <label>
+          Code
+          <input type="text" id="recover-code" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" />
+        </label>
+        <label>
+          New password
+          <input type="password" id="recover-new-pass" autocomplete="new-password" placeholder="New password" />
+        </label>
+        <label>
+          Confirm new password
+          <input type="password" id="recover-new-pass-confirm" autocomplete="new-password" placeholder="Confirm new password" />
+        </label>
+        <span id="signin-recover-code-status" class="signin-confirm-status hidden"></span>
+        <div class="modal-actions">
+          <div class="modal-actions-left">
+            <button type="button" id="signin-recover-code-back" class="btn">Back to sign in</button>
+            <button type="button" id="signin-recover-code-resend" class="btn">Resend code</button>
+          </div>
+          <button type="button" id="signin-recover-code-submit" class="btn btn-primary">Reset password</button>
         </div>
       </div>
     </div>
