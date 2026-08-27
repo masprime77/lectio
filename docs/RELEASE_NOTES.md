@@ -51,6 +51,14 @@
   `#F5F6F8` square (full-bleed, no alpha, no pre-rounded corners). The artwork
   pixels themselves are unchanged. Documented in `docs/guides/UPDATING_THE_ICON.md`.
 
+- Fixed (site): removed the "macOS: one extra step on first launch" Gatekeeper
+  warning from the GitHub Pages download page, along with its now-dead
+  `.mac-note` and `.placeholder` CSS. Verified first against the actual
+  published artifact: the `Lectio-arm64.dmg` from release `v1.1.3` reports
+  `source=Notarized Developer ID` under `spctl -a -vvvv`, so Gatekeeper no
+  longer blocks it and the warning was stale. The Windows SmartScreen warning
+  is unrelated and stays — those builds remain unsigned by design.
+
 ## 1.1.3 — 2026-08-18
 
 - Fixed: the "Changed on another device" conflict dialog no longer appears on
