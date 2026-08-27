@@ -1,9 +1,16 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import type { Session } from '@supabase/supabase-js';
+import type { Session, UserIdentity } from '@supabase/supabase-js';
 import { createURL } from 'expo-linking';
 import { supabase, isSupabaseConfigured } from '../supabase/client';
 import { isExpoGo } from './env';
-import { signInWithProvider, signInWithAppleNative } from './oauth';
+import {
+  signInWithProvider,
+  signInWithAppleNative,
+  linkGoogle as linkGoogleIdentity,
+  linkAppleNative,
+  listIdentities,
+  unlinkProvider,
+} from './oauth';
 import { isConnectivityError } from './auth-errors';
 import { deleteAccount } from './account';
 
@@ -24,6 +31,10 @@ interface AuthContextValue {
   resendConfirmation(email: string): Promise<void>;
   signInWithGoogle(): Promise<void>;
   signInWithApple(): Promise<void>;
+  linkGoogle(): Promise<void>;
+  linkApple(): Promise<void>;
+  listIdentities(): Promise<UserIdentity[]>;
+  unlinkIdentity(identity: UserIdentity): Promise<void>;
   updateEmail(newEmail: string): Promise<void>;
   updatePassword(newPassword: string): Promise<void>;
   deleteAccount(): Promise<void>;
@@ -127,6 +138,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await signInWithAppleNative();
   }
 
+  // Same Expo Go guard as the sign-in paths above: both linking flows need the
+  // installed app (the browser round-trip / native Apple sheet).
+  async function linkGoogle() {
+    if (isExpoGo) throw new Error('Google linking needs the installed app (not Expo Go).');
+    await linkGoogleIdentity();
+  }
+
+  async function linkApple() {
+    if (isExpoGo) throw new Error('Apple linking needs the installed app (not Expo Go).');
+    await linkAppleNative();
+  }
+
   async function updateEmail(newEmail: string) {
     // Supabase sends a confirmation to the new address; the change applies after confirm.
     const { error } = await supabase.auth.updateUser({ email: newEmail });
@@ -153,6 +176,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         resendConfirmation,
         signInWithGoogle,
         signInWithApple,
+        linkGoogle,
+        linkApple,
+        listIdentities,
+        unlinkIdentity: unlinkProvider,
         updateEmail,
         updatePassword,
         deleteAccount,
