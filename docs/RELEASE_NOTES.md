@@ -1,5 +1,12 @@
 ## Unreleased
 
+- Added (desktop): a forgot-password flow on the sign-in screen. A "Forgot
+  password?" link under the password field opens two new states in the same
+  modal — request a code for an email address, then enter that code with a new
+  password — each with "Back to sign in" and inline errors. Resetting signs the
+  account straight in with the new password. Both panels say "if an account
+  exists for that address", since Supabase never reveals whether one does.
+
 - Added (desktop): password recovery in the renderer auth layer —
   `lectioAuth.requestPasswordReset(email)` emails a 6-digit code, and
   `confirmPasswordReset(email, code, newPassword)` verifies it and sets the new

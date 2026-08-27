@@ -6288,6 +6288,26 @@ function setupSignIn() {
   const resendBtn = document.getElementById('signin-confirm-resend');
   const backBtn = document.getElementById('signin-confirm-back');
 
+  const recoverEl = document.getElementById('signin-recover');
+  const recoverEmailEl = document.getElementById('recover-email');
+  const recoverStatusEl = document.getElementById('signin-recover-status');
+  const recoverBackBtn = document.getElementById('signin-recover-back');
+  const recoverSendBtn = document.getElementById('signin-recover-send');
+
+  const recoverCodeEl = document.getElementById('signin-recover-code');
+  const recoverCodeEmailEl = document.getElementById('signin-recover-code-email');
+  const recoverCodeInput = document.getElementById('recover-code');
+  const recoverNewPassEl = document.getElementById('recover-new-pass');
+  const recoverNewPassConfirmEl = document.getElementById('recover-new-pass-confirm');
+  const recoverCodeStatusEl = document.getElementById('signin-recover-code-status');
+  const recoverCodeBackBtn = document.getElementById('signin-recover-code-back');
+  const recoverCodeResendBtn = document.getElementById('signin-recover-code-resend');
+  const recoverCodeSubmitBtn = document.getElementById('signin-recover-code-submit');
+  const forgotLink = document.getElementById('signin-forgot-link');
+
+  // The address the recover-code state is about.
+  let recoverEmail = '';
+
   // The address the confirm state (and its Resend button) is about.
   let pendingEmail = '';
 
@@ -6312,6 +6332,16 @@ function setupSignIn() {
 
   // Swap the form area for "check your inbox". `note` is an optional lead-in
   // (used on the sign-in path, where the user did not just create the account).
+  // Every state the overlay can show. Each show* helper hides all of them and
+  // then reveals its own, so the modal is consistent no matter which state it
+  // was left in.
+  function hideAllPanels() {
+    formArea.classList.add('hidden');
+    confirmEl.classList.add('hidden');
+    recoverEl.classList.add('hidden');
+    recoverCodeEl.classList.add('hidden');
+  }
+
   function showConfirm(email, note) {
     pendingEmail = email;
     confirmEmailEl.textContent = email;
@@ -6321,7 +6351,7 @@ function setupSignIn() {
     errEl.classList.add('hidden');
     pwEl.value = '';
     titleEl.textContent = 'Confirm your email';
-    formArea.classList.add('hidden');
+    hideAllPanels();
     confirmEl.classList.remove('hidden');
   }
 
@@ -6329,10 +6359,42 @@ function setupSignIn() {
     pendingEmail = '';
     setConfirmStatus('', false);
     titleEl.textContent = 'Sign in to Lectio';
-    confirmEl.classList.add('hidden');
+    hideAllPanels();
     formArea.classList.remove('hidden');
   }
   resetSignInView = showForm;
+
+  function setRecoverStatus(msg, isError) {
+    recoverStatusEl.textContent = msg || '';
+    recoverStatusEl.classList.toggle('hidden', !msg);
+    recoverStatusEl.classList.toggle('is-error', !!isError);
+  }
+
+  function setRecoverCodeStatus(msg, isError) {
+    recoverCodeStatusEl.textContent = msg || '';
+    recoverCodeStatusEl.classList.toggle('hidden', !msg);
+    recoverCodeStatusEl.classList.toggle('is-error', !!isError);
+  }
+
+  function showRecover() {
+    recoverEmailEl.value = emailEl.value.trim();
+    setRecoverStatus('', false);
+    titleEl.textContent = 'Reset your password';
+    hideAllPanels();
+    recoverEl.classList.remove('hidden');
+  }
+
+  function showRecoverCode(email) {
+    recoverEmail = email;
+    recoverCodeEmailEl.textContent = email;
+    recoverCodeInput.value = '';
+    recoverNewPassEl.value = '';
+    recoverNewPassConfirmEl.value = '';
+    setRecoverCodeStatus('', false);
+    titleEl.textContent = 'Enter your code';
+    hideAllPanels();
+    recoverCodeEl.classList.remove('hidden');
+  }
 
   function setBusy(busy) {
     submitBtn.disabled = busy;
@@ -6444,6 +6506,73 @@ function setupSignIn() {
   document.getElementById('signin-impressum-link').addEventListener('click', (e) => {
     e.preventDefault();
     window.legalDocs.open('impressum');
+  });
+
+  forgotLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    errEl.classList.add('hidden');
+    showRecover();
+  });
+
+  recoverBackBtn.addEventListener('click', showForm);
+
+  recoverSendBtn.addEventListener('click', () => {
+    const email = recoverEmailEl.value.trim();
+    if (!email) {
+      setRecoverStatus('Enter your email first.', true);
+      return;
+    }
+    withBusy(recoverSendBtn, 'Sending…', async () => {
+      try {
+        await lectioAuth.requestPasswordReset(email);
+        showRecoverCode(email);
+      } catch (e) {
+        setRecoverStatus(lectioAuth.friendlyAuthError(e), true);
+      }
+    });
+  });
+
+  recoverCodeBackBtn.addEventListener('click', showForm);
+
+  recoverCodeResendBtn.addEventListener('click', () => {
+    withBusy(recoverCodeResendBtn, 'Sending…', async () => {
+      try {
+        await lectioAuth.requestPasswordReset(recoverEmail);
+        setRecoverCodeStatus('Sent — check your inbox (and your spam folder).', false);
+      } catch (e) {
+        setRecoverCodeStatus(lectioAuth.friendlyAuthError(e), true);
+      }
+    });
+  });
+
+  recoverCodeSubmitBtn.addEventListener('click', () => {
+    const code = recoverCodeInput.value.trim();
+    const np = recoverNewPassEl.value;
+    const cp = recoverNewPassConfirmEl.value;
+    if (!code) {
+      setRecoverCodeStatus('Enter the code we emailed you.', true);
+      return;
+    }
+    if (np.length < 6) {
+      setRecoverCodeStatus('Password is too short (minimum 6 characters).', true);
+      return;
+    }
+    if (np !== cp) {
+      setRecoverCodeStatus('Passwords do not match.', true);
+      return;
+    }
+    withBusy(recoverCodeSubmitBtn, 'Resetting…', async () => {
+      try {
+        await lectioAuth.confirmPasswordReset(recoverEmail, code, np);
+        // Success leaves the account signed in with the new password already
+        // set. onAuthChange -> handleSession() reacts to the new session on its
+        // own and hides this overlay — often a beat before this status message
+        // even has time to render. Nothing else to do here.
+        setRecoverCodeStatus('Password updated — signing you in…', false);
+      } catch (e) {
+        setRecoverCodeStatus(lectioAuth.friendlyAuthError(e), true);
+      }
+    });
   });
 }
 
