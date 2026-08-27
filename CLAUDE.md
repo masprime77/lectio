@@ -22,7 +22,7 @@ ships as two apps sharing one core:
 
 Sync is currently **mobile-only**: desktop still uses `fs-storage` and is not
 wired to Supabase, so cross-device sync works mobile↔mobile. Remaining gaps are
-tracked in [`docs/PENDING_FEATURES.md`](docs/PENDING_FEATURES.md).
+tracked in [`docs/planning/PENDING_FEATURES.md`](docs/planning/PENDING_FEATURES.md).
 
 ## Commands
 
@@ -122,7 +122,7 @@ enforced at construction by `assertStorage`. Every adapter migrates on load
 
 A reusable contract suite (`packages/core/tests/contract/storage-contract.js`)
 exercises the full surface; it runs against `fs-storage` today. The mobile
-adapters are not yet wired to it (see `docs/PENDING_FEATURES.md`).
+adapters are not yet wired to it (see `docs/planning/PENDING_FEATURES.md`).
 
 ## Mobile (`@lectio/mobile`)
 
@@ -216,7 +216,7 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
 - **Homebrew:** cask at `homebrew/Casks/lectio.rb` (installs the
   release `.zip`). After a release, `homebrew/sync-tap.sh` refreshes
   version/sha256 and publishes to `../homebrew-tap`.
-- **Icon:** see [`docs/UPDATING_THE_ICON.md`](docs/UPDATING_THE_ICON.md).
+- **Icon:** see [`docs/guides/UPDATING_THE_ICON.md`](docs/guides/UPDATING_THE_ICON.md).
 
 ## Gotchas
 
@@ -229,7 +229,7 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
   self-signed cert gives a **stable designated requirement** so Squirrel.Mac
   **auto-update works** between two self-signed builds — ad-hoc cannot
   auto-update (its requirement is pinned to each build's hash). See
-  [`docs/MACOS_SIGNING.md`](docs/MACOS_SIGNING.md). Setting `APPLE_TEAM_ID`
+  [`docs/guides/MACOS_SIGNING.md`](docs/guides/MACOS_SIGNING.md). Setting `APPLE_TEAM_ID`
   (+ certs) switches to real Developer ID signing + notarization
   (`packages/desktop/build/afterSign.js`).
 - **iCloud:** building inside an iCloud-synced folder (e.g. `~/Documents`) can

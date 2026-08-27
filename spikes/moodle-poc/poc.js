@@ -239,7 +239,7 @@ async function main() {
     console.log(`  skipped (${err.message}) — some sites disable this function`);
   }
 
-  console.log(`\nDone. Inspect the JSON files in ${OUTPUT_DIR} and fill in docs/MOODLE_INTEGRATION_SPIKE.md.`);
+  console.log(`\nDone. Inspect the JSON files in ${OUTPUT_DIR} and fill in docs/planning/MOODLE_INTEGRATION_SPIKE.md.`);
 }
 
 main().catch((err) => {

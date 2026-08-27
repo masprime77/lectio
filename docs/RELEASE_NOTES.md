@@ -1,5 +1,152 @@
 ## Unreleased
 
+## 1.1.4 — 2026-08-28
+
+- Added (desktop): a forgot-password flow on the sign-in screen. A "Forgot
+  password?" link under the password field opens two new states in the same
+  modal — request a code for an email address, then enter that code with a new
+  password — each with "Back to sign in" and inline errors. Resetting signs the
+  account straight in with the new password. Both panels say "if an account
+  exists for that address", since Supabase never reveals whether one does.
+
+- Added (desktop): password recovery in the renderer auth layer —
+  `lectioAuth.requestPasswordReset(email)` emails a 6-digit code, and
+  `confirmPasswordReset(email, code, newPassword)` verifies it and sets the new
+  password in one step. Uses Supabase's OTP-code path rather than the emailed
+  magic link, which would require registering `lectio://` as an OS-level
+  protocol handler; the code path works identically in dev and packaged builds
+  on every OS. Not yet called by any UI. Needs `{{ .Token }}` added to the
+  Supabase project's "Reset Password" email template.
+
+- Added (desktop): `friendlyAuthError()` now maps the two OTP failures — an
+  expired code and an incorrect one.
+
+- Added (desktop): a "Linked accounts" row in Settings → Profile listing every
+  sign-in method on the account — the email/password identity (status only)
+  plus Google and Apple, each with a Connect or Disconnect button. This is also
+  how you see which sign-in methods are currently active. Disconnect is
+  disabled while only one identity remains, mirroring Supabase's own rule.
+
+- Added (desktop): identity-linking primitives in the renderer auth layer —
+  `lectioAuth.linkProvider(provider)` links a Google/Apple identity to the
+  signed-in account (reusing the same captured-BrowserWindow OAuth flow as
+  sign-in, so `main.js`/`preload.js` are untouched), `listIdentities()` reports
+  every sign-in method on the account, and `unlinkProvider(identity)` removes
+  one. Not yet called by any UI.
+
+- Added (desktop): `friendlyAuthError()` now maps the three linking-specific
+  Supabase failures — manual linking disabled for the project, an identity
+  already linked elsewhere, and refusing to remove the last remaining identity.
+
+- Changed (docs): reorganized the 11 loose Markdown files under `docs/` into
+  three themed subfolders — `planning/` (roadmap, pending features, user
+  stories, tutorial steps, testing checklist, Moodle spike), `guides/`
+  (macOS signing, updating the icon), and `archive/` (pre-launch changelog,
+  GitHub release template). Purely structural: no document contents changed.
+
+- Changed (docs): `RELEASE_NOTES.md`, `index.html`, `.nojekyll`,
+  `brand_images/`, and `legal/` deliberately stay at the `docs/` root —
+  GitHub Pages serves `index.html` from that folder, `brand_images/` is
+  referenced relatively from it, `legal/` is read at runtime by the desktop
+  main process and copied via `extraResources`, and the repo's task
+  convention appends to `docs/RELEASE_NOTES.md` at that exact path.
+
+- Fixed (docs): repointed every cross-reference to the moved files across
+  `README.md` (including its repo-tree diagram) and `CLAUDE.md`, the moved
+  docs themselves, `packages/mobile/README.md`,
+  `packages/core/src/integrations/moodle{,-sso,-client}.js`,
+  `packages/desktop/build/afterPack.js` / `afterSign.js`,
+  `.github/workflows/release.yml`, `scripts/gen-macos-signing-cert.sh`, and
+  `spikes/moodle-poc/`. Source-code changes are comment/log text only.
+
+- Fixed (docs): relative links that broke from the extra directory level —
+  `PENDING_FEATURES.md` → `README.md`, `UPDATING_THE_ICON.md` → three
+  `packages/desktop/assets/` scripts, `MOODLE_INTEGRATION_SPIKE.md` →
+  `CLAUDE.md`, and `CHANGELOG_PRE_LAUNCH.md` → `RELEASE_NOTES.md` now carry
+  the correct number of `../` segments.
+
+- Fixed (docs): `archive/GITHUB_RELEASE.md`'s "Full changelog" link pointed
+  at `docs/RELEASE_NOTES.md` from inside `docs/` itself, so it never
+  resolved — it now points at `../RELEASE_NOTES.md`.
+
+- Changed (desktop): the app icon is now the new brand artwork (a light rounded
+  square with four colored progress-bar rows), replacing the navy notebook.
+  `assets/icon.png` was swapped for the 1024x1024 source in `docs/brand_images/`
+  and `icon.icns` / `icon.ico` were regenerated from it with `npm run icons`.
+  The in-app header logo reads that same file, so it updates too.
+
+- Fixed (site): the GitHub Pages favicon, social-preview image, header logo, and
+  hero icon were all broken — they pointed at a bare `icon.png` that no longer
+  exists at the `docs/` root since the artwork moved into `docs/brand_images/`.
+  Each now points at the pre-baked size matching its display size: 32px favicon,
+  512px `og:image`, 64px header logo (rendered at 32px), and 256px hero icon
+  (rendered at 96px), so the two on-page images stay crisp on retina displays.
+
+- Changed (mobile): the Expo app icon is now the same new brand artwork as
+  desktop, replacing the navy notebook. It is deliberately **not** a byte copy of
+  the desktop icon: iOS and Android apply their own corner mask and reject/flatten
+  transparency, so the mobile icon is the artwork composited onto an opaque
+  `#F5F6F8` square (full-bleed, no alpha, no pre-rounded corners). The artwork
+  pixels themselves are unchanged. Documented in `docs/guides/UPDATING_THE_ICON.md`.
+
+- Changed (mobile): the sign-in screen now shows `lockup.png` — the combined
+  icon + "Lectio" wordmark artwork — in place of the plain "Lectio" text
+  title. This is the app's only "Lectio"-branded header moment; the
+  navigation header shows per-screen titles and the `Lectio v{version}` lines
+  in Settings/Feedback are version metadata, so neither changed.
+
+- Changed (mobile): the lockup's wordmark is baked-in dark text with no dark
+  variant, so it renders only when `useColorScheme()` is not `'dark'`; dark
+  mode keeps the existing `<Text>` title with its theme-aware color. This
+  follows the light/dark swap the screen already uses for the Google sign-in
+  button — a runtime tint of an opaque bitmap wordmark isn't possible in
+  React Native. Sized with `aspectRatio` off the source's 1636:224 ratio, so
+  a single asset (no @2x/@3x) covers a 40px-tall render.
+- Changed (desktop): the in-app header now shows `lockup.png` — the combined
+  icon + "Lectio" wordmark artwork — instead of the small icon next to a
+  separate "Lectio" heading. Both elements stay in the DOM and CSS picks one
+  per theme.
+
+- Changed (desktop): because the lockup's wordmark is baked-in dark text with
+  no dark variant, it is shown only in Light theme (and Auto resolving to
+  light); Dark theme (and Auto resolving to dark) falls back to the existing
+  icon + heading, which use theme-aware colors. A CSS `invert` filter was
+  deliberately not used — it would also invert the icon's colored bars.
+
+- Changed (desktop): `assets/lockup.png` was added to electron-builder's
+  `files` list so packaged builds bundle it, and `.app-lockup` was added to
+  the header's `no-drag` selector list so clicking it doesn't drag the window.
+- Fixed (site): removed the "macOS: one extra step on first launch" Gatekeeper
+  warning from the GitHub Pages download page, along with its now-dead
+  `.mac-note` and `.placeholder` CSS. Verified first against the actual
+  published artifact: the `Lectio-arm64.dmg` from release `v1.1.3` reports
+  `source=Notarized Developer ID` under `spctl -a -vvvv`, so Gatekeeper no
+  longer blocks it and the warning was stale. The Windows SmartScreen warning
+  is unrelated and stays — those builds remain unsigned by design.
+
+- Added (mobile): identity-linking primitives in the auth layer —
+  `linkGoogle()` links a Google identity to the signed-in account through the
+  same browser auth session as Google sign-in, `linkAppleNative()` links an
+  Apple identity from the native on-device sheet with no browser round-trip,
+  and `listIdentities()` / `unlinkProvider()` read and remove linked
+  identities. All four are exposed on the auth context as `linkGoogle`,
+  `linkApple`, `listIdentities`, and `unlinkIdentity`; the two link flows carry
+  the same "needs the installed app (not Expo Go)" guard as the sign-in paths.
+  Not yet called by any UI. Needs "Enable Manual Linking" turned on in the
+  Supabase project's Auth settings — the same project-wide toggle desktop uses.
+
+- Added (mobile): `friendlyAuthError()` now maps the three linking failures —
+  manual linking disabled for the project, an account already linked
+  elsewhere, and unlinking the last remaining identity — with the same wording
+  as the desktop app, which this file is kept in sync with by hand.
+
+- Added (mobile): a "Linked accounts" section in Profile listing every sign-in
+  method on the account — the email/password identity (status only) plus
+  Google, and Apple on iOS, each with a Connect or Disconnect action. This is
+  also how you see which sign-in methods are currently active. Disconnect is
+  disabled while only one identity remains, mirroring Supabase's own rule, and
+  linking or unlinking refreshes the list in place without leaving Profile.
+
 ## 1.1.3 — 2026-08-18
 
 - Fixed: the "Changed on another device" conflict dialog no longer appears on
@@ -617,7 +764,7 @@ _Released: 2026-08-08_
 
 - Official 1.0.0 public launch of Lectio.
 - Archived the pre-1.0 development history (tags v1.0.0–v1.9.0) to
-  `docs/CHANGELOG_PRE_LAUNCH.md`.
+  `docs/archive/CHANGELOG_PRE_LAUNCH.md`.
 - Reset `version` to `1.0.0` in both the root `package.json` and
   `packages/desktop/package.json` ahead of the public launch.
-- Rewrote `docs/GITHUB_RELEASE.md` as the v1.0.0 release description.
+- Rewrote `docs/archive/GITHUB_RELEASE.md` as the v1.0.0 release description.

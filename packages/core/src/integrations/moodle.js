@@ -1,7 +1,7 @@
 'use strict';
 // Pure, platform-free mapper from a Moodle `core_course_get_contents` response
 // to Lectio-shaped, type-agnostic import candidates. See
-// docs/MOODLE_INTEGRATION_SPIKE.md for the full design rationale.
+// docs/planning/MOODLE_INTEGRATION_SPIKE.md for the full design rationale.
 //
 // This module never classifies an item as a reading or a task — that choice
 // belongs to the user in the Phase 16 import UI. It only decides which raw
