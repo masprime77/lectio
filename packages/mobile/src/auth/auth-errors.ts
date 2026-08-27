@@ -23,6 +23,12 @@ export function friendlyAuthError(err: unknown): string {
     return 'Too many attempts. Please wait a minute and try again.';
   if (m.includes('signups not allowed'))
     return 'Account creation is currently disabled.';
+  if (m.includes('manual linking is disabled'))
+    return 'Account linking isn\u2019t turned on for this project yet.';
+  if (m.includes('already linked'))
+    return 'That account is already linked to a Lectio account \u2014 sign in with it directly instead.';
+  if (m.includes('must have at least') && m.includes('identit'))
+    return 'You need another way to sign in before removing this one.';
   return msg || 'Something went wrong. Please try again.';
 }
 

@@ -122,6 +122,22 @@
   longer blocks it and the warning was stale. The Windows SmartScreen warning
   is unrelated and stays — those builds remain unsigned by design.
 
+- Added (mobile): identity-linking primitives in the auth layer —
+  `linkGoogle()` links a Google identity to the signed-in account through the
+  same browser auth session as Google sign-in, `linkAppleNative()` links an
+  Apple identity from the native on-device sheet with no browser round-trip,
+  and `listIdentities()` / `unlinkProvider()` read and remove linked
+  identities. All four are exposed on the auth context as `linkGoogle`,
+  `linkApple`, `listIdentities`, and `unlinkIdentity`; the two link flows carry
+  the same "needs the installed app (not Expo Go)" guard as the sign-in paths.
+  Not yet called by any UI. Needs "Enable Manual Linking" turned on in the
+  Supabase project's Auth settings — the same project-wide toggle desktop uses.
+
+- Added (mobile): `friendlyAuthError()` now maps the three linking failures —
+  manual linking disabled for the project, an account already linked
+  elsewhere, and unlinking the last remaining identity — with the same wording
+  as the desktop app, which this file is kept in sync with by hand.
+
 ## 1.1.3 — 2026-08-18
 
 - Fixed: the "Changed on another device" conflict dialog no longer appears on
