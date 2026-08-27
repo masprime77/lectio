@@ -138,6 +138,13 @@
   elsewhere, and unlinking the last remaining identity — with the same wording
   as the desktop app, which this file is kept in sync with by hand.
 
+- Added (mobile): a "Linked accounts" section in Profile listing every sign-in
+  method on the account — the email/password identity (status only) plus
+  Google, and Apple on iOS, each with a Connect or Disconnect action. This is
+  also how you see which sign-in methods are currently active. Disconnect is
+  disabled while only one identity remains, mirroring Supabase's own rule, and
+  linking or unlinking refreshes the list in place without leaving Profile.
+
 ## 1.1.3 — 2026-08-18
 
 - Fixed: the "Changed on another device" conflict dialog no longer appears on
