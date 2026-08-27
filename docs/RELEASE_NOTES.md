@@ -64,6 +64,27 @@
   button — a runtime tint of an opaque bitmap wordmark isn't possible in
   React Native. Sized with `aspectRatio` off the source's 1636:224 ratio, so
   a single asset (no @2x/@3x) covers a 40px-tall render.
+- Changed (desktop): the in-app header now shows `lockup.png` — the combined
+  icon + "Lectio" wordmark artwork — instead of the small icon next to a
+  separate "Lectio" heading. Both elements stay in the DOM and CSS picks one
+  per theme.
+
+- Changed (desktop): because the lockup's wordmark is baked-in dark text with
+  no dark variant, it is shown only in Light theme (and Auto resolving to
+  light); Dark theme (and Auto resolving to dark) falls back to the existing
+  icon + heading, which use theme-aware colors. A CSS `invert` filter was
+  deliberately not used — it would also invert the icon's colored bars.
+
+- Changed (desktop): `assets/lockup.png` was added to electron-builder's
+  `files` list so packaged builds bundle it, and `.app-lockup` was added to
+  the header's `no-drag` selector list so clicking it doesn't drag the window.
+- Fixed (site): removed the "macOS: one extra step on first launch" Gatekeeper
+  warning from the GitHub Pages download page, along with its now-dead
+  `.mac-note` and `.placeholder` CSS. Verified first against the actual
+  published artifact: the `Lectio-arm64.dmg` from release `v1.1.3` reports
+  `source=Notarized Developer ID` under `spctl -a -vvvv`, so Gatekeeper no
+  longer blocks it and the warning was stale. The Windows SmartScreen warning
+  is unrelated and stays — those builds remain unsigned by design.
 
 ## 1.1.3 — 2026-08-18
 
