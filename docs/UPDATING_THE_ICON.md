@@ -6,7 +6,11 @@ The macOS app icon **and** the DMG volume icon both come from a single file,
 `packages/desktop/package.json` already points both `build.mac.icon` and
 `build.dmg.icon` at `assets/icon.icns`.
 
-All paths below are relative to the desktop workspace
+The **mobile** app has a separate icon file with different rules — see
+[Mobile (`@lectio/mobile`)](#mobile-lectiomobile) below.
+
+Except in the mobile section (whose paths are repo-root-relative), all paths
+below are relative to the desktop workspace
 (`packages/desktop/`); the icon scripts live there, so run them with
 `--workspace @lectio/desktop` from the repo root (the root `package.json` has no
 `icon` alias).
@@ -115,6 +119,47 @@ node_modules/.bin/electron packages/desktop/assets/generate-dmg-background.js
 | `packages/desktop/assets/dmg-background.png` / `@2x` | DMG window background |
 | `packages/desktop/assets/generate-dmg-background.js` | DMG background generator |
 | `packages/desktop/package.json` → `build.mac.icon`, `build.dmg.icon` | Point at `assets/icon.icns` |
+| `packages/mobile/assets/icon.png` | 1024×1024 full-bleed, **no-alpha** mobile icon (committed); `app.json` → `expo.icon` |
+
+## Mobile (`@lectio/mobile`)
+
+The Expo app has its **own** icon file, `packages/mobile/assets/icon.png`
+(referenced by `expo.icon` in `packages/mobile/app.json`). It is **not** the
+same file as the desktop one and must **not** be a straight copy of it:
+
+- **Full-bleed, no rounded corners.** Unlike macOS, iOS and Android apply their
+  own mask to the icon. Shipping artwork that already has rounded corners rounds
+  it twice.
+- **No alpha channel.** App Store validation rejects icons with transparency,
+  and Expo's iOS icon generation flattens any transparency onto **white**
+  (`removeTransparency: true`, `backgroundColor: '#ffffff'` in
+  `@expo/prebuild-config`'s `withIosIcons`) — which would leave white corners
+  against this brand's off-white body.
+
+So the mobile icon is the shared brand artwork composited onto an opaque
+background of its own body color (`#F5F6F8`), which turns the rounded square
+into a seamless full-bleed square without touching a single pixel of the
+artwork itself:
+
+```bash
+magick docs/brand_images/icon.png \
+  -background '#F5F6F8' -alpha remove -alpha off -strip \
+  PNG24:packages/mobile/assets/icon.png
+```
+
+Verify the result is `1024 x 1024, 8-bit/color RGB` (RGB, *not* RGBA):
+
+```bash
+file packages/mobile/assets/icon.png
+```
+
+The icon only shows up in a real build (EAS / dev client) — **Expo Go shows its
+own icon**, so you cannot check this one with `npm run mobile`.
+
+Android currently has no `android.adaptiveIcon` block in `app.json`, so Expo
+generates the legacy + round launcher icons from this same file. Adding an
+adaptive icon later would need a separate foreground asset padded for Android's
+safe zone (the outer ~25% gets cropped), not this full-bleed square.
 
 ## Shipping the new icon
 
