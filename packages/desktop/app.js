@@ -5785,6 +5785,99 @@ function closeProfileModal() {
 
 // Open the Profile sub-window (parity with the mobile Profile hub): pops Settings,
 // populates the email, resets the fields, and re-attaches the action listeners.
+// Providers shown in the Linked accounts list, in display order. 'email' is
+// rendered separately below (status-only, no button) since it isn't managed
+// through linkIdentity/unlinkIdentity — see auth.js's updateEmail/updatePassword.
+const LINKABLE_PROVIDERS = [
+  { id: 'google', label: 'Google', icon: '<img src="assets/google-logo.svg" width="18" height="18" alt="">' },
+  { id: 'apple', label: 'Apple', icon: '<span class="apple-icon" aria-hidden="true"></span>' },
+];
+
+// Renders the Linked accounts list from the account's current identities and
+// wires each row's Connect/Disconnect button. Called on every Profile-window
+// open (openProfileModal) and again after a successful link/unlink so the
+// list reflects the change immediately.
+async function renderLinkedAccounts() {
+  const listEl = document.getElementById('linked-accounts-list');
+  if (!listEl) return;
+  listEl.innerHTML = '<span class="settings-value">Loading…</span>';
+
+  let identities = [];
+  try {
+    identities = await lectioAuth.listIdentities();
+  } catch (e) {
+    listEl.innerHTML = '';
+    setAccountStatus(lectioAuth.friendlyAuthError(e), true);
+    return;
+  }
+
+  // Supabase requires at least 2 identities to unlink one — mirror that
+  // rule in the UI so the button is never offered when it would just fail.
+  const canUnlink = identities.length > 1;
+  listEl.innerHTML = '';
+
+  const emailIdentity = identities.find((i) => i.provider === 'email');
+  if (emailIdentity) {
+    const row = document.createElement('div');
+    row.className = 'linked-account-row';
+    row.innerHTML = `
+      <span class="linked-account-icon">✉</span>
+      <span class="linked-account-label">Email &amp; password</span>
+      <span class="linked-account-status">Active</span>
+    `;
+    listEl.appendChild(row);
+  }
+
+  LINKABLE_PROVIDERS.forEach(({ id, label, icon }) => {
+    const identity = identities.find((i) => i.provider === id);
+    const row = document.createElement('div');
+    row.className = 'linked-account-row';
+    row.dataset.provider = id;
+    if (identity) {
+      row.innerHTML = `
+        <span class="linked-account-icon">${icon}</span>
+        <span class="linked-account-label">${label}</span>
+        <span class="linked-account-status">Connected</span>
+        <button type="button" class="btn btn-small linked-account-action" data-action="unlink" ${canUnlink ? '' : 'disabled'}>Disconnect</button>
+      `;
+    } else {
+      row.innerHTML = `
+        <span class="linked-account-icon">${icon}</span>
+        <span class="linked-account-label">${label}</span>
+        <span class="linked-account-status">Not connected</span>
+        <button type="button" class="btn btn-small linked-account-action" data-action="link">Connect</button>
+      `;
+    }
+    listEl.appendChild(row);
+  });
+
+  listEl.querySelectorAll('.linked-account-action').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const provider = btn.closest('.linked-account-row').dataset.provider;
+      const action = btn.dataset.action;
+      withBusy(btn, action === 'link' ? 'Connecting…' : 'Removing…', async () => {
+        try {
+          if (action === 'link') {
+            await lectioAuth.linkProvider(provider);
+          } else {
+            const current = await lectioAuth.listIdentities();
+            const target = current.find((i) => i.provider === provider);
+            if (!target) throw new Error('That account is not linked.');
+            await lectioAuth.unlinkProvider(target);
+          }
+          setAccountStatus(
+            action === 'link' ? `${provider} connected.` : `${provider} disconnected.`,
+            false
+          );
+          await renderLinkedAccounts();
+        } catch (e) {
+          setAccountStatus(lectioAuth.friendlyAuthError(e), true);
+        }
+      });
+    });
+  });
+}
+
 async function openProfileModal() {
   closeSettingsModal(); // Profile replaces Settings; closeProfileModal pops back.
 
@@ -5798,6 +5891,7 @@ async function openProfileModal() {
   document.getElementById('set-pass-new').value = '';
   document.getElementById('set-pass-confirm').value = '';
   setAccountStatus('');
+  await renderLinkedAccounts();
 
   // Change email: Supabase emails the new address; the change applies after confirm.
   rewireButton('set-email-save', (btn) => {

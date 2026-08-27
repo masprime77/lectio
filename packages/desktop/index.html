@@ -548,6 +548,15 @@
         <button type="button" id="set-pass-save" class="btn btn-small" style="align-self:flex-end;">Save password</button>
       </div>
 
+      <!-- Every sign-in method on the account: the email/password identity
+           (status only — managed by the two rows above) plus each OAuth
+           provider, with Connect / Disconnect. Populated by
+           renderLinkedAccounts() in app.js on every Profile open. -->
+      <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:0.4rem;">
+        <span class="settings-label">Linked accounts</span>
+        <div id="linked-accounts-list" class="linked-accounts-list"></div>
+      </div>
+
       <div class="settings-row" style="padding-top:0;">
         <span id="set-account-status" class="hidden" style="font-size:0.8rem;color:var(--muted);"></span>
       </div>
