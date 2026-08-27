@@ -49,7 +49,7 @@ exports.default = async function afterSign(context) {
       `afterSign: partial macOS signing configuration. Present: ${present.join(', ')}. ` +
         `Missing: ${missing.join(', ')}. Real signing + notarization requires all five ` +
         `secrets set together (${REQUIRED_SIGNING_VARS.join(', ')}), or none of them, to ` +
-        `use the self-signed/ad-hoc fallback in afterPack.js. See docs/MACOS_SIGNING.md.`
+        `use the self-signed/ad-hoc fallback in afterPack.js. See docs/guides/MACOS_SIGNING.md.`
     );
   }
 
@@ -70,7 +70,7 @@ exports.default = async function afterSign(context) {
       `afterSign: all five signing secrets are set, but ${appPath} is not actually signed ` +
         `with the "${process.env.APPLE_TEAM_ID}" Developer ID identity. This usually means ` +
         `CSC_LINK is not valid base64 of a "Developer ID Application" .p12 export, or ` +
-        `CSC_KEY_PASSWORD doesn't match its export password. See docs/MACOS_SIGNING.md.\n\n` +
+        `CSC_KEY_PASSWORD doesn't match its export password. See docs/guides/MACOS_SIGNING.md.\n\n` +
         `codesign output:\n${signingInfo || '(no output captured)'}`
     );
   }

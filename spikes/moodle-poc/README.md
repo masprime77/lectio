@@ -3,7 +3,7 @@
 A **throwaway** validation script — not shipped product code. It hits a real
 Moodle Web Services REST endpoint with a personal token to confirm the
 integration model (option **(a)** in
-[`../../docs/MOODLE_INTEGRATION_SPIKE.md`](../../docs/MOODLE_INTEGRATION_SPIKE.md))
+[`../../docs/planning/MOODLE_INTEGRATION_SPIKE.md`](../../docs/planning/MOODLE_INTEGRATION_SPIKE.md))
 works against a real institution's Moodle before Phase 14 builds the actual
 `@lectio/core/integrations/moodle` mapper.
 

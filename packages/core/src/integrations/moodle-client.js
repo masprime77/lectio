@@ -1,7 +1,7 @@
 'use strict';
 // A thin, platform-agnostic client for Moodle's Web Services REST API. Wraps
 // exactly the three functions validated in the Phase 13 spike
-// (docs/MOODLE_INTEGRATION_SPIKE.md, "Web Services functions needed"):
+// (docs/planning/MOODLE_INTEGRATION_SPIKE.md, "Web Services functions needed"):
 // core_webservice_get_site_info, core_enrol_get_users_courses, and
 // core_course_get_contents. `mod_assign_get_assignments` is intentionally not
 // wrapped here — the spike found it unusable at TU Darmstadt and nothing in

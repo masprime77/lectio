@@ -61,7 +61,7 @@ not build it.
 The nice property here is that Moodle integration needs **no change to the
 storage contract**. Moodle simply becomes another way to produce a `Semester`
 object — the exact JSON shape `@lectio/core` already reads and writes (see the
-**Data model** section of [`../CLAUDE.md`](../CLAUDE.md) for the canonical
+**Data model** section of [`../../CLAUDE.md`](../../CLAUDE.md) for the canonical
 shape). Once we've turned Moodle's responses into a `Semester`, it flows through
 the same `list`/`get`/`save`/`delete` adapters as any hand-built semester and
 syncs to every device for free.

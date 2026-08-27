@@ -9,7 +9,7 @@
 - **Onboarding tour, theming, and auto-updates** — a guided first-run tour, Light/Dark/Auto theme, and background auto-updates via GitHub Releases.
 - **Signed and notarized on macOS** — builds are signed with an Apple Developer ID certificate and notarized by Apple, so they open normally with no Gatekeeper warning and no Terminal workaround.
 
-This is the official 1.0.0 public launch — prior v1.x tags were internal development and test builds (see `docs/CHANGELOG_PRE_LAUNCH.md`).
+This is the official 1.0.0 public launch — prior v1.x tags were internal development and test builds (see `docs/archive/CHANGELOG_PRE_LAUNCH.md`).
 
 ---
 
@@ -25,7 +25,7 @@ This is the official 1.0.0 public launch — prior v1.x tags were internal devel
 
 > **Intel Macs:** not supported yet. The macOS build is Apple Silicon (arm64) only.
 
-**Full changelog:** [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md)
+**Full changelog:** [`docs/RELEASE_NOTES.md`](../RELEASE_NOTES.md)
 
 <!--
 Publishing checklist
