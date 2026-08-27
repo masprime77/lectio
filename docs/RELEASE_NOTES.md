@@ -51,6 +51,20 @@
   `#F5F6F8` square (full-bleed, no alpha, no pre-rounded corners). The artwork
   pixels themselves are unchanged. Documented in `docs/guides/UPDATING_THE_ICON.md`.
 
+- Changed (desktop): the in-app header now shows `lockup.png` — the combined
+  icon + "Lectio" wordmark artwork — instead of the small icon next to a
+  separate "Lectio" heading. Both elements stay in the DOM and CSS picks one
+  per theme.
+
+- Changed (desktop): because the lockup's wordmark is baked-in dark text with
+  no dark variant, it is shown only in Light theme (and Auto resolving to
+  light); Dark theme (and Auto resolving to dark) falls back to the existing
+  icon + heading, which use theme-aware colors. A CSS `invert` filter was
+  deliberately not used — it would also invert the icon's colored bars.
+
+- Changed (desktop): `assets/lockup.png` was added to electron-builder's
+  `files` list so packaged builds bundle it, and `.app-lockup` was added to
+  the header's `no-drag` selector list so clicking it doesn't drag the window.
 - Fixed (site): removed the "macOS: one extra step on first launch" Gatekeeper
   warning from the GitHub Pages download page, along with its now-dead
   `.mac-note` and `.placeholder` CSS. Verified first against the actual
