@@ -1639,6 +1639,42 @@ body.electron-app .header-inner { padding-left: 80px; }
 .settings-label { font-size: 0.95rem; }
 .settings-value { color: var(--muted); font-size: 0.9rem; }
 
+/* Linked accounts (Profile) — one compact row per identity: the account's
+   email/password identity (status only, no action — managed via the
+   Change email/password fields above) and each OAuth provider (Connect /
+   Disconnect). Deliberately smaller than .oauth-buttons/.btn-oauth, which
+   are sized as full-width primary actions for the sign-in screen. */
+.linked-accounts-list { display: flex; flex-direction: column; }
+.linked-account-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.linked-account-row:last-child { border-bottom: none; }
+.linked-account-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.linked-account-icon img { width: 18px; height: 18px; display: block; }
+/* .apple-icon paints itself with --oauth-apple-text, which is inverted for
+   the black/white sign-in button (white in light theme, black in dark) and so
+   would be invisible on the modal surface. Repaint it in the body text color. */
+.linked-account-icon .apple-icon {
+  width: 14px;
+  height: 17px;
+  background-color: var(--text);
+}
+.linked-account-label { font-size: 0.9rem; flex: 1; }
+.linked-account-status { color: var(--muted); font-size: 0.8rem; }
+
 /* Feedback modal */
 .feedback-type-toggle { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
 .feedback-type-btn { flex: 1; }
