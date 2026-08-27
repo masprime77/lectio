@@ -1,5 +1,25 @@
 ## Unreleased
 
+- Changed (desktop): the app icon is now the new brand artwork (a light rounded
+  square with four colored progress-bar rows), replacing the navy notebook.
+  `assets/icon.png` was swapped for the 1024x1024 source in `docs/brand_images/`
+  and `icon.icns` / `icon.ico` were regenerated from it with `npm run icons`.
+  The in-app header logo reads that same file, so it updates too.
+
+- Fixed (site): the GitHub Pages favicon, social-preview image, header logo, and
+  hero icon were all broken — they pointed at a bare `icon.png` that no longer
+  exists at the `docs/` root since the artwork moved into `docs/brand_images/`.
+  Each now points at the pre-baked size matching its display size: 32px favicon,
+  512px `og:image`, 64px header logo (rendered at 32px), and 256px hero icon
+  (rendered at 96px), so the two on-page images stay crisp on retina displays.
+
+- Changed (mobile): the Expo app icon is now the same new brand artwork as
+  desktop, replacing the navy notebook. It is deliberately **not** a byte copy of
+  the desktop icon: iOS and Android apply their own corner mask and reject/flatten
+  transparency, so the mobile icon is the artwork composited onto an opaque
+  `#F5F6F8` square (full-bleed, no alpha, no pre-rounded corners). The artwork
+  pixels themselves are unchanged. Documented in `docs/UPDATING_THE_ICON.md`.
+
 ## 1.1.3 — 2026-08-18
 
 - Fixed: the "Changed on another device" conflict dialog no longer appears on
