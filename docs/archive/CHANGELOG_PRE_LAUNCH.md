@@ -4,7 +4,7 @@ This file archives the internal development changelog from before the
 official 1.0.0 public launch (tags v1.0.0–v1.9.0). Several entries in this
 range are diagnostic or test-only releases with no functional changes.
 These builds were never publicly announced. For the live changelog going
-forward, see [`RELEASE_NOTES.md`](RELEASE_NOTES.md).
+forward, see [`RELEASE_NOTES.md`](../RELEASE_NOTES.md).
 
 ---
 

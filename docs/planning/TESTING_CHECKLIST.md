@@ -25,7 +25,7 @@ npm run typecheck --workspace @lectio/mobile   # tsc --noEmit del móvil
 - [ ] **[CI]** `git diff --stat` no muestra cambios en `packages/desktop/**` (salvo que el prompt lo indique).
 - [ ] **[CI]** No se añadieron dependencias nuevas, salvo las que el prompt autoriza explícitamente.
 - [ ] **[CI]** El último commit añade un resumen a `docs/RELEASE_NOTES.md` bajo `## Unreleased`.
-- [ ] **[CI]** Si el prompt marca un ítem en `docs/PENDING_FEATURES.md`, la casilla quedó marcada.
+- [ ] **[CI]** Si el prompt marca un ítem en `docs/planning/PENDING_FEATURES.md`, la casilla quedó marcada.
 - [ ] **[CI]** Commits en estilo Conventional Commits, uno por concern, sin commits vacíos.
 
 ---

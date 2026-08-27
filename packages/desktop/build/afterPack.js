@@ -14,7 +14,7 @@
 //     identity is STABLE, each build's signature satisfies the previous build's
 //     designated requirement, so Squirrel.Mac accepts macOS auto-updates
 //     between two self-signed builds. CI imports the cert and sets this env var
-//     (see .github/workflows/release.yml + docs/MACOS_SIGNING.md).
+//     (see .github/workflows/release.yml + docs/guides/MACOS_SIGNING.md).
 //   - Ad-hoc (fallback): valid for Gatekeeper but its requirement is pinned to
 //     each build's binary hash, so macOS auto-update can never install it.
 //

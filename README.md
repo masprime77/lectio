@@ -13,7 +13,7 @@ bars. Lectio ships as two apps from one monorepo:
 
 Both apps share the same planner logic from the `@lectio/core` workspace. The
 mobile app is an early preview that mirrors a subset of the desktop features —
-see [`docs/PENDING_FEATURES.md`](docs/PENDING_FEATURES.md) for the gaps.
+see [`docs/planning/PENDING_FEATURES.md`](docs/planning/PENDING_FEATURES.md) for the gaps.
 
 ![CI](https://github.com/masprime77/lectio/actions/workflows/ci.yml/badge.svg)
 [![Latest release](https://img.shields.io/github/v/release/masprime77/lectio?label=download)](https://github.com/masprime77/lectio/releases/latest)
@@ -51,7 +51,7 @@ brew tap masprime77/tap && brew install --cask lectio
 The full feature set below is the **desktop app**. The mobile app currently
 mirrors a subset (browse semesters/courses, per-course progress, tap to cycle
 item tags) — see [Mobile app](#mobile-app) and
-[`docs/PENDING_FEATURES.md`](docs/PENDING_FEATURES.md).
+[`docs/planning/PENDING_FEATURES.md`](docs/planning/PENDING_FEATURES.md).
 
 - **Semester selector** — switch between all `.json` semesters with labelled
   Edit and Delete controls; delete requires confirmation.
@@ -164,7 +164,7 @@ npm run mobile:android # open on the Android emulator
 
 Setup details and current limitations are in
 [`packages/mobile/README.md`](packages/mobile/README.md) and
-[`docs/PENDING_FEATURES.md`](docs/PENDING_FEATURES.md).
+[`docs/planning/PENDING_FEATURES.md`](docs/planning/PENDING_FEATURES.md).
 
 ## Testing
 
@@ -190,7 +190,7 @@ artifact. It also runs a macOS packaging build (no publish) so desktop build
 breakage is caught on PRs. A release is only built once CI passes — see
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) and
 [`release.yml`](.github/workflows/release.yml). Feature-to-test traceability
-lives in [`docs/USER_STORIES.md`](docs/USER_STORIES.md).
+lives in [`docs/planning/USER_STORIES.md`](docs/planning/USER_STORIES.md).
 
 ## Build for distribution
 
@@ -216,7 +216,7 @@ notarized by Apple, so a freshly downloaded copy opens normally — no
 Gatekeeper warning, no manual step required.
 
 If a build was ever produced without notarization credentials configured
-(see [`docs/MACOS_SIGNING.md`](docs/MACOS_SIGNING.md) for the fallback
+(see [`docs/guides/MACOS_SIGNING.md`](docs/guides/MACOS_SIGNING.md) for the fallback
 path), Gatekeeper shows "unidentified developer" instead. In that case,
 do this once:
 
@@ -253,7 +253,7 @@ updates after that launch normally.
 
 Windows builds remain unsigned (see Phase 17 in the roadmap for the
 signing-cert decision); macOS builds are fully signed and notarized as of
-this release — see [`docs/MACOS_SIGNING.md`](docs/MACOS_SIGNING.md) for
+this release — see [`docs/guides/MACOS_SIGNING.md`](docs/guides/MACOS_SIGNING.md) for
 how the credentials are configured and the self-signed fallback behavior.
 
 ## Updating the app icon
@@ -269,7 +269,7 @@ npm run icons --workspace @lectio/desktop     # rebuild both icon.icns and icon.
 
 Commit both files and ship the new icon in the next release. Full details (the
 generated sizes, DMG background, and caching tips) are in
-[`docs/UPDATING_THE_ICON.md`](docs/UPDATING_THE_ICON.md).
+[`docs/guides/UPDATING_THE_ICON.md`](docs/guides/UPDATING_THE_ICON.md).
 
 ## Project structure
 
@@ -304,7 +304,7 @@ lectio/
 │   │   ├── scripts/sync-core.js  # Vendors planner-core next to index.html for the renderer
 │   │   ├── assets/               # Icon + DMG background, and their generators
 │   │   │   ├── icon.png              # 1024×1024 source icon
-│   │   │   ├── icon.icns             # built app/volume icon (see docs/UPDATING_THE_ICON.md)
+│   │   │   ├── icon.icns             # built app/volume icon (see docs/guides/UPDATING_THE_ICON.md)
 │   │   │   ├── build-icns.sh         # icon.png → icon.icns  (npm run icon)
 │   │   │   ├── generate-icon.js      # generate a placeholder icon.png
 │   │   │   ├── dmg-background.png / @2x   # DMG window background
@@ -329,11 +329,16 @@ lectio/
 │   ├── update-cask.sh             # refresh cask version + sha256 from a release
 │   └── sync-tap.sh                # publish the cask to ../homebrew-tap
 ├── docs/
-│   ├── PENDING_FEATURES.md       # Mobile/desktop/infra gaps tracker
-│   ├── USER_STORIES.md           # Stories + test traceability
-│   ├── UPDATING_THE_ICON.md      # How to rebuild icon files from icon.png
-│   ├── MACOS_SIGNING.md          # Self-signed signing + auto-update notes
-│   └── GITHUB_RELEASE.md         # Release-description template
+│   ├── RELEASE_NOTES.md          # Full changelog (append under
+│   │                             #   ## Unreleased each task)
+│   ├── planning/
+│   │   ├── PENDING_FEATURES.md   # Mobile/desktop/infra gaps tracker
+│   │   └── USER_STORIES.md       # Stories + test traceability
+│   ├── guides/
+│   │   ├── UPDATING_THE_ICON.md  # How to rebuild icon files from icon.png
+│   │   └── MACOS_SIGNING.md      # Self-signed signing + auto-update notes
+│   └── archive/
+│       └── GITHUB_RELEASE.md     # Release-description template
 ├── .github/workflows/  # ci.yml (tests + macOS build) + release.yml (build & publish)
 └── README.md
 ```

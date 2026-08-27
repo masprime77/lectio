@@ -1,7 +1,7 @@
 'use strict';
 // Pure helpers for Moodle's SSO-based "Mobile app" token flow. Formalizes the
 // manual DevTools-capture process documented in
-// docs/MOODLE_INTEGRATION_SPIKE.md ("Validation status" → "Token: SSO, not
+// docs/planning/MOODLE_INTEGRATION_SPIKE.md ("Validation status" → "Token: SSO, not
 // native Moodle login", and Open risk 5) into two testable functions. No DOM,
 // no Electron, no network — this only builds a URL and parses one. The
 // platform layer (packages/desktop now, later packages/mobile) is responsible
