@@ -1,5 +1,11 @@
 ## Unreleased
 
+- Added (desktop): a "Linked accounts" row in Settings → Profile listing every
+  sign-in method on the account — the email/password identity (status only)
+  plus Google and Apple, each with a Connect or Disconnect button. This is also
+  how you see which sign-in methods are currently active. Disconnect is
+  disabled while only one identity remains, mirroring Supabase's own rule.
+
 - Added (desktop): identity-linking primitives in the renderer auth layer —
   `lectioAuth.linkProvider(provider)` links a Google/Apple identity to the
   signed-in account (reusing the same captured-BrowserWindow OAuth flow as
