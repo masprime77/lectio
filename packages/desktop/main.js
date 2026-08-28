@@ -35,6 +35,13 @@ function createWindow() {
     minWidth: 500,
     minHeight: 400,
     titleBarStyle: 'hiddenInset',
+    // Pin the traffic-light dots to a known position (macOS only —
+    // this key is ignored on other platforms, but we gate it anyway to
+    // be explicit) instead of relying on the OS default inset, so the
+    // header spacing reserved for them in style.css is deterministic.
+    ...(process.platform === 'darwin'
+      ? { trafficLightPosition: { x: 20, y: 20 } }
+      : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

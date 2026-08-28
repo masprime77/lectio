@@ -239,9 +239,19 @@ body {
   gap: 1rem;
   flex-wrap: wrap;
 }
-/* Reserve space for macOS traffic-light buttons (hiddenInset title bar).
-   Applied via a body class set from app.js (Electron only). */
-body.electron-app .header-inner { padding-left: 80px; }
+/* Reserve space for macOS traffic-light buttons (hiddenInset title bar,
+   pinned via trafficLightPosition {x:20,y:20} in main.js). Rather than
+   sitting beside the dots, .header-inner — including .header-left's
+   logo/wordmark — now renders in a full-width row below them, with its
+   left edge roughly aligned under the dots.
+   Applied via body.platform-mac, set from app.js from the
+   appInfo.platform bridge (macOS Electron only — Windows/Linux have no
+   inset traffic lights to clear, so they keep the header's plain
+   default padding). */
+body.platform-mac .header-inner {
+  padding-top: 40px;
+  padding-left: 20px;
+}
 /* Headings & course names use Outfit */
 .logo,
 .dashboard h2,
