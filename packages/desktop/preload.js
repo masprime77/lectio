@@ -40,6 +40,10 @@ contextBridge.exposeInMainWorld('saver', {
 // App info (read-only).
 contextBridge.exposeInMainWorld('appInfo', {
   getVersion: () => ipcRenderer.invoke('get-version'),
+  // Synchronous — process.platform is available directly in the
+  // preload context, no IPC round-trip needed. Used by app.js to
+  // scope the traffic-light header spacing (see init()) to macOS.
+  platform: process.platform,
 });
 
 // External links: open a URL in the default browser. Main restricts this to
