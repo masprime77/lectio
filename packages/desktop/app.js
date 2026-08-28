@@ -2423,6 +2423,9 @@ async function loadInitialData() {
 
 async function init() {
   document.body.classList.add('electron-app');
+  if (window.appInfo?.platform === 'darwin') {
+    document.body.classList.add('platform-mac');
+  }
 
   // Icon buttons in the header
   document.getElementById('edit-semester-btn').innerHTML = icon('pencil') + '<span style="font-size:0.75rem;margin-left:0.25rem;">Edit</span>';

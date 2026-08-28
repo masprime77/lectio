@@ -1,5 +1,22 @@
 ## Unreleased
 
+- Changed (desktop, macOS): the header's logo and "Lectio" wordmark now sit in
+  their own row below the traffic-light buttons instead of beside them. The
+  dots are pinned via `trafficLightPosition: {x: 20, y: 20}` in `main.js`, and
+  the header reserves a 40px top strip for them so the whole `.header-inner`
+  row — logo and controls alike — renders underneath, left-aligned under the
+  dots.
+
+- Fixed (desktop, Windows/Linux): the header no longer reserves an 80px
+  left gap for traffic lights that only exist on macOS. The reservation was
+  previously applied via `body.electron-app` on every platform; it is now
+  scoped to a new `body.platform-mac` class, so non-mac builds use the
+  header's plain default padding.
+
+- Added (desktop): `window.appInfo.platform` on the preload bridge, exposing
+  `process.platform` synchronously to the renderer so `init()` can apply the
+  `platform-mac` body class.
+
 ## 1.1.4 — 2026-08-28
 
 - Added (desktop): a forgot-password flow on the sign-in screen. A "Forgot
