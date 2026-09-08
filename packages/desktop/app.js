@@ -413,32 +413,38 @@ const {
   setItemStatus, convertItemKind, MAX_NOTE_LENGTH,
 } = window.PlannerCore;
 
-// Pomodoro timer + study time. `isRunning`/`isPaused` are aliased because
-// app.js is global-scoped and those names are too generic to claim.
-// getCourseStudySeconds / setStudyTime / formatHoursMinutes /
-// parseHoursMinutesInput are unused until the course-view work lands.
+// Pomodoro timer + study time. `isPaused` is aliased because app.js is
+// global-scoped and that name is too generic to claim. Advancing a phase always
+// goes through skipPhase() — core's confirmAdvance() is the same transition
+// under another name, and one call site keeps the credit rules in one place.
 const {
   clampPomodoroSettings,
   createIdleSession,
   startSession,
   remainingSeconds,
-  isRunning: pomodoroIsRunning,
   isPaused: pomodoroIsPaused,
   isPhaseComplete,
   isAwaitingAdvance,
+  isOvertime,
+  overtimeSeconds,
   markPhaseComplete,
+  extendPhase,
+  extendPhaseByMinutes,
   pauseSession,
   resumeSession,
-  elapsedWorkSeconds,
-  confirmAdvance,
+  pendingWorkCreditSeconds,
   skipPhase,
   phaseLabel,
+  sessionLabel,
   rehydrateSession,
   phaseDurationSeconds,
   addStudyTime,
+  addFreeStudyTime,
   getCourseStudySeconds,
   studyTimeByCourse,
   setStudyTime,
+  FREE_STUDY_NAME,
+  FREE_STUDY_COLOR,
   formatClock,
   formatHoursMinutes,
   parseHoursMinutesInput,
@@ -2208,7 +2214,7 @@ const TUTORIAL_STEPS = [
     id: 'pomodoro',
     title: 'Study timer',
     description:
-      'Start a Pomodoro timer for any course from the bottom-left corner: set your focus and break lengths, and Lectio tracks how long you have studied each course. The button becomes a live countdown — click it to pause, skip ahead, or stop, and the chart button opens your study time.',
+      'Start a Pomodoro timer from the bottom-left corner, for a course or as Free study — its own category. When a focus block ends you can take the break or keep studying; when a break ends you can go back to work, take five more minutes, or rest on. The button becomes a live countdown, and the chart button opens your study time.',
     targetSelector: '#pomodoro-control',
     setup: null,
   },
@@ -2732,6 +2738,70 @@ function setupSort() {
 
 const POMODORO_TICK_MS = 1000;
 
+// How many minutes the "+N minutes" answer adds to a finished break.
+const POMODORO_EXTRA_MINUTES = 5;
+
+// ---- Phase chimes ---------------------------------------------------------
+// Three short, quiet tones, synthesized rather than shipped as audio files:
+// pure sines have no harmonics to sound harsh, a soft attack and a long
+// exponential tail keep them calm, and there is nothing to bundle, sync or
+// keep in step with the packaged build.
+//
+//   focusEnd  a focus block ran out — descending, an exhale
+//   breakEnd  a break ran out — the same two notes rising, a nudge back
+//   cycleEnd  the whole pomodoro cycle is done — a resolving major triad,
+//             played only on the long break -> idle transition
+//
+// Each entry is [frequency (Hz), delay from the start of the chime (s)].
+const POMODORO_CHIMES = {
+  focusEnd: [[1046.5, 0], [783.99, 0.32]],
+  breakEnd: [[783.99, 0], [1046.5, 0.32]],
+  cycleEnd: [[523.25, 0], [659.25, 0.28], [783.99, 0.56]],
+};
+
+let pomodoroAudioCtx = null;
+
+// One lazily created AudioContext for the app's lifetime. Chromium starts it
+// suspended until the page has been interacted with; by the time a phase can
+// finish the user has necessarily started a timer, and resume() covers the
+// rest. Returns null where Web Audio isn't available.
+function pomodoroAudio() {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null;
+  if (!pomodoroAudioCtx) pomodoroAudioCtx = new Ctx();
+  if (pomodoroAudioCtx.state === 'suspended') pomodoroAudioCtx.resume().catch(() => {});
+  return pomodoroAudioCtx;
+}
+
+// Best-effort: a chime is a nicety, never a reason to break a phase change.
+function playPomodoroChime(kind) {
+  const notes = POMODORO_CHIMES[kind];
+  if (!notes) return;
+  try {
+    const ctx = pomodoroAudio();
+    if (!ctx) return;
+    const start = ctx.currentTime + 0.02;
+    notes.forEach(([freq, offset], i) => {
+      const at = start + offset;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, at);
+      // Later notes sit slightly back so the chime reads as one gesture rather
+      // than a row of equal beeps.
+      const peak = 0.13 * (1 - i * 0.12);
+      gain.gain.setValueAtTime(0.0001, at);
+      gain.gain.exponentialRampToValueAtTime(peak, at + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + 1.15);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(at);
+      osc.stop(at + 1.2);
+    });
+  } catch (e) {
+    /* audio unavailable — non-critical */
+  }
+}
+
 async function readSettingsFile() {
   if (!window.settings) return {};
   return (await window.settings.get()) || {};
@@ -2751,20 +2821,20 @@ async function setupPomodoro() {
   document.getElementById('pomodoro-btn')
     .addEventListener('click', onPomodoroPrimaryClick);
   document.getElementById('pomodoro-stop-btn')
-    .addEventListener('click', () => stopPomodoro(true));
+    .addEventListener('click', () => runPomodoroAction('stop'));
   document.getElementById('pomodoro-skip-btn')
-    .addEventListener('click', onPomodoroSkip);
+    .addEventListener('click', () => runPomodoroAction('advance'));
 
+  // The tray and the always-on-top popup both drive the session through the
+  // same action ids the in-window modal uses (see pomodoroActions), so none of
+  // the three surfaces needs timer logic of its own.
   if (window.pomodoroTray) {
-    window.pomodoroTray.onToggle(onPomodoroPrimaryClick);
-    window.pomodoroTray.onSkip(onPomodoroSkip);
-    window.pomodoroTray.onStop(() => stopPomodoro(true));
+    window.pomodoroTray.onAction(runPomodoroAction);
     window.pomodoroTray.onOpenModal(openPomodoroModal);
   }
 
   if (window.pomodoroPopup) {
-    window.pomodoroPopup.onConfirm(() => confirmPomodoroAdvance());
-    window.pomodoroPopup.onStop(() => stopPomodoro(true));
+    window.pomodoroPopup.onAction(runPomodoroAction);
   }
 
   // Defensive resync: backgroundThrottling:false (see main.js) is the real
@@ -2787,6 +2857,10 @@ async function setupPomodoro() {
     if (e.target === overlay) closePomodoroModal();
   });
   document.getElementById('pomodoro-start').addEventListener('click', startPomodoroFromModal);
+  document.getElementById('pomodoro-mode-course')
+    .addEventListener('click', () => setPomodoroModalMode('course'));
+  document.getElementById('pomodoro-mode-free')
+    .addEventListener('click', () => setPomodoroModalMode('free'));
 
   setupPomodoroAdvanceModal();
   setupStudyTimePanel();
@@ -2821,49 +2895,158 @@ function onPomodoroPrimaryClick() {
     openPomodoroAdvanceModal();
     return;
   }
-  state.pomodoro.session = pomodoroIsPaused(s) ? resumeSession(s) : pauseSession(s);
+  runPomodoroAction('toggle');
+}
+
+// ---- Session actions ------------------------------------------------------
+// One vocabulary of action ids, shared by the header controls, the phase-
+// complete modal, the menu-bar Tray and the always-on-top popup:
+//
+//   toggle   pause / resume
+//   advance  move to the next phase — the "Skip" button mid-phase, the
+//            "Start break" / "Start focus block" answer once a phase is done,
+//            and the way out of an open-ended stretch
+//   extend   carry the finished phase on open-ended ("Keep studying" after a
+//            focus block, "Keep resting" after a break)
+//   extend5  give a finished break five more minutes
+//   stop     end the session
+//
+// pomodoroActions() below decides which of these a given state offers, and
+// every surface renders that same list.
+
+function runPomodoroAction(id) {
+  const s = state.pomodoro.session;
+  if (s.phase === 'idle') return;
+
+  if (id === 'toggle') {
+    state.pomodoro.session = pomodoroIsPaused(s) ? resumeSession(s) : pauseSession(s);
+    persistPomodoroSession();
+    renderPomodoroControl();
+    return;
+  }
+
+  closePomodoroAdvanceModal();
+
+  if (id === 'extend' || id === 'extend5') {
+    const next = id === 'extend' ? extendPhase(s) : extendPhaseByMinutes(s, POMODORO_EXTRA_MINUTES);
+    if (next === s) return;
+    state.pomodoro.session = next;
+    startPomodoroTicking();
+    persistPomodoroSession();
+    renderPomodoroControl();
+    return;
+  }
+
+  if (id === 'stop') {
+    stopPomodoro(true);
+    return;
+  }
+
+  if (id !== 'advance') return;
+
+  // Whatever the focus phase still owes — the part-worked block when skipping
+  // mid-phase, the extra minutes of an open-ended stretch, nothing at all for a
+  // block already banked in full when it completed.
+  creditPendingWork(s);
+  // Leaving a finished long break is the end of the whole cycle, not just of a
+  // phase; core signals that by returning the session to idle.
+  const next = skipPhase(s, state.pomodoro.settings);
+  const cycleComplete = s.phase === 'longBreak' && next.phase === 'idle';
+  state.pomodoro.session = next;
+  if (next.phase === 'idle') stopPomodoroTicking();
+  else startPomodoroTicking();
+  if (cycleComplete) playPomodoroChime('cycleEnd');
   persistPomodoroSession();
   renderPomodoroControl();
 }
 
-function onPomodoroSkip() {
-  const s = state.pomodoro.session;
-  if (s.phase === 'idle') return;
-  // Skipping out of a *running* focus block still credits the time actually
-  // worked. A finished one was already credited in full when it completed, so
-  // skipping from the waiting state is just the advance the user was asked for.
-  if (s.phase === 'work' && !isAwaitingAdvance(s)) creditElapsedWork(s);
-  closePomodoroAdvanceModal();
-  state.pomodoro.session = skipPhase(s, state.pomodoro.settings);
-  if (state.pomodoro.session.phase === 'idle') stopPomodoroTicking();
-  else startPomodoroTicking();
-  persistPomodoroSession();
-  renderPomodoroControl();
+// Which actions the current state offers, most-secondary first so every
+// surface can render them left to right with the primary answer last.
+// `primary` marks the one the user most likely wants.
+function pomodoroActions(session) {
+  const s = clampPomodoroSettings(state.pomodoro.settings);
+  const phase = session.phase;
+  if (phase === 'idle') return [];
+
+  const nextLabel =
+    phase === 'work'
+      ? (session.completedPomodoros + 1) % s.pomodorosUntilLongBreak === 0
+        ? 'Start long break'
+        : 'Start break'
+      : phase === 'shortBreak'
+        ? 'Start focus block'
+        : 'Finish session';
+
+  if (isAwaitingAdvance(session)) {
+    if (phase === 'work') {
+      return [
+        { id: 'stop', label: 'Stop timer' },
+        { id: 'extend', label: 'Keep studying' },
+        { id: 'advance', label: nextLabel, primary: true },
+      ];
+    }
+    // A finished break can be stretched two ways before moving on. A finished
+    // *long* break ends the cycle, so "move on" and "stop" are the same thing
+    // and only the one button is offered.
+    const rest = [
+      { id: 'extend5', label: `+${POMODORO_EXTRA_MINUTES} minutes` },
+      { id: 'extend', label: 'Keep resting' },
+      { id: 'advance', label: nextLabel, primary: true },
+    ];
+    return phase === 'longBreak' ? rest : [{ id: 'stop', label: 'Stop timer' }, ...rest];
+  }
+
+  const paused = pomodoroIsPaused(session);
+  return [
+    { id: 'stop', label: 'Stop timer' },
+    { id: 'toggle', label: paused ? 'Resume' : 'Pause' },
+    // Mid-phase this is a skip; out of an open-ended stretch it is the only
+    // way on, so it says where it goes.
+    { id: 'advance', label: isOvertime(session) ? nextLabel : 'Skip', primary: true },
+  ];
+}
+
+// 'course' | 'free' — free study is its own category, so it is a mode of the
+// setup modal rather than another row in the course list.
+let pomodoroModalMode = 'course';
+
+function setPomodoroModalMode(mode) {
+  pomodoroModalMode = mode === 'free' ? 'free' : 'course';
+  const free = pomodoroModalMode === 'free';
+  document.getElementById('pomodoro-mode-course').setAttribute('aria-checked', String(!free));
+  document.getElementById('pomodoro-mode-free').setAttribute('aria-checked', String(free));
+  document.getElementById('pomodoro-course-field').classList.toggle('hidden', free);
+  const hint = document.getElementById('pomodoro-hint');
+  if (!state.semester) {
+    hint.textContent = 'Open a semester first to track this session.';
+    return;
+  }
+  hint.textContent = free
+    ? 'Time is banked as Free study on this semester — its own category in Study time, ' +
+      'separate from every course.'
+    : 'Time is added to the chosen course when a focus block finishes.';
 }
 
 function openPomodoroModal() {
   const select = document.getElementById('pomodoro-course-select');
-  select.innerHTML = '<option value="">Free study (no course)</option>';
-  if (state.semester) {
-    sortedCourses(state.semester.courses).forEach((c) => {
-      const opt = document.createElement('option');
-      opt.value = c.id;
-      opt.textContent = c.name;
-      select.appendChild(opt);
-    });
-  }
+  select.innerHTML = '';
+  const courses = state.semester ? sortedCourses(state.semester.courses) : [];
+  courses.forEach((c) => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name;
+    select.appendChild(opt);
+  });
   // Preselect the focused course when the user is already concentrating on one.
   if (state.focusedCourseId) select.value = state.focusedCourseId;
+  // With no courses to credit there is nothing for the Course mode to do.
+  setPomodoroModalMode(courses.length === 0 ? 'free' : 'course');
 
   const s = state.pomodoro.settings;
   document.getElementById('pomodoro-work-min').value = s.workMinutes;
   document.getElementById('pomodoro-short-min').value = s.shortBreakMinutes;
   document.getElementById('pomodoro-long-min').value = s.longBreakMinutes;
   document.getElementById('pomodoro-count').value = s.pomodorosUntilLongBreak;
-
-  document.getElementById('pomodoro-hint').textContent = state.semester
-    ? 'Time is added to the chosen course when a focus block finishes. Free study is not tracked.'
-    : 'Open a semester first to track time against a course.';
 
   document.getElementById('pomodoro-overlay').classList.remove('hidden');
   document.getElementById('pomodoro-start').focus();
@@ -2882,10 +3065,15 @@ async function startPomodoroFromModal() {
   });
   state.pomodoro.settings = settings;
 
-  const courseId = document.getElementById('pomodoro-course-select').value || null;
+  const courseId =
+    pomodoroModalMode === 'free'
+      ? null
+      : document.getElementById('pomodoro-course-select').value || null;
+  // The semester is carried even for free study: that time is banked on the
+  // semester itself, as its own category.
   state.pomodoro.session = startSession(settings, {
     courseId,
-    semesterId: courseId ? state.semesterId : null,
+    semesterId: state.semesterId,
   });
 
   await writeSettingsPatch({
@@ -2925,6 +3113,10 @@ function handlePomodoroPhaseComplete() {
     // app was closed or asleep when the deadline passed.
     creditStudySeconds(finished, phaseDurationSeconds('work', state.pomodoro.settings));
   }
+  // A chime for the phase that just ran out: one voice for "focus is over",
+  // another for "the break is over". The third chime is reserved for the end of
+  // the whole cycle and is played in runPomodoroAction('advance').
+  playPomodoroChime(finishedPhase === 'work' ? 'focusEnd' : 'breakEnd');
   // The OS notification is only a heads-up for an unfocused window — the modal
   // is what actually advances the session.
   notifyPomodoroPhase(finishedPhase);
@@ -2951,16 +3143,41 @@ function setupPomodoroAdvanceModal() {
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) closePomodoroAdvanceModal();
   });
-  document.getElementById('pomodoro-advance-confirm')
-    .addEventListener('click', confirmPomodoroAdvance);
-  document.getElementById('pomodoro-advance-stop').addEventListener('click', () => {
-    closePomodoroAdvanceModal();
-    stopPomodoro(true);
+  // The buttons themselves are rebuilt per phase (see
+  // renderPomodoroAdvanceActions); one delegated listener covers both groups.
+  overlay.querySelector('.modal-actions').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-action]');
+    if (btn) runPomodoroAction(btn.dataset.action);
   });
 }
 
-// Copy for the phase that just finished, plus the label of the button that
-// leaves this state. `nextIsLongBreak` decides which break a focus block earns.
+function pomodoroActionButtonHtml(a) {
+  return (
+    `<button type="button" class="btn${a.primary ? ' btn-primary' : ''}" ` +
+    `data-action="${escapeHtml(a.id)}">${escapeHtml(a.label)}</button>`
+  );
+}
+
+// Rebuild the modal's button row from pomodoroActions(). Stopping is the one
+// answer that leaves rather than continues, so it takes the footer's left
+// slot — the same place every other modal in the app puts its odd-one-out
+// action — and the ways forward stay grouped on the right, primary last.
+function renderPomodoroAdvanceActions(session) {
+  const overlay = document.getElementById('pomodoro-advance-overlay');
+  if (!overlay) return;
+  const actions = pomodoroActions(session);
+  overlay.querySelector('.modal-actions-left').innerHTML = actions
+    .filter((a) => a.id === 'stop')
+    .map(pomodoroActionButtonHtml)
+    .join('');
+  overlay.querySelector('#pomodoro-advance-actions').innerHTML = actions
+    .filter((a) => a.id !== 'stop')
+    .map(pomodoroActionButtonHtml)
+    .join('');
+}
+
+// Copy for the phase that just finished. The buttons that leave this state come
+// from pomodoroActions(), so this is only the title and the sentence above them.
 function pomodoroAdvanceCopy(session) {
   const s = clampPomodoroSettings(state.pomodoro.settings);
   if (session.phase === 'work') {
@@ -2969,28 +3186,26 @@ function pomodoroAdvanceCopy(session) {
     const minutes = long ? s.longBreakMinutes : s.shortBreakMinutes;
     return {
       title: 'Focus block done',
-      message: `That block is logged. Take a ${minutes}-minute ${
-        long ? 'long break' : 'break'
-      } and pick things back up after?`,
-      confirm: long ? 'Start long break' : 'Start break',
-      canStop: true,
+      message:
+        `That block is logged. Take a ${minutes}-minute ${long ? 'long break' : 'break'}, ` +
+        'or keep studying and stop when you are ready — the extra time counts too.',
     };
   }
   if (session.phase === 'shortBreak') {
     return {
       title: 'Break over',
-      message: `Ready for another ${s.workMinutes}-minute focus block?`,
-      confirm: 'Start focus block',
-      canStop: true,
+      message:
+        `Ready for another ${s.workMinutes}-minute focus block? ` +
+        `You can also take ${POMODORO_EXTRA_MINUTES} more minutes, or rest until you say so.`,
     };
   }
   // A long break ends the configured cycle, so there is nothing to move on to —
-  // confirming and stopping are the same thing, and only one button is offered.
+  // finishing is the only way forward, though the rest can still be stretched.
   return {
     title: 'Long break over',
-    message: `That is ${s.pomodorosUntilLongBreak} focus blocks and a long break — a full cycle. Wrap up the session, or start a new one whenever you like.`,
-    confirm: 'Finish session',
-    canStop: false,
+    message:
+      `That is ${s.pomodorosUntilLongBreak} focus blocks and a long break — a full cycle. ` +
+      'Wrap up the session, or stay on the break a while longer.',
   };
 }
 
@@ -3029,8 +3244,7 @@ function showPomodoroCompletionPopup() {
     title: copy.title,
     status: pomodoroCycleStatusText(s),
     message: copy.message,
-    confirmLabel: copy.confirm,
-    canStop: copy.canStop,
+    actions: pomodoroActions(s),
     theme: resolveEffectiveTheme(),
   });
 }
@@ -3041,11 +3255,10 @@ function openPomodoroAdvanceModal() {
   const copy = pomodoroAdvanceCopy(state.pomodoro.session);
   document.getElementById('pomodoro-advance-title').textContent = copy.title;
   document.getElementById('pomodoro-advance-message').textContent = copy.message;
-  const confirmBtn = document.getElementById('pomodoro-advance-confirm');
-  confirmBtn.textContent = copy.confirm;
-  document.getElementById('pomodoro-advance-stop').classList.toggle('hidden', !copy.canStop);
+  renderPomodoroAdvanceActions(state.pomodoro.session);
   overlay.classList.remove('hidden');
-  confirmBtn.focus();
+  const primary = document.querySelector('#pomodoro-advance-actions .btn-primary');
+  if (primary) primary.focus();
 }
 
 function closePomodoroAdvanceModal() {
@@ -3054,36 +3267,29 @@ function closePomodoroAdvanceModal() {
   if (window.pomodoroPopup) window.pomodoroPopup.hide();
 }
 
-// The user said yes: perform the transition core held back.
-function confirmPomodoroAdvance() {
-  const s = state.pomodoro.session;
-  closePomodoroAdvanceModal();
-  if (!isAwaitingAdvance(s)) return;
-  state.pomodoro.session = confirmAdvance(s, state.pomodoro.settings);
-  if (state.pomodoro.session.phase === 'idle') stopPomodoroTicking();
-  else startPomodoroTicking();
-  persistPomodoroSession();
-  renderPomodoroControl();
-}
-
-// Credit however much of the current focus block has actually elapsed. Used
-// when a block is stopped or skipped part-way; ignored under 30s so an
+// Credit whatever the current focus phase still owes — the part-worked block
+// when stopping or skipping mid-phase, the extra minutes of an open-ended
+// stretch, nothing for a block already banked in full. Ignored under 30s so an
 // accidental start-then-stop does not litter the session log.
-function creditElapsedWork(session) {
-  const elapsed = elapsedWorkSeconds(session, state.pomodoro.settings);
-  if (elapsed >= 30) creditStudySeconds(session, elapsed);
+function creditPendingWork(session) {
+  const seconds = pendingWorkCreditSeconds(session, state.pomodoro.settings);
+  if (seconds >= 30) creditStudySeconds(session, seconds);
 }
 
-// Write studied seconds onto the session's course. No-ops for a free-study
-// session, and refuses to write if the loaded semester is no longer the one the
-// session was started against — otherwise switching semesters mid-session would
-// credit the wrong course.
+// Write studied seconds onto the session's course, or — for a session with no
+// course — onto the semester's own Free study category. Refuses to write if the
+// loaded semester is no longer the one the session was started against,
+// otherwise switching semesters mid-session would credit the wrong place.
 function creditStudySeconds(session, seconds) {
-  if (!session.courseId || !session.semesterId) return;
+  if (!session.semesterId || !(seconds > 0)) return;
   if (!state.semester || state.semesterId !== session.semesterId) return;
-  const course = state.semester.courses.find((c) => c.id === session.courseId);
-  if (!course) return;
-  addStudyTime(course, seconds, { source: 'pomodoro' });
+  if (session.courseId) {
+    const course = state.semester.courses.find((c) => c.id === session.courseId);
+    if (!course) return;
+    addStudyTime(course, seconds, { source: 'pomodoro' });
+  } else {
+    addFreeStudyTime(state.semester, seconds, { source: 'pomodoro' });
+  }
   persist();
   renderDashboard();
   renderStudyTimePanel();
@@ -3099,9 +3305,9 @@ function creditStudySeconds(session, seconds) {
 function stopPomodoro(creditPartial) {
   const s = state.pomodoro.session;
   if (s.phase === 'idle') return;
-  // A finished block was already credited in full when it completed, so a stop
-  // from the waiting state must not credit it a second time.
-  if (creditPartial && s.phase === 'work' && !isAwaitingAdvance(s)) creditElapsedWork(s);
+  // pendingWorkCreditSeconds already returns 0 for a finished block waiting to
+  // be advanced, which was credited in full when it completed.
+  if (creditPartial) creditPendingWork(s);
   closePomodoroAdvanceModal();
   stopPomodoroTicking();
   state.pomodoro.session = createIdleSession();
@@ -3115,9 +3321,9 @@ function notifyPomodoroPhase(finishedPhase) {
   try {
     if (typeof Notification === 'undefined') return;
     const body = {
-      work: 'Focus block complete — take a break.',
-      shortBreak: 'Break over — back to it.',
-      longBreak: 'Long break over — back to it.',
+      work: 'Focus block complete — take a break, or keep studying.',
+      shortBreak: 'Break over — back to it, or rest a little longer.',
+      longBreak: 'Long break over — wrap up, or rest a little longer.',
     }[finishedPhase];
     if (body) new Notification('Lectio', { body });
   } catch (e) {
@@ -3155,9 +3361,7 @@ function renderPomodoroControl() {
   }
 
   const paused = pomodoroIsPaused(s);
-  const course =
-    s.courseId && state.semester ? state.semester.courses.find((c) => c.id === s.courseId) : null;
-  const label = s.phase === 'work' ? (course ? course.name : 'Free study') : phaseLabel(s.phase);
+  const label = pomodoroControlLabel(s);
 
   const meter = pomodoroDotsHtml(s) + pomodoroProgressHtml(s);
 
@@ -3180,11 +3384,33 @@ function renderPomodoroControl() {
 
   btn.innerHTML =
     `${icon(paused ? 'player-play' : 'player-pause')}` +
-    `<span class="pomodoro-clock">${formatClock(remainingSeconds(s))}</span>` +
+    `<span class="pomodoro-clock">${pomodoroClockText(s)}</span>` +
     `<span class="pomodoro-label">${escapeHtml(label)}</span>` +
     meter;
   btn.title = paused ? 'Resume' : 'Pause';
   reportPomodoroToTray();
+}
+
+// What the control (and the Tray) call the current session. A focus block is
+// named after what it credits — the course, or the Free study category — while
+// a break is named after itself. An open-ended stretch says so instead, since
+// "Focus" beside a clock that stopped counting down reads as a bug.
+function pomodoroControlLabel(session) {
+  if (isOvertime(session)) return sessionLabel(session);
+  if (session.phase !== 'work') return phaseLabel(session.phase);
+  const course =
+    session.courseId && state.semester
+      ? state.semester.courses.find((c) => c.id === session.courseId)
+      : null;
+  return course ? course.name : FREE_STUDY_NAME;
+}
+
+// The clock face: time left in the phase, or time *into* an open-ended stretch,
+// which counts up and is prefixed to say so.
+function pomodoroClockText(session) {
+  if (isAwaitingAdvance(session)) return 'Done';
+  if (isOvertime(session)) return '+' + formatClock(overtimeSeconds(session));
+  return formatClock(remainingSeconds(session));
 }
 
 // ---- Timer control meter (phase progress + cycle dots) ---------------------
@@ -3196,7 +3422,9 @@ function renderPomodoroControl() {
 function pomodoroPhaseProgress(session) {
   const full = phaseDurationSeconds(session.phase, state.pomodoro.settings);
   if (!full) return 0;
-  if (isAwaitingAdvance(session)) return 1;
+  // A finished phase, and one carried on past its deadline, are both "all the
+  // way through" — an open-ended stretch has no length to be a fraction of.
+  if (isAwaitingAdvance(session) || isOvertime(session)) return 1;
   return Math.min(1, Math.max(0, (full - remainingSeconds(session)) / full));
 }
 
@@ -3236,17 +3464,18 @@ function reportPomodoroToTray() {
   const s = state.pomodoro.session;
   const idle = s.phase === 'idle';
   if (idle) {
-    window.pomodoroTray.report({ phase: 'idle', clock: '', label: '', paused: false });
+    window.pomodoroTray.report({ phase: 'idle', clock: '', label: '', paused: false, actions: [] });
     return;
   }
-  const course =
-    s.courseId && state.semester ? state.semester.courses.find((c) => c.id === s.courseId) : null;
-  const label = s.phase === 'work' ? (course ? course.name : 'Free study') : phaseLabel(s.phase);
   window.pomodoroTray.report({
     phase: s.phase,
-    clock: isAwaitingAdvance(s) ? 'Done' : formatClock(remainingSeconds(s)),
-    label,
+    clock: pomodoroClockText(s),
+    label: pomodoroControlLabel(s),
     paused: pomodoroIsPaused(s),
+    // The menu-bar menu is built from exactly the same answers the in-window
+    // modal offers, so "Keep studying", "+5 minutes" and "Keep resting" are
+    // reachable without bringing the window forward.
+    actions: pomodoroActions(s),
   });
 }
 
@@ -3333,8 +3562,9 @@ function studyTimeRingHtml(breakdown) {
 function studyTimeLegendHtml(breakdown) {
   if (breakdown.courses.length === 0) {
     return (
-      '<p class="st-empty">No study time tracked yet. Finish a focus block, or set a ' +
-      "course's studied time from the dashboard.</p>"
+      '<p class="st-empty">No study time tracked yet. Finish a focus block — against a ' +
+      `course or as ${escapeHtml(FREE_STUDY_NAME)} — or set a course's studied time from the ` +
+      'dashboard.</p>'
     );
   }
   const rows = breakdown.courses
@@ -3356,10 +3586,13 @@ function studyTimeLegendHtml(breakdown) {
 function studyTimeSwitchHtml() {
   const s = state.pomodoro.session;
   if (s.phase === 'idle') {
-    return '<p class="st-switch-hint">No timer running — start one to track time against a course.</p>';
+    return (
+      '<p class="st-switch-hint">No timer running — start one to track time against a course, ' +
+      `or as ${escapeHtml(FREE_STUDY_NAME)}.</p>`
+    );
   }
   const options = [
-    `<option value=""${s.courseId ? '' : ' selected'}>Free study (no course)</option>`,
+    `<option value=""${s.courseId ? '' : ' selected'}>${escapeHtml(FREE_STUDY_NAME)}</option>`,
   ];
   if (state.semester) {
     sortedCourses(state.semester.courses).forEach((c) => {
@@ -3371,8 +3604,8 @@ function studyTimeSwitchHtml() {
   }
   const midBlock = s.phase === 'work' && !isAwaitingAdvance(s);
   const hint = midBlock
-    ? 'Minutes already studied in this block stay with the course they were earned on — switching banks them and starts a fresh block for the new course.'
-    : 'The next focus block is credited to this course.';
+    ? 'Minutes already studied in this block stay where they were earned — switching banks them and starts a fresh block.'
+    : `The next focus block is credited here. ${FREE_STUDY_NAME} is its own category on this semester.`;
   return (
     '<div class="st-switch">' +
     '<label class="st-switch-label" for="studytime-course">This session credits</label>' +
@@ -3418,7 +3651,8 @@ function switchPomodoroCourse(courseId) {
   if (s.phase === 'idle') return;
   const nextCourseId = courseId || null;
   if ((s.courseId || null) === nextCourseId) return;
-  const nextSemesterId = nextCourseId ? state.semesterId : null;
+  // The semester rides along either way: free study is banked on it too.
+  const nextSemesterId = state.semesterId;
 
   if (s.phase !== 'work' || isAwaitingAdvance(s)) {
     // Nothing is accruing: a break credits nothing, and a finished block was
@@ -3426,10 +3660,10 @@ function switchPomodoroCourse(courseId) {
     state.pomodoro.session = { ...s, courseId: nextCourseId, semesterId: nextSemesterId };
   } else {
     // Mid-block. Bank what the old course has actually earned, on the same
-    // terms as stopping or skipping would (creditElapsedWork, 30s floor), then
+    // terms as stopping or skipping would (creditPendingWork, 30s floor), then
     // start a fresh block for the new course — a completed block always credits
     // its full length, so the banked part must not also be part of the next one.
-    creditElapsedWork(s);
+    creditPendingWork(s);
     const fresh = startSession(state.pomodoro.settings, {
       courseId: nextCourseId,
       semesterId: nextSemesterId,

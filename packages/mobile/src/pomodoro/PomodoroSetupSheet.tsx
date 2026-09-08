@@ -1,7 +1,8 @@
-// Bottom sheet for starting a study timer: pick the course (or free study) and
-// the four durations. Same fade-backdrop + slide-sheet shape as SortMenu, using
-// RN's <Modal> so no extra dependency is needed; tapping the dimmed backdrop
-// dismisses without starting anything.
+// Bottom sheet for starting a study timer: pick what it tracks — a course, or
+// Free study, which is its own category on the semester rather than another
+// entry in the course list — and the four durations. Same fade-backdrop +
+// slide-sheet shape as SortMenu, using RN's <Modal> so no extra dependency is
+// needed; tapping the dimmed backdrop dismisses without starting anything.
 //
 // The four duration fields keep their raw text in local state and are only
 // converted on Start — clamping while the user is mid-typing makes the field
@@ -21,7 +22,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { clampPomodoroSettings } from '@lectio/core/pomodoro-core';
+import { FREE_STUDY_NAME, clampPomodoroSettings } from '@lectio/core/pomodoro-core';
 import { getCourses } from '@lectio/core/planner-core';
 import { NumericKeyboardDoneBar, NUMERIC_KEYBOARD_ACCESSORY_ID } from '../components/NumericKeyboardDoneBar';
 import { useTheme } from '../theme';
@@ -30,7 +31,7 @@ import type { PomodoroSettings, Semester } from '../../types/lectio-core';
 interface PomodoroSetupSheetProps {
   visible: boolean;
   semester: Semester | null;
-  /** Preselected course; null = free study. */
+  /** Preselected course; null means "no particular course", not free study. */
   initialCourseId?: string | null;
   initialSettings: PomodoroSettings;
   onStart: (opts: { settings: PomodoroSettings; courseId: string | null }) => void;
@@ -51,6 +52,9 @@ export function PomodoroSetupSheet({
   const insets = useSafeAreaInsets();
   const slide = useRef(new Animated.Value(0)).current;
 
+  // 'course' | 'free'. Free study hides the course list entirely: it is a
+  // different thing to track, not a course with no name.
+  const [mode, setMode] = useState<'course' | 'free'>('course');
   const [courseId, setCourseId] = useState<string | null>(initialCourseId);
   const [work, setWork] = useState(String(initialSettings.workMinutes));
   const [short, setShort] = useState(String(initialSettings.shortBreakMinutes));
@@ -61,7 +65,12 @@ export function PomodoroSetupSheet({
   // settings and the screen's course rather than the last session's edits.
   useEffect(() => {
     if (!visible) return;
-    setCourseId(initialCourseId);
+    // Default to tracking a course, falling back to the first one when the
+    // screen has no particular one in mind — a Course mode with nothing
+    // selected would silently behave as free study.
+    const list = semester ? getCourses(semester) : [];
+    setMode(list.length > 0 ? 'course' : 'free');
+    setCourseId(initialCourseId || (list.length > 0 ? list[0].id : null));
     setWork(String(initialSettings.workMinutes));
     setShort(String(initialSettings.shortBreakMinutes));
     setLong(String(initialSettings.longBreakMinutes));
@@ -73,10 +82,12 @@ export function PomodoroSetupSheet({
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [visible, initialCourseId, initialSettings, slide]);
+  }, [visible, semester, initialCourseId, initialSettings, slide]);
 
   const translateY = slide.interpolate({ inputRange: [0, 1], outputRange: [520, 0] });
   const courses = semester ? getCourses(semester) : [];
+  // With no courses to credit there is nothing for the Course mode to do.
+  const free = mode === 'free' || courses.length === 0;
 
   function handleStart() {
     // clampPomodoroSettings coerces and bounds the raw strings itself.
@@ -86,7 +97,7 @@ export function PomodoroSetupSheet({
       longBreakMinutes: long as unknown as number,
       pomodorosUntilLongBreak: count as unknown as number,
     });
-    onStart({ settings, courseId });
+    onStart({ settings, courseId: free ? null : courseId });
   }
 
   const field = (label: string, value: string, onChange: (v: string) => void) => (
@@ -120,22 +131,29 @@ export function PomodoroSetupSheet({
           >
             <Text style={[styles.title, { color: theme.text }]}>Study timer</Text>
 
-            <ScrollView style={styles.courseList} keyboardShouldPersistTaps="handled">
-              <CourseRow
-                label="Free study (no course)"
-                selected={courseId === null}
-                onPress={() => setCourseId(null)}
+            <View style={[styles.modes, { borderColor: theme.border }]}>
+              <ModeTab
+                label="Course"
+                selected={!free}
+                disabled={courses.length === 0}
+                onPress={() => setMode('course')}
               />
-              {courses.map((c) => (
-                <CourseRow
-                  key={c.id}
-                  label={c.name}
-                  color={c.color}
-                  selected={courseId === c.id}
-                  onPress={() => setCourseId(c.id)}
-                />
-              ))}
-            </ScrollView>
+              <ModeTab label={FREE_STUDY_NAME} selected={free} onPress={() => setMode('free')} />
+            </View>
+
+            {free ? null : (
+              <ScrollView style={styles.courseList} keyboardShouldPersistTaps="handled">
+                {courses.map((c) => (
+                  <CourseRow
+                    key={c.id}
+                    label={c.name}
+                    color={c.color}
+                    selected={courseId === c.id}
+                    onPress={() => setCourseId(c.id)}
+                  />
+                ))}
+              </ScrollView>
+            )}
 
             <View style={styles.grid}>
               {field('Focus (min)', work, setWork)}
@@ -145,8 +163,10 @@ export function PomodoroSetupSheet({
             </View>
 
             <Text style={[styles.hint, { color: theme.muted }]}>
-              Time is added to the chosen course when a focus block finishes. Free study is not
-              tracked.
+              {free
+                ? `Time is banked as ${FREE_STUDY_NAME} on this semester — its own category in ` +
+                  'Study time, separate from every course.'
+                : 'Time is added to the chosen course when a focus block finishes.'}
             </Text>
 
             <Pressable
@@ -166,6 +186,45 @@ export function PomodoroSetupSheet({
       </KeyboardAvoidingView>
       <NumericKeyboardDoneBar />
     </Modal>
+  );
+}
+
+/** One half of the Course / Free study switch above the list. */
+function ModeTab({
+  label,
+  selected,
+  disabled,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  disabled?: boolean;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="radio"
+      accessibilityState={{ selected, disabled: !!disabled }}
+      accessibilityLabel={label}
+      style={({ pressed }) => [
+        styles.modeTab,
+        selected && { backgroundColor: theme.surfaceAlt },
+        pressed && { opacity: 0.6 },
+      ]}
+    >
+      <Text
+        style={[
+          styles.modeTabText,
+          { color: disabled ? theme.muted : selected ? theme.accent : theme.text },
+          selected && styles.modeTabTextOn,
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -222,6 +281,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   title: { fontSize: 17, fontWeight: '600', textAlign: 'center', marginBottom: 8 },
+  modes: {
+    flexDirection: 'row',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  modeTab: { flex: 1, paddingVertical: 9, alignItems: 'center' },
+  modeTabText: { fontSize: 14 },
+  modeTabTextOn: { fontWeight: '600' },
   courseList: { maxHeight: 180 },
   courseRow: {
     flexDirection: 'row',

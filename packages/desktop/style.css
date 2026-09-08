@@ -469,6 +469,33 @@ body.platform-mac .header-inner {
 .pomodoro-aux .ti { width: 16px; height: 16px; }
 
 .pomodoro-modal { min-width: 380px; }
+
+/* Course vs Free study — a two-up segmented switch, because free study is a
+   category of its own rather than another entry in the course list. */
+.pomodoro-mode {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+}
+.pomodoro-mode-btn {
+  border: none;
+  background: var(--surface);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 0.35rem 0.85rem;
+  cursor: pointer;
+}
+.pomodoro-mode-btn + .pomodoro-mode-btn { border-left: 1px solid var(--border); }
+.pomodoro-mode-btn:hover { background: var(--hover); color: var(--text); }
+.pomodoro-mode-btn[aria-checked='true'] {
+  background: var(--select-bg);
+  color: var(--primary);
+  font-weight: 600;
+}
 .pomodoro-field { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 0.75rem; }
 .pomodoro-field > span { font-size: 0.8rem; color: var(--muted); }
 .pomodoro-grid {
@@ -536,9 +563,13 @@ body.platform-mac .header-inner {
 .st-switch-label { font-size: 0.8rem; color: var(--muted); }
 .st-switch-hint { font-size: 0.75rem; color: var(--muted); margin: 0.15rem 0 0; line-height: 1.45; }
 
-/* Phase-complete gate — same modal shell as the setup modal above, just
-   narrower since it is one line of copy and two buttons. */
-.pomodoro-advance-modal { min-width: 360px; max-width: 420px; }
+/* Phase-complete gate — same modal shell as the setup modal above, sized for
+   the widest answer set: a finished break offers three ways forward (+5 min /
+   keep resting / next phase) beside the stop button in the footer's left slot. */
+.pomodoro-advance-modal { min-width: 520px; max-width: 560px; }
+/* Sized so the widest set fits on one row; wrapping is only a safety net for a
+   font or locale that runs wider than the labels shipped here. */
+#pomodoro-advance-actions { flex-wrap: wrap; justify-content: flex-end; }
 .pomodoro-advance-message {
   font-size: 0.85rem;
   color: var(--muted);

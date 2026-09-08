@@ -1,6 +1,7 @@
-// Where the semester's tracked study time went: a ring of per-course slices,
-// the total in the middle, a legend, and — while a session is running — which
-// course it credits. The mobile half of the desktop "Study time" panel.
+// Where the semester's tracked study time went: a ring of slices — one per
+// course plus the semester's own Free study category — the total in the middle,
+// a legend, and, while a session is running, which of them it credits. The
+// mobile half of the desktop "Study time" panel.
 //
 // Same fade-backdrop + slide-sheet shape as PomodoroSetupSheet (RN's <Modal>,
 // no extra dependency), and deliberately nothing to do with the course
@@ -24,7 +25,12 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { formatHoursMinutes, studyTimeByCourse } from '@lectio/core/pomodoro-core';
+import {
+  FREE_STUDY_COLOR,
+  FREE_STUDY_NAME,
+  formatHoursMinutes,
+  studyTimeByCourse,
+} from '@lectio/core/pomodoro-core';
 import { getCourses } from '@lectio/core/planner-core';
 import { useTheme } from '../theme';
 import { usePomodoro } from './PomodoroProvider';
@@ -85,8 +91,8 @@ export function StudyTimeDashboard({
 
           {breakdown.courses.length === 0 ? (
             <Text style={[styles.empty, { color: theme.muted }]}>
-              No study time tracked yet. Finish a focus block, or set a course&apos;s studied time
-              from its course screen.
+              No study time tracked yet. Finish a focus block — against a course or as{' '}
+              {FREE_STUDY_NAME} — or set a course&apos;s studied time from its course screen.
             </Text>
           ) : (
             <View style={styles.legend}>
@@ -113,9 +119,10 @@ export function StudyTimeDashboard({
               <>
                 <ScrollView style={styles.courseList}>
                   <CourseRow
-                    label="Free study (no course)"
+                    label={FREE_STUDY_NAME}
+                    color={FREE_STUDY_COLOR}
                     selected={session.courseId === null}
-                    onPress={() => switchCourse(null, null)}
+                    onPress={() => switchCourse(null, semester ? semester.id : null)}
                   />
                   {courses.map((c) => (
                     <CourseRow
@@ -129,13 +136,13 @@ export function StudyTimeDashboard({
                 </ScrollView>
                 <Text style={[styles.hint, { color: theme.muted }]}>
                   {midBlock
-                    ? 'Minutes already studied in this block stay with the course they were earned on — switching banks them and starts a fresh block for the new course.'
-                    : 'The next focus block is credited to this course.'}
+                    ? 'Minutes already studied in this block stay where they were earned — switching banks them and starts a fresh block.'
+                    : `The next focus block is credited here. ${FREE_STUDY_NAME} is its own category on this semester.`}
                 </Text>
               </>
             ) : (
               <Text style={[styles.hint, { color: theme.muted }]}>
-                No timer running — start one to track time against a course.
+                {`No timer running — start one to track time against a course, or as ${FREE_STUDY_NAME}.`}
               </Text>
             )}
           </View>
