@@ -7,7 +7,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 // the same JS context.
 contextBridge.exposeInMainWorld('pomodoroPopup', {
   onData: (callback) => ipcRenderer.on('pomodoro-popup-data', (_e, payload) => callback(payload)),
-  confirm: () => ipcRenderer.send('pomodoro-popup-confirm'),
-  stop: () => ipcRenderer.send('pomodoro-popup-stop'),
+  // The buttons are whatever the main window sent in `actions`; clicking one
+  // relays its id back rather than naming a fixed transition here.
+  action: (id) => ipcRenderer.send('pomodoro-popup-action', id),
   dismiss: () => ipcRenderer.send('pomodoro-popup-dismiss'),
 });
