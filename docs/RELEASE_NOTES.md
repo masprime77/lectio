@@ -42,6 +42,25 @@
   `process.platform` synchronously to the renderer so `init()` can apply the
   `platform-mac` body class.
 
+- Fixed (desktop): "+ Add tag" in the semester editor's Tags tab did nothing.
+  It named the new tag with `window.prompt()`, which Electron does not
+  implement — the click handler threw before reaching `addTag()`, with no
+  dialog and no visible error. The button now appends an inline draft row with
+  a focused name field: Enter or clicking away commits it, Escape or the ✕
+  button cancels, and an empty name is treated as a cancel. Same in-place
+  pattern as `editStudyTimeInline()`, which already avoided `prompt()` for this
+  reason. Mobile was never affected — it has its own inline add form.
+
+- Changed (desktop): a new tag's color is now picked in the draft row instead
+  of being hardcoded per section (orange for pending, blue for done), matching
+  the color choice mobile already offers.
+
+- Fixed (desktop): the Tags tab re-bound its drag-to-reorder listeners on every
+  render, stacking a duplicate set on each `<ul>` and pinning each copy to
+  whichever semester object was open when it was bound — so reordering tags
+  could mutate a previously-edited semester. The listeners are now bound once
+  per list and read `state.editingSemester`.
+
 ## 1.1.4 — 2026-08-28
 
 - Added (desktop): a forgot-password flow on the sign-in screen. A "Forgot
