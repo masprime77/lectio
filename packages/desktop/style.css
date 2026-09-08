@@ -1644,6 +1644,10 @@ body.platform-mac .header-inner {
   color: var(--text);
 }
 .tag-name-input:disabled { opacity: 0.55; cursor: not-allowed; }
+/* The unsaved "+ Add tag" row, named in place (Electron has no prompt()). */
+.tag-row--draft .tag-name-input {
+  border-color: var(--primary);
+}
 
 /* Settings modal */
 .settings-modal { max-width: 360px; }
