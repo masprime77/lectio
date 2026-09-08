@@ -4484,7 +4484,7 @@ function renderTagsEditor(semester) {
       tags
         .filter((t) => t.section === section)
         .forEach((tag) => list.appendChild(buildTagRow(semester, type, tag)));
-      setupTagDragDrop(list, semester, type);
+      setupTagDragDrop(list, type);
     });
   });
   wireAddTagButtons(semester);
@@ -4552,7 +4552,19 @@ function buildTagRow(semester, type, tag) {
   return li;
 }
 
-function setupTagDragDrop(list, semester, type) {
+function setupTagDragDrop(list, type) {
+  // Only non-protected saved rows are draggable (a draft row has no tag id yet).
+  list.querySelectorAll('li').forEach((li) => {
+    li.draggable = !isProtectedTag(li.dataset.tagId);
+  });
+
+  // The rows are rebuilt on every render but the <ul> is not, so bind the drag
+  // listeners once: re-binding would stack duplicates and pin each copy to
+  // whichever semester object was open when it was bound. The handlers read
+  // state.editingSemester instead — always the semester the Tags tab edits.
+  if (list.dataset.dndWired === '1') return;
+  list.dataset.dndWired = '1';
+
   let dragSrc = null;
 
   list.addEventListener('dragstart', (e) => {
@@ -4582,15 +4594,11 @@ function setupTagDragDrop(list, semester, type) {
     // Collect ordered ids from ALL lists for this type, then reorder.
     const allLists = document.querySelectorAll('[id^="' + type + '-tags-"][id$="-list"]');
     const orderedIds = [...allLists].flatMap((l) =>
-      [...l.querySelectorAll('li')].map((li) => li.dataset.tagId)
+      [...l.querySelectorAll('li:not(.tag-row--draft)')].map((li) => li.dataset.tagId)
     );
-    reorderTags(semester, type, orderedIds);
+    if (!state.editingSemester) return;
+    reorderTags(state.editingSemester, type, orderedIds);
     persist();
-  });
-
-  // Only non-protected rows are draggable.
-  list.querySelectorAll('li').forEach((li) => {
-    li.draggable = !isProtectedTag(li.dataset.tagId);
   });
 }
 
@@ -4606,14 +4614,107 @@ function wireAddTagButtons(semester) {
     // Clone to drop any previous listener bound to a stale semester object.
     btn.replaceWith(btn.cloneNode(true));
     document.getElementById(btnId).addEventListener('click', () => {
-      const name = prompt('Tag name:');
-      if (!name || !name.trim()) return;
-      const color = section === 'pending' ? '#f97316' : '#3b82f6';
-      addTag(semester, type, { name: name.trim(), color, section });
-      persist();
-      renderTagsEditor(semester);
+      openTagDraftRow(semester, type, section);
     });
   });
+}
+
+// "+ Add tag" names the new tag in place: a draft row with a focused name input
+// and a color swatch, committed on Enter or when focus leaves the row and
+// cancelled with Escape. Inline rather than a dialog because Electron has no
+// window.prompt() — same reason editStudyTimeInline() edits in place.
+function openTagDraftRow(semester, type, section) {
+  const list = document.getElementById(type + '-tags-' + section + '-list');
+  if (!list) return;
+
+  // One draft at a time per list: a second click just refocuses the open one.
+  const open = list.querySelector('.tag-row--draft');
+  if (open) {
+    open.querySelector('.tag-name-input').focus();
+    return;
+  }
+
+  const li = document.createElement('li');
+  li.className = 'tag-row tag-row--draft';
+
+  // Placeholder handle so the draft lines up with the saved rows above it.
+  const handle = document.createElement('span');
+  handle.className = 'tag-drag-handle tag-drag-handle--locked';
+  handle.innerHTML = '⠿';
+
+  const colorPicker = document.createElement('input');
+  colorPicker.type = 'color';
+  colorPicker.value = section === 'pending' ? '#f97316' : '#3b82f6';
+
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.className = 'tag-name-input';
+  nameInput.placeholder = 'Tag name';
+  nameInput.setAttribute('aria-label', 'New tag name');
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.className = 'icon-btn';
+  cancelBtn.innerHTML = icon('x');
+  cancelBtn.title = 'Cancel';
+
+  let settled = false;
+
+  const cancel = () => {
+    if (settled) return;
+    settled = true;
+    li.remove();
+  };
+
+  const commit = () => {
+    if (settled) return;
+    const name = nameInput.value.trim();
+    // An empty name is a cancel, not an unnamed tag.
+    if (!name) {
+      cancel();
+      return;
+    }
+    settled = true;
+    const tag = addTag(semester, type, { name, color: colorPicker.value, section });
+    persist();
+    // Swap in the saved row rather than re-rendering the editor: a full render
+    // also replaces the "+ Add tag" buttons, which would swallow the click that
+    // committed this draft when it landed on another section's button.
+    const row = buildTagRow(semester, type, tag);
+    row.draggable = !isProtectedTag(tag.id);
+    li.replaceWith(row);
+  };
+
+  // Commit when focus leaves the row entirely — moving between the name input
+  // and the color swatch keeps the draft open.
+  li.addEventListener('focusout', (e) => {
+    if (li.contains(e.relatedTarget)) return;
+    commit();
+  });
+
+  nameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commit();
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      cancel();
+    }
+  });
+
+  // mousedown (not click) so the row is gone before the focusout would commit.
+  cancelBtn.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    cancel();
+  });
+
+  li.appendChild(handle);
+  li.appendChild(colorPicker);
+  li.appendChild(nameInput);
+  li.appendChild(cancelBtn);
+  list.appendChild(li);
+  nameInput.focus();
 }
 
 // ---------------------------------------------------------------------------
