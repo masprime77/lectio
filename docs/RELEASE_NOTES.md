@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 1.1.5 — 2026-09-11
+
 - Added (desktop + mobile): **Free study is its own tracked category.** It was
   the "no course" entry in the timer's course list and its time was discarded;
   it is now a top-level choice beside Course, banked on the semester itself
