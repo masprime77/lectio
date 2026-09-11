@@ -49,7 +49,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: 'pomodoro',
     title: 'Study timer',
     description:
-      'The clock button starts a Pomodoro timer for a course: set your focus and break lengths, and Lectio tracks how long you have studied. It becomes a live countdown — tap to pause, long-press to skip ahead.',
+      'The clock button starts a Pomodoro timer for a course, or as Free study — its own category. When a focus block ends you can take the break or keep studying; when a break ends you can go back to work, take five more minutes, or rest on. Tap the pill to pause, long-press to move on.',
   },
   {
     id: 'settings',

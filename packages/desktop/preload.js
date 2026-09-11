@@ -40,6 +40,10 @@ contextBridge.exposeInMainWorld('saver', {
 // App info (read-only).
 contextBridge.exposeInMainWorld('appInfo', {
   getVersion: () => ipcRenderer.invoke('get-version'),
+  // Synchronous — process.platform is available directly in the
+  // preload context, no IPC round-trip needed. Used by app.js to
+  // scope the traffic-light header spacing (see init()) to macOS.
+  platform: process.platform,
 });
 
 // External links: open a URL in the default browser. Main restricts this to
@@ -82,26 +86,24 @@ contextBridge.exposeInMainWorld('providerAuth', {
 });
 
 // Pomodoro menu bar bridge: the renderer reports its current display state
-// one-way (main has no timer logic of its own — see main.js), and receives
-// back the three actions the header button already performs, relayed from
-// clicks on the Tray menu.
+// one-way, including the list of answers that state offers (main has no timer
+// logic of its own — see main.js), and receives back the id of whichever menu
+// item was clicked. One channel covers every action the menu can show, so the
+// menu bar tracks the in-window modal without new IPC per option.
 contextBridge.exposeInMainWorld('pomodoroTray', {
   report: (state) => ipcRenderer.send('pomodoro-tray-report', state),
-  onToggle: (callback) => ipcRenderer.on('tray-pomodoro-toggle', () => callback()),
-  onSkip: (callback) => ipcRenderer.on('tray-pomodoro-skip', () => callback()),
-  onStop: (callback) => ipcRenderer.on('tray-pomodoro-stop', () => callback()),
+  onAction: (callback) => ipcRenderer.on('tray-pomodoro-action', (_e, id) => callback(id)),
   onOpenModal: (callback) => ipcRenderer.on('tray-open-pomodoro-modal', () => callback()),
 });
 
 // Pomodoro completion popup bridge (main window side): asks main to
 // show/hide the always-on-top completion alert (see main.js's
-// showPomodoroPopup) and listens for the two actions its buttons can
-// trigger, relayed back here so @lectio/core's session logic —
-// confirmAdvance()/stopPomodoro() — only ever runs in this renderer, the
-// same as the header button and the Tray.
+// showPomodoroPopup) — the payload carries the answers to render — and listens
+// for the id of whichever one was clicked, relayed back here so @lectio/core's
+// session logic only ever runs in this renderer, the same as the header button
+// and the Tray.
 contextBridge.exposeInMainWorld('pomodoroPopup', {
   show: (payload) => ipcRenderer.send('pomodoro-popup-show', payload),
   hide: () => ipcRenderer.send('pomodoro-popup-hide'),
-  onConfirm: (callback) => ipcRenderer.on('popup-pomodoro-confirm', () => callback()),
-  onStop: (callback) => ipcRenderer.on('popup-pomodoro-stop', () => callback()),
+  onAction: (callback) => ipcRenderer.on('popup-pomodoro-action', (_e, id) => callback(id)),
 });

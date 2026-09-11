@@ -238,9 +238,9 @@ describe('studyTimeByCourse', () => {
     const out = pomodoro.studyTimeByCourse(mixed);
     expect(out.totalSeconds).toBe(9000);
     expect(out.courses).toEqual([
-      { id: 'long', name: 'LONG', color: '#4A90D9', seconds: 5400, share: 0.6, percent: 60 },
-      { id: 'mid', name: 'MID', color: '#4A90D9', seconds: 2700, share: 0.3, percent: 30 },
-      { id: 'short', name: 'SHORT', color: '#4A90D9', seconds: 900, share: 0.1, percent: 10 },
+      { id: 'long', name: 'LONG', color: '#4A90D9', seconds: 5400, share: 0.6, percent: 60, freeStudy: false },
+      { id: 'mid', name: 'MID', color: '#4A90D9', seconds: 2700, share: 0.3, percent: 30, freeStudy: false },
+      { id: 'short', name: 'SHORT', color: '#4A90D9', seconds: 900, share: 0.1, percent: 10, freeStudy: false },
     ]);
   });
 
@@ -258,7 +258,7 @@ describe('studyTimeByCourse', () => {
   it('gives a lone studied course the whole 100%', () => {
     const solo = semester([course('a'), course('b', 300)]);
     expect(pomodoro.studyTimeByCourse(solo).courses).toEqual([
-      { id: 'b', name: 'B', color: '#4A90D9', seconds: 300, share: 1, percent: 100 },
+      { id: 'b', name: 'B', color: '#4A90D9', seconds: 300, share: 1, percent: 100, freeStudy: false },
     ]);
   });
 
@@ -272,7 +272,7 @@ describe('studyTimeByCourse', () => {
     ]);
     const out = pomodoro.studyTimeByCourse(odd);
     expect(out.courses).toEqual([
-      { id: 'a', name: 'A', color: null, seconds: 60, share: 1, percent: 100 },
+      { id: 'a', name: 'A', color: null, seconds: 60, share: 1, percent: 100, freeStudy: false },
     ]);
   });
 
@@ -465,6 +465,7 @@ describe('deadline-based session', () => {
         pausedAt: null,
         completedPomodoros: 0,
         awaitingAdvance: false,
+        overtimeStartedAt: null,
         courseId: null,
         semesterId: null,
       });
@@ -492,6 +493,7 @@ describe('deadline-based session', () => {
         pausedAt: null,
         completedPomodoros: 0,
         awaitingAdvance: false,
+        overtimeStartedAt: null,
         courseId: 'c1',
         semesterId: 's1',
       });
@@ -928,6 +930,384 @@ describe('deadline-based session', () => {
       expect(back.courseId).toBeNull();
       expect(pomodoro.rehydrateSession({ ...raw, completedPomodoros: 'two' }, T).completedPomodoros).toBe(0);
       expect(pomodoro.rehydrateSession({ ...raw, completedPomodoros: 2.7 }, T).completedPomodoros).toBe(2);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Open-ended phases: a finished focus block or break carried on past its
+// deadline until the user says otherwise, and the timed "+N minutes" break.
+// ---------------------------------------------------------------------------
+describe('open-ended phases', () => {
+  const T = 1_700_000_000_000;
+  const WORK = 25 * 60;
+  const SHORT = 5 * 60;
+
+  // A session parked awaiting advance, exactly as markPhaseComplete leaves one.
+  const parked = (phase, over) => ({
+    ...pomodoro.startSession(settings(), { courseId: 'c1', semesterId: 's1' }, T),
+    phase,
+    endsAt: T,
+    awaitingAdvance: true,
+    ...over,
+  });
+
+  describe('extendPhase', () => {
+    it('leaves the awaiting-advance state without changing phase', () => {
+      const out = pomodoro.extendPhase(parked('work'), T + 500);
+      expect(out.phase).toBe('work');
+      expect(out.awaitingAdvance).toBe(false);
+      expect(out.overtimeStartedAt).toBe(T + 500);
+      expect(pomodoro.isOvertime(out)).toBe(true);
+      expect(pomodoro.isAwaitingAdvance(out)).toBe(false);
+    });
+
+    it('keeps the course, semester and completed count', () => {
+      const out = pomodoro.extendPhase(parked('work', { completedPomodoros: 2 }), T);
+      expect(out.courseId).toBe('c1');
+      expect(out.semesterId).toBe('s1');
+      expect(out.completedPomodoros).toBe(2);
+    });
+
+    it('works for a break too', () => {
+      expect(pomodoro.isOvertime(pomodoro.extendPhase(parked('shortBreak'), T))).toBe(true);
+      expect(pomodoro.isOvertime(pomodoro.extendPhase(parked('longBreak'), T))).toBe(true);
+    });
+
+    it('is a no-op for anything that is not awaiting advance', () => {
+      const running = pomodoro.startSession(settings(), {}, T);
+      expect(pomodoro.extendPhase(running, T)).toBe(running);
+      const idle = pomodoro.createIdleSession();
+      expect(pomodoro.extendPhase(idle, T)).toBe(idle);
+    });
+  });
+
+  describe('isOvertime / overtimeSeconds', () => {
+    it('is false, and 0 seconds, for an ordinary session', () => {
+      const running = pomodoro.startSession(settings(), {}, T);
+      expect(pomodoro.isOvertime(running)).toBe(false);
+      expect(pomodoro.overtimeSeconds(running, T + 60_000)).toBe(0);
+      expect(pomodoro.isOvertime(pomodoro.createIdleSession())).toBe(false);
+    });
+
+    it('counts up from when the user chose to keep going', () => {
+      const out = pomodoro.extendPhase(parked('work'), T);
+      expect(pomodoro.overtimeSeconds(out, T)).toBe(0);
+      expect(pomodoro.overtimeSeconds(out, T + 90_000)).toBe(90);
+    });
+
+    it('freezes while paused and resumes without counting the pause', () => {
+      const extended = pomodoro.extendPhase(parked('work'), T);
+      const paused = pomodoro.pauseSession(extended, T + 60_000);
+      expect(pomodoro.overtimeSeconds(paused, T + 5 * 60_000)).toBe(60);
+      const resumed = pomodoro.resumeSession(paused, T + 5 * 60_000);
+      expect(pomodoro.overtimeSeconds(resumed, T + 5 * 60_000)).toBe(60);
+      expect(pomodoro.overtimeSeconds(resumed, T + 6 * 60_000)).toBe(120);
+    });
+
+    it('caps a stretch left running for days', () => {
+      const out = pomodoro.extendPhase(parked('work'), T);
+      expect(pomodoro.overtimeSeconds(out, T + 3 * 24 * 3600_000)).toBe(
+        pomodoro.MAX_OVERTIME_SECONDS
+      );
+    });
+  });
+
+  describe('isPhaseComplete', () => {
+    it('never fires for an open-ended stretch, however far past the deadline', () => {
+      const out = pomodoro.extendPhase(parked('work'), T);
+      expect(pomodoro.isPhaseComplete(out, T + 10 * 3600_000)).toBe(false);
+      expect(pomodoro.isRunning(out)).toBe(true);
+    });
+  });
+
+  describe('pendingWorkCreditSeconds', () => {
+    it('is the elapsed part of a running block', () => {
+      const running = pomodoro.startSession(settings(), {}, T);
+      expect(pomodoro.pendingWorkCreditSeconds(running, settings(), T + 60_000)).toBe(60);
+    });
+
+    it('is 0 for a finished block waiting to be advanced — already credited', () => {
+      expect(pomodoro.pendingWorkCreditSeconds(parked('work'), settings(), T + 60_000)).toBe(0);
+    });
+
+    it('is only the extra stretch once the block is carried on', () => {
+      const out = pomodoro.extendPhase(parked('work'), T);
+      expect(pomodoro.pendingWorkCreditSeconds(out, settings(), T + 120_000)).toBe(120);
+    });
+
+    it('is 0 outside a work phase', () => {
+      expect(pomodoro.pendingWorkCreditSeconds(parked('shortBreak'), settings(), T)).toBe(0);
+      const extendedBreak = pomodoro.extendPhase(parked('shortBreak'), T);
+      expect(pomodoro.pendingWorkCreditSeconds(extendedBreak, settings(), T + 60_000)).toBe(0);
+      expect(pomodoro.pendingWorkCreditSeconds(pomodoro.createIdleSession(), settings(), T)).toBe(0);
+    });
+  });
+
+  describe('advanceSession out of an open-ended stretch', () => {
+    it('moves focus on to the break and clears the overtime marker', () => {
+      const out = pomodoro.advanceSession(
+        pomodoro.extendPhase(parked('work'), T),
+        settings(),
+        T + 600_000
+      );
+      expect(out.phase).toBe('shortBreak');
+      expect(out.overtimeStartedAt).toBe(null);
+      expect(out.completedPomodoros).toBe(1);
+      expect(out.endsAt).toBe(T + 600_000 + SHORT * 1000);
+    });
+
+    it('moves an extended break on to a fresh focus block', () => {
+      const out = pomodoro.advanceSession(
+        pomodoro.extendPhase(parked('shortBreak'), T),
+        settings(),
+        T + 600_000
+      );
+      expect(out.phase).toBe('work');
+      expect(out.overtimeStartedAt).toBe(null);
+      expect(out.endsAt).toBe(T + 600_000 + WORK * 1000);
+    });
+
+    it('ends the cycle when an extended long break is finished', () => {
+      const out = pomodoro.advanceSession(
+        pomodoro.extendPhase(parked('longBreak'), T),
+        settings(),
+        T + 600_000
+      );
+      expect(out).toEqual(pomodoro.createIdleSession());
+    });
+  });
+
+  describe('extendPhaseByMinutes', () => {
+    it('gives a finished break a fresh countdown', () => {
+      const out = pomodoro.extendPhaseByMinutes(parked('shortBreak'), 5, T + 1000);
+      expect(out.awaitingAdvance).toBe(false);
+      expect(out.overtimeStartedAt).toBe(null);
+      expect(out.phase).toBe('shortBreak');
+      expect(out.endsAt).toBe(T + 1000 + 5 * 60_000);
+      expect(pomodoro.remainingSeconds(out, T + 1000)).toBe(300);
+      expect(pomodoro.isOvertime(out)).toBe(false);
+    });
+
+    it('completes again when those minutes run out', () => {
+      const out = pomodoro.extendPhaseByMinutes(parked('longBreak'), 5, T);
+      expect(pomodoro.isPhaseComplete(out, T + 4 * 60_000)).toBe(false);
+      expect(pomodoro.isPhaseComplete(out, T + 5 * 60_000)).toBe(true);
+    });
+
+    it('clamps the minutes and falls back to 5 for nonsense', () => {
+      expect(pomodoro.extendPhaseByMinutes(parked('shortBreak'), 999, T).endsAt).toBe(
+        T + 90 * 60_000
+      );
+      expect(pomodoro.extendPhaseByMinutes(parked('shortBreak'), 'abc', T).endsAt).toBe(
+        T + 5 * 60_000
+      );
+    });
+
+    it('refuses a work phase, whose block was already credited in full', () => {
+      const work = parked('work');
+      expect(pomodoro.extendPhaseByMinutes(work, 5, T)).toBe(work);
+    });
+
+    it('is a no-op for anything that is not awaiting advance', () => {
+      const running = pomodoro.startSession(settings(), {}, T);
+      expect(pomodoro.extendPhaseByMinutes(running, 5, T)).toBe(running);
+    });
+  });
+
+  describe('sessionLabel', () => {
+    it('names an open-ended stretch rather than its phase', () => {
+      expect(pomodoro.sessionLabel(pomodoro.extendPhase(parked('work'), T))).toBe('Extra focus');
+      expect(pomodoro.sessionLabel(pomodoro.extendPhase(parked('shortBreak'), T))).toBe(
+        'Extra break'
+      );
+      expect(pomodoro.sessionLabel(pomodoro.extendPhase(parked('longBreak'), T))).toBe(
+        'Extra break'
+      );
+    });
+
+    it('falls back to the plain phase label otherwise', () => {
+      expect(pomodoro.sessionLabel(pomodoro.startSession(settings(), {}, T))).toBe('Focus');
+      expect(pomodoro.sessionLabel(parked('shortBreak'))).toBe('Short break');
+      expect(pomodoro.sessionLabel(pomodoro.createIdleSession())).toBe('Idle');
+      expect(pomodoro.sessionLabel(null)).toBe('Idle');
+    });
+  });
+
+  describe('rehydrateSession', () => {
+    it('restores an open-ended stretch as-is, deadline long past', () => {
+      const raw = pomodoro.extendPhase(parked('work'), T);
+      const out = pomodoro.rehydrateSession(JSON.parse(JSON.stringify(raw)), T + 3600_000);
+      expect(out).toEqual(raw);
+    });
+
+    it('restores an open-ended *break* instead of collapsing it to idle', () => {
+      const raw = pomodoro.extendPhase(parked('shortBreak'), T);
+      const out = pomodoro.rehydrateSession(JSON.parse(JSON.stringify(raw)), T + 3600_000);
+      expect(out.phase).toBe('shortBreak');
+      expect(out.overtimeStartedAt).toBe(T);
+    });
+
+    it('drops a non-numeric overtime marker', () => {
+      const out = pomodoro.rehydrateSession(
+        { ...parked('work'), awaitingAdvance: false, overtimeStartedAt: 'soon' },
+        T
+      );
+      expect(out.overtimeStartedAt).toBe(null);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Free study: time tracked with no course attached, banked on the semester as
+// its own category rather than dropped.
+// ---------------------------------------------------------------------------
+describe('free study', () => {
+  const semester = (over) => ({ id: 'ss2025', name: 'Summer', courses: [], ...over });
+
+  describe('getFreeStudySeconds', () => {
+    it('is 0 for a semester that has never tracked any', () => {
+      expect(pomodoro.getFreeStudySeconds(semester())).toBe(0);
+      expect(pomodoro.getFreeStudySeconds(null)).toBe(0);
+    });
+
+    it('does not create the bucket the way ensureFreeStudyTime does', () => {
+      const s = semester();
+      pomodoro.getFreeStudySeconds(s);
+      expect(s.freeStudy).toBeUndefined();
+      expect(pomodoro.ensureFreeStudyTime(s)).toEqual({ totalSeconds: 0, sessions: [] });
+      expect(s.freeStudy).toEqual({ totalSeconds: 0, sessions: [] });
+    });
+
+    it('repairs a malformed bucket in place', () => {
+      const s = semester({ freeStudy: { totalSeconds: 'lots' } });
+      expect(pomodoro.ensureFreeStudyTime(s)).toEqual({ totalSeconds: 0, sessions: [] });
+    });
+  });
+
+  describe('addFreeStudyTime', () => {
+    it('adds seconds and logs a session entry', () => {
+      const s = semester();
+      pomodoro.addFreeStudyTime(s, 600, { source: 'pomodoro', date: '2026-09-08' });
+      expect(s.freeStudy.totalSeconds).toBe(600);
+      expect(s.freeStudy.sessions).toHaveLength(1);
+      expect(s.freeStudy.sessions[0]).toMatchObject({
+        seconds: 600,
+        source: 'pomodoro',
+        date: '2026-09-08',
+      });
+    });
+
+    it('accumulates across calls', () => {
+      const s = semester();
+      pomodoro.addFreeStudyTime(s, 600);
+      pomodoro.addFreeStudyTime(s, 300);
+      expect(pomodoro.getFreeStudySeconds(s)).toBe(900);
+    });
+
+    it('ignores zero, negative and missing seconds, and a missing semester', () => {
+      const s = semester();
+      pomodoro.addFreeStudyTime(s, 0);
+      pomodoro.addFreeStudyTime(s, -60);
+      pomodoro.addFreeStudyTime(s);
+      expect(s.freeStudy).toBeUndefined();
+      expect(pomodoro.addFreeStudyTime(null, 60)).toBe(null);
+    });
+
+    it('caps the session log at MAX_SESSIONS, dropping the oldest', () => {
+      const s = semester();
+      for (let i = 0; i < pomodoro.MAX_SESSIONS + 5; i++) pomodoro.addFreeStudyTime(s, i + 1);
+      expect(s.freeStudy.sessions).toHaveLength(pomodoro.MAX_SESSIONS);
+      expect(s.freeStudy.sessions[0].seconds).toBe(6);
+    });
+  });
+
+  describe('setFreeStudyTime', () => {
+    it('overwrites the total and logs the delta as an adjustment', () => {
+      const s = semester();
+      pomodoro.addFreeStudyTime(s, 600);
+      pomodoro.setFreeStudyTime(s, 1800);
+      expect(pomodoro.getFreeStudySeconds(s)).toBe(1800);
+      const last = s.freeStudy.sessions[s.freeStudy.sessions.length - 1];
+      expect(last).toMatchObject({ seconds: 1200, source: 'adjustment' });
+    });
+
+    it('logs nothing when the total is unchanged, and floors at zero', () => {
+      const s = semester();
+      pomodoro.addFreeStudyTime(s, 600);
+      pomodoro.setFreeStudyTime(s, 600);
+      expect(s.freeStudy.sessions).toHaveLength(1);
+      pomodoro.setFreeStudyTime(s, -50);
+      expect(pomodoro.getFreeStudySeconds(s)).toBe(0);
+    });
+
+    it('tolerates a missing semester', () => {
+      expect(pomodoro.setFreeStudyTime(null, 60)).toBe(null);
+    });
+  });
+
+  describe('studyTimeByCourse', () => {
+    const withCourse = (seconds) => ({
+      id: 'c1',
+      name: 'Algorithms',
+      color: '#4A90D9',
+      studyTime: { totalSeconds: seconds, sessions: [] },
+    });
+
+    it('lists free study as its own slice alongside the courses', () => {
+      const s = semester({ courses: [withCourse(1800)] });
+      pomodoro.addFreeStudyTime(s, 600);
+      const out = pomodoro.studyTimeByCourse(s);
+      expect(out.totalSeconds).toBe(2400);
+      expect(out.courses).toEqual([
+        {
+          id: 'c1',
+          name: 'Algorithms',
+          color: '#4A90D9',
+          seconds: 1800,
+          share: 0.75,
+          percent: 75,
+          freeStudy: false,
+        },
+        {
+          id: pomodoro.FREE_STUDY_ID,
+          name: pomodoro.FREE_STUDY_NAME,
+          color: pomodoro.FREE_STUDY_COLOR,
+          seconds: 600,
+          share: 0.25,
+          percent: 25,
+          freeStudy: true,
+        },
+      ]);
+    });
+
+    it('sorts it by size like any other slice', () => {
+      const s = semester({ courses: [withCourse(600)] });
+      pomodoro.addFreeStudyTime(s, 1800);
+      expect(pomodoro.studyTimeByCourse(s).courses.map((c) => c.id)).toEqual([
+        pomodoro.FREE_STUDY_ID,
+        'c1',
+      ]);
+    });
+
+    it('leaves it out when nothing has been tracked against it', () => {
+      const out = pomodoro.studyTimeByCourse(semester({ courses: [withCourse(600)] }));
+      expect(out.courses).toHaveLength(1);
+      expect(out.courses[0].id).toBe('c1');
+    });
+
+    it('can be the only slice', () => {
+      const s = semester();
+      pomodoro.addFreeStudyTime(s, 600);
+      const out = pomodoro.studyTimeByCourse(s);
+      expect(out.totalSeconds).toBe(600);
+      expect(out.courses).toHaveLength(1);
+      expect(out.courses[0]).toMatchObject({ freeStudy: true, percent: 100 });
+    });
+
+    it('survives a malformed free-study bucket', () => {
+      const s = semester({ courses: [withCourse(600)], freeStudy: { totalSeconds: 'lots' } });
+      expect(pomodoro.studyTimeByCourse(s).courses).toHaveLength(1);
     });
   });
 });

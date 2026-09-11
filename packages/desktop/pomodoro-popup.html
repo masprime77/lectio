@@ -96,15 +96,19 @@
     .actions {
       margin-top: auto;
       display: flex;
+      flex-wrap: wrap;
       justify-content: flex-end;
       gap: 0.5rem;
     }
+    /* "Stop timer" is the one answer that leaves rather than continues, so it
+       is pushed to the far left and the ways forward stay grouped right. */
+    .actions button.btn[data-action='stop'] { margin-right: auto; }
     button.btn {
       -webkit-app-region: no-drag;
       font-family: inherit;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       font-weight: 600;
-      padding: 0.5rem 0.9rem;
+      padding: 0.5rem 0.7rem;
       border-radius: var(--radius);
       border: 1px solid var(--border);
       background: var(--surface);
@@ -129,24 +133,37 @@
     </div>
     <h1 id="title"></h1>
     <p id="message"></p>
-    <div class="actions">
-      <button type="button" class="btn hidden" id="stop-btn">Stop timer</button>
-      <button type="button" class="btn btn-primary" id="confirm-btn"></button>
-    </div>
+    <!-- Buttons are built from the payload's `actions`, the same list the
+         in-window modal and the menu-bar menu render. -->
+    <div class="actions" id="actions"></div>
   </div>
   <script>
+    const actionsEl = document.getElementById('actions');
+
     window.pomodoroPopup.onData((data) => {
       if (data.theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
       document.getElementById('status').textContent = data.status || '';
       document.getElementById('title').textContent = data.title || '';
       document.getElementById('message').textContent = data.message || '';
-      const confirmBtn = document.getElementById('confirm-btn');
-      confirmBtn.textContent = data.confirmLabel || 'Continue';
-      document.getElementById('stop-btn').classList.toggle('hidden', !data.canStop);
+
+      actionsEl.textContent = '';
+      const actions = Array.isArray(data.actions) ? data.actions : [];
+      let primary = null;
+      actions.forEach((a) => {
+        if (!a || typeof a.id !== 'string') return;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = a.primary ? 'btn btn-primary' : 'btn';
+        btn.dataset.action = a.id;
+        // textContent, not innerHTML: labels come over IPC and are never markup.
+        btn.textContent = a.label || 'Continue';
+        btn.addEventListener('click', () => window.pomodoroPopup.action(a.id));
+        actionsEl.appendChild(btn);
+        if (a.primary) primary = btn;
+      });
+      if (primary) primary.focus();
     });
 
-    document.getElementById('confirm-btn').addEventListener('click', () => window.pomodoroPopup.confirm());
-    document.getElementById('stop-btn').addEventListener('click', () => window.pomodoroPopup.stop());
     document.getElementById('close-btn').addEventListener('click', () => window.pomodoroPopup.dismiss());
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') window.pomodoroPopup.dismiss();

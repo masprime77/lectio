@@ -4,6 +4,10 @@
 // Done: an amber pill with a tick reading "Done" instead of a stopped 00:00,
 // for a phase that finished and is waiting on the "what's next?" answer —
 // tapping it re-opens that question.
+// Extra focus / Extra break: a phase carried on past its deadline has no clock
+// counting down, so the pill counts *up* from when the user chose to keep going
+// (+MM:SS) with the meter full; the long-press is then the way on to the next
+// phase rather than a skip.
 //
 // Lives in the bottom-LEFT corner, its own column: the timer button on the
 // baseline (level with the bottom-right "+" Fab, never overlapping it) and the
@@ -22,7 +26,13 @@
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { formatClock, phaseDurationSeconds, phaseLabel } from '@lectio/core/pomodoro-core';
+import {
+  FREE_STUDY_NAME,
+  formatClock,
+  phaseDurationSeconds,
+  phaseLabel,
+  sessionLabel,
+} from '@lectio/core/pomodoro-core';
 import { useTheme } from '../theme';
 import { usePomodoro } from './PomodoroProvider';
 import { PomodoroSetupSheet } from './PomodoroSetupSheet';
@@ -38,8 +48,20 @@ export function PomodoroFab({
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { session, settings, remaining, paused, awaiting, promptAdvance, start, togglePause, skip, stop } =
-    usePomodoro();
+  const {
+    session,
+    settings,
+    remaining,
+    elapsed,
+    paused,
+    awaiting,
+    overtime,
+    promptAdvance,
+    start,
+    togglePause,
+    skip,
+    stop,
+  } = usePomodoro();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
 
@@ -54,11 +76,28 @@ export function PomodoroFab({
   // How far through the current phase, 0..1. A paused session freezes because
   // `remaining` does; a finished one waiting on an answer reads as full.
   const phaseSeconds = phaseDurationSeconds(session.phase, settings);
-  const progress = awaiting
-    ? 1
-    : phaseSeconds > 0
-      ? Math.min(1, Math.max(0, (phaseSeconds - remaining) / phaseSeconds))
-      : 0;
+  // A finished phase, and one carried on past its deadline, are both "all the
+  // way through" — an open-ended stretch has no length to be a fraction of.
+  const progress =
+    awaiting || overtime
+      ? 1
+      : phaseSeconds > 0
+        ? Math.min(1, Math.max(0, (phaseSeconds - remaining) / phaseSeconds))
+        : 0;
+
+  // What the pill calls this session. A focus block is named after what it
+  // credits — the course, or the Free study category — while a break, and any
+  // open-ended stretch, is named after itself.
+  const course = semester ? semester.courses.find((c) => c.id === session.courseId) : null;
+  const label = overtime
+    ? sessionLabel(session)
+    : focus
+      ? course
+        ? course.name
+        : FREE_STUDY_NAME
+      : phaseLabel(session.phase);
+  // Counts up while open-ended, down the rest of the time.
+  const clock = overtime ? `+${formatClock(elapsed)}` : formatClock(remaining);
 
   // One dot per focus block in the cycle. completedPomodoros reaches the full
   // count during the long break (every dot lit) and core resets it to 0 by
@@ -211,10 +250,14 @@ export function PomodoroFab({
         onPress={togglePause}
         onLongPress={skip}
         accessibilityRole="button"
-        accessibilityLabel={`Study timer, ${phaseLabel(session.phase)}, ${formatClock(
-          remaining
-        )} remaining, ${paused ? 'paused' : 'running'}, ${blocksDone} of ${cycle} focus blocks done`}
-        accessibilityHint="Tap to pause or resume, long-press to skip to the next phase"
+        accessibilityLabel={`Study timer, ${label}, ${
+          overtime ? `${formatClock(elapsed)} so far` : `${formatClock(remaining)} remaining`
+        }, ${paused ? 'paused' : 'running'}, ${blocksDone} of ${cycle} focus blocks done`}
+        accessibilityHint={
+          overtime
+            ? 'Tap to pause or resume, long-press to move on to the next phase'
+            : 'Tap to pause or resume, long-press to skip to the next phase'
+        }
         style={({ pressed }) => [
           styles.fab,
           styles.pill,
@@ -230,7 +273,7 @@ export function PomodoroFab({
       >
         {paused ? <PlayGlyph color={fg} /> : <PauseGlyph color={fg} />}
         <PhaseMeter
-          label={formatClock(remaining)}
+          label={clock}
           progress={progress}
           dots={cycle}
           filled={blocksDone}
