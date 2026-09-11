@@ -1,5 +1,18 @@
 ## Unreleased
 
+- Added (docs): a read-only repository audit
+  (`docs/AUDIT_2026-09.md`) covering architecture conformance, dead-code
+  candidates, test-coverage gaps, the security/IPC surface, documentation
+  drift, and whether the `@lectio/core` split has earned its keep. No source
+  file was changed — every finding is a proposal.
+
+- Noted (docs): the audit records three drift items worth acting on. All three
+  planning documents still say the desktop is not wired to Supabase, though
+  cross-device sync shipped there; the `externalLinks` IPC bridge and its
+  `open-external` handler no longer have a renderer caller; and the desktop's
+  drag-and-drop import reads the `File.path` property that Electron removed in
+  favour of `webUtils.getPathForFile`.
+
 - Fixed (desktop, macOS): after the study-timer's phase-complete popup
   appeared, Lectio lost its dock indicator and menu bar and its window stopped
   behaving normally in Stage Manager (couldn't be moved between stages, stuck
