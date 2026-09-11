@@ -359,6 +359,10 @@ function showPomodoroPopup(payload) {
     alwaysOnTop: true,
     show: false,
     backgroundColor: '#00000000',
+    // An NSPanel is macOS's own way to float a small window over other apps'
+    // full-screen Spaces without turning the whole app into a dock-less
+    // accessory (see setVisibleOnAllWorkspaces below). macOS-only type.
+    ...(process.platform === 'darwin' ? { type: 'panel' } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload-pomodoro-popup.js'),
       contextIsolation: true,
@@ -370,8 +374,12 @@ function showPomodoroPopup(payload) {
   // Floats above other apps' windows too, not just Lectio's own — this is
   // meant to read as a system alert, not a regular document window.
   // macOS/Linux-only knobs; no-ops on Windows.
+  // skipTransformProcessType is essential: without it, visibleOnFullScreen
+  // makes Electron call app.dock.hide(), which flips the whole app to an
+  // accessory process — the dock indicator and menu bar vanish and the main
+  // window stops behaving like a normal window in Stage Manager, until quit.
   popupWindow.setAlwaysOnTop(true, 'floating');
-  popupWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  popupWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
 
   popupWindow.loadFile('pomodoro-popup.html');
 
