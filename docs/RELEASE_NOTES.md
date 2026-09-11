@@ -1,5 +1,12 @@
 ## Unreleased
 
+- Fixed (desktop, macOS): after the study-timer's phase-complete popup
+  appeared, Lectio lost its dock indicator and menu bar and its window stopped
+  behaving normally in Stage Manager (couldn't be moved between stages, stuck
+  in the background). The popup no longer switches the app into a dock-less
+  background mode; it's now a floating panel that still appears over other
+  apps and on every desktop.
+
 ## 1.1.5 — 2026-09-11
 
 - Added (desktop + mobile): **Free study is its own tracked category.** It was
