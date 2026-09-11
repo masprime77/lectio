@@ -63,6 +63,13 @@
   could mutate a previously-edited semester. The listeners are now bound once
   per list and read `state.editingSemester`.
 
+- Fixed (desktop, build): upgraded electron-builder from 24.13.3 to 26.16.1.
+  24.x passed the certificate's import password (`CSC_KEY_PASSWORD`) to
+  `security set-key-partition-list -k` instead of its temporary keychain's own
+  password; older macOS tolerated that, but the macOS 26.6 (Darwin 25.6) CI
+  runner rejects it with `SecKeychainUnlock`, failing every Developer ID
+  (`CSC_LINK`) signed release build. Fixed upstream in electron-builder#10101.
+
 ## 1.1.4 — 2026-08-28
 
 - Added (desktop): a forgot-password flow on the sign-in screen. A "Forgot
