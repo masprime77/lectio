@@ -404,7 +404,16 @@
         <button id="pomodoro-close" class="icon-btn" aria-label="Close"></button>
       </div>
 
-      <label class="pomodoro-field">
+      <!-- Free study is its own category, not a course: picking it hides the
+           course list entirely and banks the time on the semester. -->
+      <div class="pomodoro-mode" role="radiogroup" aria-label="What this session tracks">
+        <button type="button" class="pomodoro-mode-btn" id="pomodoro-mode-course"
+                role="radio" aria-checked="true">Course</button>
+        <button type="button" class="pomodoro-mode-btn" id="pomodoro-mode-free"
+                role="radio" aria-checked="false">Free study</button>
+      </div>
+
+      <label class="pomodoro-field" id="pomodoro-course-field">
         <span>Course</span>
         <select id="pomodoro-course-select"></select>
       </label>
@@ -458,7 +467,7 @@
 
   <!-- Phase-complete gate: a finished focus block or break waits here until the
        user chooses to move on. Nothing advances on its own — see
-       handlePomodoroPhaseComplete() / confirmPomodoroAdvance() in app.js.
+       handlePomodoroPhaseComplete() / runPomodoroAction() in app.js.
        Title, message and confirm label are filled in per phase. -->
   <div id="pomodoro-advance-overlay" class="modal-overlay hidden">
     <div class="modal pomodoro-advance-modal" role="dialog" aria-modal="true"
@@ -470,12 +479,12 @@
 
       <p class="pomodoro-advance-message" id="pomodoro-advance-message"></p>
 
+      <!-- Buttons are built per phase by renderPomodoroAdvanceActions() in
+           app.js from the same pomodoroActions() list the tray and the
+           always-on-top popup use, so the three surfaces can't disagree. -->
       <div class="modal-actions">
         <div class="modal-actions-left"></div>
-        <div class="modal-actions-right">
-          <button type="button" id="pomodoro-advance-stop" class="btn">Stop timer</button>
-          <button type="button" id="pomodoro-advance-confirm" class="btn btn-primary">Start break</button>
-        </div>
+        <div class="modal-actions-right" id="pomodoro-advance-actions"></div>
       </div>
     </div>
   </div>

@@ -1,5 +1,68 @@
 ## Unreleased
 
+## 1.1.5 — 2026-09-11
+
+- Added (desktop + mobile): **Free study is its own tracked category.** It was
+  the "no course" entry in the timer's course list and its time was discarded;
+  it is now a top-level choice beside Course, banked on the semester itself
+  (`semester.freeStudy`) and shown as its own slice in Study time.
+
+- Added (desktop + mobile): **"Keep studying"** on a finished focus block. The
+  block keeps running with no deadline, the timer counts *up* ("Extra focus",
+  +MM:SS), and that extra time is credited when the user moves on. Capped at 8
+  hours so a sleeping machine can't claim days of focus.
+
+- Added (desktop + mobile): **"+5 minutes" and "Keep resting"** on a finished
+  break — a fresh countdown that asks again when it runs out, or the same
+  open-ended stretch ("Extra break"). Nothing still advances on its own.
+
+- Changed (desktop): the phase-complete answers are built once in the renderer
+  and rendered identically by the in-window modal, the always-on-top popup
+  **and the menu-bar menu**, so the new options are reachable without bringing
+  the window forward. Tray/popup IPC is now one `{ id, label }` action list
+  plus one reply channel instead of a channel per fixed action.
+
+- Added (desktop): **three calm chimes**, synthesized with the Web Audio API
+  rather than shipped as audio files — descending when a focus block ends,
+  rising when a break ends, and a resolving triad only when the whole cycle
+  finishes. Mobile gets the same three moments as notification sounds.
+
+- Changed (desktop, macOS): the header's logo and "Lectio" wordmark now sit in
+  their own row below the traffic-light buttons instead of beside them. The
+  dots are pinned via `trafficLightPosition: {x: 20, y: 20}` in `main.js`, and
+  the header reserves a 40px top strip for them so the whole `.header-inner`
+  row — logo and controls alike — renders underneath, left-aligned under the
+  dots.
+
+- Fixed (desktop, Windows/Linux): the header no longer reserves an 80px
+  left gap for traffic lights that only exist on macOS. The reservation was
+  previously applied via `body.electron-app` on every platform; it is now
+  scoped to a new `body.platform-mac` class, so non-mac builds use the
+  header's plain default padding.
+
+- Added (desktop): `window.appInfo.platform` on the preload bridge, exposing
+  `process.platform` synchronously to the renderer so `init()` can apply the
+  `platform-mac` body class.
+
+- Fixed (desktop): "+ Add tag" in the semester editor's Tags tab did nothing.
+  It named the new tag with `window.prompt()`, which Electron does not
+  implement — the click handler threw before reaching `addTag()`, with no
+  dialog and no visible error. The button now appends an inline draft row with
+  a focused name field: Enter or clicking away commits it, Escape or the ✕
+  button cancels, and an empty name is treated as a cancel. Same in-place
+  pattern as `editStudyTimeInline()`, which already avoided `prompt()` for this
+  reason. Mobile was never affected — it has its own inline add form.
+
+- Changed (desktop): a new tag's color is now picked in the draft row instead
+  of being hardcoded per section (orange for pending, blue for done), matching
+  the color choice mobile already offers.
+
+- Fixed (desktop): the Tags tab re-bound its drag-to-reorder listeners on every
+  render, stacking a duplicate set on each `<ul>` and pinning each copy to
+  whichever semester object was open when it was bound — so reordering tags
+  could mutate a previously-edited semester. The listeners are now bound once
+  per list and read `state.editingSemester`.
+
 ## 1.1.4 — 2026-08-28
 
 - Added (desktop): a forgot-password flow on the sign-in screen. A "Forgot

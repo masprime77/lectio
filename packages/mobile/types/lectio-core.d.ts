@@ -59,6 +59,11 @@ export interface Semester {
   courses: Course[];
   readingTags?: Tag[];
   taskTags?: Tag[];
+  /**
+   * Time studied with no course attached — its own category in the study-time
+   * breakdown. Present only once free study has been logged.
+   */
+  freeStudy?: StudyTime;
 }
 
 export interface SemesterSummary {
@@ -371,6 +376,13 @@ export interface PomodoroSession {
   completedPomodoros: number;
   /** True once the phase has run out and the user has not confirmed moving on. */
   awaitingAdvance: boolean;
+  /**
+   * Epoch ms when the user chose to carry a finished phase on open-ended
+   * ("Extra focus" / "Extra break"), or null. While set the phase counts up
+   * with no deadline, and for a work phase it marks the start of the
+   * not-yet-credited stretch.
+   */
+  overtimeStartedAt: number | null;
   courseId: string | null;
   semesterId: string | null;
 }
@@ -388,11 +400,13 @@ export interface StudyTime {
   sessions: StudySession[];
 }
 
-/** One course's slice of a semester's tracked study time. */
+/** One category's slice of a semester's tracked study time. */
 export interface StudyTimeSlice {
   id: string;
   name: string;
   color: string | null;
+  /** True for the semester-level free-study slice, false for a course. */
+  freeStudy: boolean;
   seconds: number;
   /** Exact fraction of totalSeconds, 0..1. */
   share: number;
@@ -402,12 +416,19 @@ export interface StudyTimeSlice {
 
 export interface StudyTimeBreakdown {
   totalSeconds: number;
-  /** Most-studied first; courses with no tracked time are omitted. */
+  /**
+   * Most-studied first; categories with no tracked time are omitted. Includes
+   * the free-study slice (id FREE_STUDY_ID) alongside the courses.
+   */
   courses: StudyTimeSlice[];
 }
 
 export const DEFAULT_POMODORO_SETTINGS: PomodoroSettings;
 export const MAX_SESSIONS: number;
+export const MAX_OVERTIME_SECONDS: number;
+export const FREE_STUDY_ID: string;
+export const FREE_STUDY_NAME: string;
+export const FREE_STUDY_COLOR: string;
 export function clampPomodoroSettings(
   settings: Partial<PomodoroSettings> | null | undefined
 ): PomodoroSettings;
@@ -424,10 +445,24 @@ export function isRunning(session: PomodoroSession): boolean;
 export function isPaused(session: PomodoroSession): boolean;
 export function isPhaseComplete(session: PomodoroSession, nowMs?: number): boolean;
 export function isAwaitingAdvance(session: PomodoroSession): boolean;
+export function isOvertime(session: PomodoroSession): boolean;
+export function overtimeSeconds(session: PomodoroSession, nowMs?: number): number;
 export function markPhaseComplete(session: PomodoroSession, nowMs?: number): PomodoroSession;
+export function extendPhase(session: PomodoroSession, nowMs?: number): PomodoroSession;
+export function extendPhaseByMinutes(
+  session: PomodoroSession,
+  minutes: number,
+  nowMs?: number
+): PomodoroSession;
 export function pauseSession(session: PomodoroSession, nowMs?: number): PomodoroSession;
 export function resumeSession(session: PomodoroSession, nowMs?: number): PomodoroSession;
 export function elapsedWorkSeconds(
+  session: PomodoroSession,
+  settings: PomodoroSettings,
+  nowMs?: number
+): number;
+/** Studied seconds the current work phase still owes; 0 outside a work phase. */
+export function pendingWorkCreditSeconds(
   session: PomodoroSession,
   settings: PomodoroSettings,
   nowMs?: number
@@ -448,17 +483,27 @@ export function confirmAdvance(
   nowMs?: number
 ): PomodoroSession;
 export function phaseLabel(phase: PomodoroPhase): string;
+/** Phase label that reads "Extra focus"/"Extra break" while open-ended. */
+export function sessionLabel(session: PomodoroSession): string;
 export function rehydrateSession(raw: unknown, nowMs?: number): PomodoroSession;
 
 export function ensureStudyTime(course: Course): StudyTime;
+export function ensureFreeStudyTime(semester: Semester): StudyTime;
 export function getCourseStudySeconds(course: Course): number;
+export function getFreeStudySeconds(semester: Semester | null | undefined): number;
 export function studyTimeByCourse(semester: Semester | null | undefined): StudyTimeBreakdown;
 export function addStudyTime(
   course: Course,
   seconds: number,
   opts?: { source?: StudySession['source']; date?: string }
 ): Course;
+export function addFreeStudyTime(
+  semester: Semester,
+  seconds: number,
+  opts?: { source?: StudySession['source']; date?: string }
+): Semester;
 export function setStudyTime(course: Course, newTotalSeconds: number): Course;
+export function setFreeStudyTime(semester: Semester, newTotalSeconds: number): Semester;
 export function formatClock(totalSeconds: number): string;
 export function formatHoursMinutes(totalSeconds: number): string;
 export function parseHoursMinutesInput(text: string): number | null;

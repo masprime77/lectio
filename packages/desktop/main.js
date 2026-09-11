@@ -35,6 +35,13 @@ function createWindow() {
     minWidth: 500,
     minHeight: 400,
     titleBarStyle: 'hiddenInset',
+    // Pin the traffic-light dots to a known position (macOS only —
+    // this key is ignored on other platforms, but we gate it anyway to
+    // be explicit) instead of relying on the OS default inset, so the
+    // header spacing reserved for them in style.css is deterministic.
+    ...(process.platform === 'darwin'
+      ? { trafficLightPosition: { x: 20, y: 20 } }
+      : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -186,7 +193,11 @@ function buildAppMenu() {
 let tray = null;
 
 // Last state reported by the renderer. Idle until the first report arrives.
-let trayState = { phase: 'idle', clock: '', label: '', paused: false };
+// `actions` is the list of {id, label} answers the renderer says this state
+// offers — pause/resume and skip while a phase runs, and "Keep studying",
+// "+5 minutes" or "Keep resting" once one has finished. Building the menu from
+// it is what keeps the menu bar in step with the in-window modal.
+let trayState = { phase: 'idle', clock: '', label: '', paused: false, actions: [] };
 
 function buildTrayIcon() {
   // A dedicated monochrome clock glyph for the menu bar — not the color app
@@ -233,15 +244,16 @@ function buildTrayMenu() {
   }
 
   const statusLabel = `${trayState.label} — ${trayState.clock}${trayState.paused ? ' (paused)' : ''}`;
+  // Rendered in the renderer's order (most-secondary first), which puts the
+  // answer it considers primary at the bottom of the group.
+  const actionItems = trayState.actions.map((a) => ({
+    label: a.label,
+    click: () => sendToRenderer('tray-pomodoro-action', a.id),
+  }));
   return Menu.buildFromTemplate([
     { label: statusLabel, enabled: false },
     { type: 'separator' },
-    {
-      label: trayState.paused ? 'Resume' : 'Pause',
-      click: () => sendToRenderer('tray-pomodoro-toggle'),
-    },
-    { label: 'Skip', click: () => sendToRenderer('tray-pomodoro-skip') },
-    { label: 'Stop', click: () => sendToRenderer('tray-pomodoro-stop') },
+    ...actionItems,
     { type: 'separator' },
     { label: 'Open Lectio', click: showMainWindow },
     { type: 'separator' },
@@ -275,6 +287,11 @@ ipcMain.on('pomodoro-tray-report', (event, payload) => {
     clock: typeof payload.clock === 'string' ? payload.clock : '',
     label: typeof payload.label === 'string' ? payload.label : '',
     paused: !!payload.paused,
+    actions: Array.isArray(payload.actions)
+      ? payload.actions
+          .filter((a) => a && typeof a.id === 'string' && typeof a.label === 'string')
+          .map((a) => ({ id: a.id, label: a.label }))
+      : [],
   };
   refreshTray();
 });
@@ -320,8 +337,10 @@ function showPomodoroPopup(payload) {
     return;
   }
 
-  const width = 380;
-  const height = 260;
+  // Wide enough for the widest answer set on one row — a finished break offers
+  // four ways out (stop / +5 min / keep resting / next phase).
+  const width = 440;
+  const height = 270;
   const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
   const x = Math.round(display.bounds.x + (display.bounds.width - width) / 2);
   const y = Math.round(display.bounds.y + (display.bounds.height - height) / 2);
@@ -371,13 +390,12 @@ function showPomodoroPopup(payload) {
 ipcMain.on('pomodoro-popup-show', (event, payload) => showPomodoroPopup(payload));
 ipcMain.on('pomodoro-popup-hide', () => closePomodoroPopup());
 ipcMain.on('pomodoro-popup-dismiss', () => closePomodoroPopup());
-ipcMain.on('pomodoro-popup-confirm', () => {
+// The popup carries no session logic: it renders the answers the renderer sent
+// and relays whichever one was clicked straight back by id.
+ipcMain.on('pomodoro-popup-action', (event, id) => {
+  if (typeof id !== 'string') return;
   closePomodoroPopup();
-  sendToRenderer('popup-pomodoro-confirm');
-});
-ipcMain.on('pomodoro-popup-stop', () => {
-  closePomodoroPopup();
-  sendToRenderer('popup-pomodoro-stop');
+  sendToRenderer('popup-pomodoro-action', id);
 });
 
 // ---------------------------------------------------------------------------
