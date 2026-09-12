@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 // Expose a minimal, safe API to the renderer. ipcRenderer itself is never
 // exposed — only these four wrapped methods cross the bridge.
@@ -44,6 +44,16 @@ contextBridge.exposeInMainWorld('appInfo', {
   // preload context, no IPC round-trip needed. Used by app.js to
   // scope the traffic-light header spacing (see init()) to macOS.
   platform: process.platform,
+});
+
+// Dropped-file paths. Electron used to augment renderer `File` objects with a
+// `.path` property; that was removed in favour of webUtils.getPathForFile(),
+// which only exists in the preload context — the sandboxed renderer has no
+// `webUtils`. The `File` itself crosses the contextBridge by structured clone,
+// which is exactly what this call is for. Used by app.js's drag-and-drop
+// import to turn a dropped file into a path for the `import-file` handler.
+contextBridge.exposeInMainWorld('fileUtils', {
+  getPathForFile: (file) => webUtils.getPathForFile(file),
 });
 
 // External links: open a URL in the default browser. Main restricts this to

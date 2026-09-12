@@ -1,5 +1,13 @@
 ## Unreleased
 
+- Fixed (desktop): **drag-and-drop import was broken.** Dropping a
+  `.lectio.json` file onto the window always failed with "Only .lectio.json
+  files can be dropped here", because the code read the `File.path` property
+  that Electron removed. It now uses `webUtils.getPathForFile()` — Electron's
+  documented replacement — through a new `window.fileUtils` preload bridge, so
+  dropped files import again. The extension check and its message are
+  unchanged, as is the dialog-based import path.
+
 - Fixed (docs): **the docs said desktop had no cloud sync.** CLAUDE.md,
   README.md, `PENDING_FEATURES.md` and `ROADMAP_TO_LAUNCH.md` all claimed the
   desktop app was not wired to Supabase and that sync was mobile-only. Desktop

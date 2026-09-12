@@ -4007,8 +4007,9 @@ function setupDragAndDrop() {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
     if (!file) return;
-    // Electron exposes the real fs path on File objects in the renderer.
-    const filePath = file.path;
+    // Electron removed the `File.path` augmentation; webUtils.getPathForFile()
+    // is its documented replacement and lives in preload (see window.fileUtils).
+    const filePath = window.fileUtils.getPathForFile(file);
     if (!filePath || !filePath.endsWith('.lectio.json')) {
       alert('Only .lectio.json files can be dropped here.');
       return;
