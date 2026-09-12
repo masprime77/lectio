@@ -65,12 +65,29 @@ import {
   resumeSession,
   skipPhase,
   startSession,
+  // Stopwatch — the second, independent timer (see the stopwatch section below).
+  createIdleStopwatch,
+  isStopwatchIdle,
+  isStopwatchPaused,
+  isStopwatchRunning,
+  pauseStopwatch,
+  rehydrateStopwatch,
+  resumeStopwatch,
+  startStopwatch,
+  stopwatchSeconds,
+  localDateKey,
+  pruneStudySessions,
 } from '@lectio/core/pomodoro-core';
 import { getCourses as getCoursesFromCore } from '@lectio/core/planner-core';
 import { storage } from '../storage';
 import { saveWithConflict } from '../sync/saveWithConflict';
 import { prefs } from '../lib/prefs';
-import type { PomodoroSession, PomodoroSettings, Semester } from '../../types/lectio-core';
+import type {
+  PomodoroSession,
+  PomodoroSettings,
+  Semester,
+  Stopwatch,
+} from '../../types/lectio-core';
 
 interface PomodoroContextValue {
   session: PomodoroSession;
@@ -100,6 +117,31 @@ interface PomodoroContextValue {
   stop: () => void;
   /** Re-point a live session at another course (null = free study). */
   switchCourse: (courseId: string | null, semesterId: string | null) => void;
+
+  // --- Stopwatch ---
+  /** The count-up timer. Independent of the pomodoro session above. */
+  stopwatch: Stopwatch;
+  /** Seconds on the stopwatch; recomputed on every tick, frozen while paused. */
+  stopwatchElapsed: number;
+  stopwatchRunning: boolean;
+  /** Stopped with time on the clock — waiting to be assigned to a course. */
+  stopwatchPaused: boolean;
+  /** Start it, or resume a paused one. Refuses while a pomodoro is running. */
+  startWatch: (semesterId: string | null) => boolean;
+  /** Pause a running stopwatch, which is also "I'm done" — see the sheet. */
+  pauseWatch: () => void;
+  /** Bank the elapsed time on a course (null = free study) and reset. */
+  saveWatch: (courseId: string | null) => Promise<boolean>;
+  /** Throw the elapsed time away and reset. */
+  discardWatch: () => void;
+
+  /** Log time studied away from the app, on a day the user picks. */
+  logStudyTime: (opts: {
+    seconds: number;
+    courseId: string | null;
+    semesterId: string | null;
+    date: string;
+  }) => Promise<boolean>;
 }
 
 /** How many minutes the "+N minutes" answer adds to a finished break. */
@@ -119,13 +161,19 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   const [remaining, setRemaining] = useState(0);
   // Counts up while a phase runs open-ended; 0 the rest of the time.
   const [elapsed, setElapsed] = useState(0);
+  // The stopwatch is a second, independent timer with its own repaint loop.
+  // Only one of the two may be live at a time — see startWatch / start.
+  const [stopwatch, setStopwatch] = useState<Stopwatch>(() => createIdleStopwatch());
+  const [stopwatchElapsed, setStopwatchElapsed] = useState(0);
 
   // The interval callback reads these through refs so it never needs to be
   // torn down and rebuilt on every state change.
   const sessionRef = useRef(session);
   const settingsRef = useRef(settings);
+  const stopwatchRef = useRef(stopwatch);
   sessionRef.current = session;
   settingsRef.current = settings;
+  stopwatchRef.current = stopwatch;
 
   // At most one phase-completion notification is ever outstanding — this is
   // its id, so every transition can cancel the previous one before scheduling
@@ -227,24 +275,41 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   // the semester's own Free study category. Re-reads the semester from storage
   // rather than trusting a screen's copy: the provider outlives every screen,
   // so it may hold no semester at all.
-  const creditStudyTime = useCallback(async (s: PomodoroSession, seconds: number) => {
-    if (!s.semesterId || seconds <= 0) return;
-    try {
-      const semester: Semester | null = await storage.get(s.semesterId);
-      if (!semester) return;
-      const next: Semester = JSON.parse(JSON.stringify(semester));
-      if (s.courseId) {
-        const course = getCoursesFromCore(next).find((c) => c.id === s.courseId);
-        if (!course) return;
-        addStudyTime(course, seconds, { source: 'pomodoro' });
-      } else {
-        addFreeStudyTime(next, seconds, { source: 'pomodoro' });
+  // `entry` carries the log entry's source and date, so the stopwatch can bank
+  // on the day it started and a logged entry on the day the user picked; it
+  // defaults to a pomodoro entry dated today. Returns whether it wrote.
+  const creditStudyTime = useCallback(
+    async (
+      s: { semesterId: string | null; courseId: string | null },
+      seconds: number,
+      entry?: { source?: 'pomodoro' | 'manual'; date?: string }
+    ): Promise<boolean> => {
+      if (!s.semesterId || seconds <= 0) return false;
+      try {
+        const semester: Semester | null = await storage.get(s.semesterId);
+        if (!semester) return false;
+        const next: Semester = JSON.parse(JSON.stringify(semester));
+        const opts = { source: 'pomodoro' as const, ...(entry || {}) };
+        if (s.courseId) {
+          const course = getCoursesFromCore(next).find((c) => c.id === s.courseId);
+          if (!course) return false;
+          addStudyTime(course, seconds, opts);
+        } else {
+          addFreeStudyTime(next, seconds, opts);
+        }
+        // Day and week detail is only kept for four weeks; the running totals
+        // behind the all-time view are never trimmed. Pruning here means the
+        // log is tidied exactly when it grows.
+        pruneStudySessions(next);
+        await saveWithConflict(s.semesterId, next);
+        return true;
+      } catch (err) {
+        console.warn('pomodoro: could not credit study time', err);
+        return false;
       }
-      await saveWithConflict(s.semesterId, next);
-    } catch (err) {
-      console.warn('pomodoro: could not credit study time', err);
-    }
-  }, []);
+    },
+    []
+  );
 
   // Ask what happens next. This Alert *is* the gate: nothing has advanced when
   // it appears, and only its buttons move the session on. Backgrounded, it is
@@ -455,6 +520,9 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
       courseId: string | null;
       semesterId: string | null;
     }) => {
+      // Both clocks measure the same wall time; the sheet keeps the user from
+      // getting here, and this is the backstop.
+      if (!isStopwatchIdle(stopwatchRef.current)) return;
       const clamped = clampPomodoroSettings(opts.settings);
       settingsRef.current = clamped;
       setSettings(clamped);
@@ -541,6 +609,117 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     [applySession, creditPartial]
   );
 
+  // ---- Stopwatch -----------------------------------------------------------
+  // Counts up with no phases and no breaks, and — unlike the pomodoro — does
+  // not know what it credits until it is stopped. Wall-clock based like the
+  // session, so it survives backgrounding and a relaunch with no catch-up.
+
+  const applyStopwatch = useCallback((next: Stopwatch) => {
+    stopwatchRef.current = next;
+    setStopwatch(next);
+    setStopwatchElapsed(stopwatchSeconds(next));
+    void prefs.setStopwatch(JSON.stringify(next));
+  }, []);
+
+  const startWatch = useCallback(
+    (semesterId: string | null) => {
+      const sw = stopwatchRef.current;
+      if (isStopwatchPaused(sw)) {
+        applyStopwatch(resumeStopwatch(sw));
+        return true;
+      }
+      if (isStopwatchRunning(sw)) return true;
+      // Both clocks measure the same wall time — running them together would
+      // double-count it.
+      if (sessionRef.current.phase !== 'idle') return false;
+      applyStopwatch(startStopwatch({ semesterId }));
+      return true;
+    },
+    [applyStopwatch]
+  );
+
+  const pauseWatch = useCallback(() => {
+    const sw = stopwatchRef.current;
+    if (!isStopwatchRunning(sw)) return;
+    applyStopwatch(pauseStopwatch(sw));
+  }, [applyStopwatch]);
+
+  const discardWatch = useCallback(() => {
+    applyStopwatch(createIdleStopwatch());
+  }, [applyStopwatch]);
+
+  // Credited to the day the stopwatch *started*, so a stretch begun at 23:50
+  // counts as that evening rather than as the small hours of the next day.
+  const saveWatch = useCallback(
+    async (courseId: string | null) => {
+      const sw = stopwatchRef.current;
+      const seconds = stopwatchSeconds(sw);
+      if (seconds <= 0) return false;
+      const ok = await creditStudyTime({ semesterId: sw.semesterId, courseId }, seconds, {
+        source: 'pomodoro',
+        date: sw.startedDate || localDateKey(),
+      });
+      if (ok) applyStopwatch(createIdleStopwatch());
+      return ok;
+    },
+    [applyStopwatch, creditStudyTime]
+  );
+
+  // 1s repaint while the stopwatch runs. Nothing accumulates here — the
+  // elapsed time is derived from `runningSince`.
+  useEffect(() => {
+    if (!isStopwatchRunning(stopwatch)) return;
+    const id = setInterval(() => setStopwatchElapsed(stopwatchSeconds(stopwatchRef.current)), 1000);
+    return () => clearInterval(id);
+  }, [stopwatch]);
+
+  // The interval is throttled or stopped while backgrounded, so re-derive on
+  // return — the same reasoning as the session's foreground recompute.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') setStopwatchElapsed(stopwatchSeconds(stopwatchRef.current));
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Restore the persisted stopwatch on mount. A stopwatch that was running when
+  // the app closed keeps running; its elapsed time is capped by core, so a long
+  // absence can never bank a day of "study".
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const raw = await prefs.getStopwatch();
+      if (!active) return;
+      let parsed: unknown = null;
+      try {
+        parsed = raw ? JSON.parse(raw) : null;
+      } catch {
+        parsed = null;
+      }
+      const restored = rehydrateStopwatch(parsed);
+      stopwatchRef.current = restored;
+      setStopwatch(restored);
+      setStopwatchElapsed(stopwatchSeconds(restored));
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // ---- Logged time ----------------------------------------------------------
+  // For time studied away from the app: no clock, just an amount and the day it
+  // belongs to. It lands in the day and week views on that date.
+
+  const logStudyTime = useCallback(
+    (opts: { seconds: number; courseId: string | null; semesterId: string | null; date: string }) =>
+      creditStudyTime(
+        { semesterId: opts.semesterId, courseId: opts.courseId },
+        opts.seconds,
+        { source: 'manual', date: opts.date }
+      ),
+    [creditStudyTime]
+  );
+
   // The pill's tap target while a phase is parked: re-open the question.
   const promptAdvanceNow = useCallback(() => {
     promptAdvance(sessionRef.current);
@@ -563,6 +742,15 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
         skip,
         stop,
         switchCourse,
+        stopwatch,
+        stopwatchElapsed,
+        stopwatchRunning: isStopwatchRunning(stopwatch),
+        stopwatchPaused: isStopwatchPaused(stopwatch),
+        startWatch,
+        pauseWatch,
+        saveWatch,
+        discardWatch,
+        logStudyTime,
       }}
     >
       {children}

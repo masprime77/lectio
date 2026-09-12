@@ -141,8 +141,12 @@ Desktop has three layers + the shared core:
   - `planner-core.js` — tag sets, `courseProgress`, `courseBreakdown`, course
     and item CRUD, sorting, `uid` (dual-mode: attaches `window.PlannerCore` in
     the browser, `module.exports` in Node)
-  - `pomodoro-core.js` — the deadline-based study timer and study-time
-    accounting (`window.PomodoroCore`); the largest core module
+  - `pomodoro-core.js` — the deadline-based pomodoro timer, the count-up
+    stopwatch, and study-time accounting: local `YYYY-MM-DD` date keys, the
+    day/week ranges behind the Today / This week / Last week / All time views
+    (`studyTimeInRange`, `studyTimeByDay`), and the four-week log retention
+    (`pruneStudySessions`, which never touches a bucket's `totalSeconds`)
+    (`window.PomodoroCore`); the largest core module
   - `semester-store.js` — filesystem read/write/delete (parameterized by dir)
   - `ipc-handlers.js` — `registerIpcHandlers(ipcMain, getDir)`, used by
     `main.js`; also owns the export/import file handlers
@@ -222,8 +226,11 @@ runnable in Expo Go (no native/dev-client build). Key pieces:
 - **Storage** (`src/storage/index.ts`): returns `supabase-storage` as the
   singleton `storage`; `ensureSeed` exists but is intentionally **not**
   auto-called (so new cloud accounts aren't seeded with sample data).
-- **Other subsystems** under `src/`: `pomodoro/` (the study timer + study-time
-  dashboard, on `@lectio/core/pomodoro-core`), `moodle/` (import session, raw
+- **Other subsystems** under `src/`: `pomodoro/` (`PomodoroProvider` owns both
+  clocks — the pomodoro session and the stopwatch — plus `logStudyTime`;
+  `StudyTimerSheet` is the three-tab Pomodoro / Stopwatch / Log sheet and
+  `StudyTimeDashboard` the ranged study-time panel, all on
+  `@lectio/core/pomodoro-core`), `moodle/` (import session, raw
   rows, week suggestion), `sync/` (conflict dialog + `saveWithConflict`),
   `tutorial/` (the first-run overlay), `components/` and `add/` (shared UI).
 - All planner math comes from `@lectio/core` (typed via the hand-written
@@ -261,6 +268,11 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
   "freeStudy": {
     "totalSeconds": 1500,
     "sessions": [
+      // `date` is a LOCAL date key, not a UTC slice — that is what makes the
+      // day and week views right for anyone not on GMT. Entries are pruned to
+      // the last four weeks (see pruneStudySessions); `totalSeconds` is never
+      // trimmed, so All time keeps every hour. 'adjustment' entries (a
+      // hand-edited total) are excluded from the day/week views.
       { "id": "st-abc", "seconds": 1500, "source": "pomodoro",
         "date": "2025-04-09", "createdAt": "2025-04-09T14:05:00.000Z" }
     ]
@@ -314,6 +326,14 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
   script in `index.html`. All colors are CSS variables (`style.css` top block).
 - **Add course:** "+ Add course" reuses the semester editor modal (no separate
   flow). Course columns/empty states have low-weight +Reading/+Task buttons.
+- **Study timer:** one modal, three tabs (`setupTimerTabs` / `setTimerTab`) —
+  Pomodoro (the cycle timer, with the Course / Free study switch inside it),
+  Stopwatch (counts up; the target picker is the assign step shown only once it
+  is paused) and Log (an amount + target + date, no clock). Only one clock runs
+  at a time (`otherTimerBusy`); the stopwatch persists to `settings.json` beside
+  the pomodoro session. The Study time panel's ranges (`STUDY_RANGES`,
+  `setStudyRange`) are Today / This week / Last week / All time, with a
+  tappable day bar per day in the week views.
 
 ## Testing
 
