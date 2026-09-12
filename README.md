@@ -399,7 +399,7 @@ semester's id. Follow this schema:
           "id": "r-1",
           "week": 1,
           "title": "Chapter 1: Introduction",
-          "status": "pending"
+          "status": "r-pending"
         }
       ],
       "tasks": [
@@ -408,7 +408,7 @@ semester's id. Follow this schema:
           "week": 1,
           "title": "Exercise Set 1",
           "dueDate": "2025-10-20",
-          "status": "not done"
+          "status": "t-pending"
         }
       ]
     }
@@ -429,6 +429,10 @@ Field reference:
   (e.g. `"t-pending"`, `"t-done"`). Legacy strings (`"not done"`, `"done"`,
   etc.) are migrated automatically on load.
 - All `id` values must be unique within their list.
+- Optional fields the app adds as you use it, safe to omit when hand-writing a
+  file: `readingTags` / `taskTags` (the semester's tag sets — the defaults are
+  filled in on load if absent), `examDate` and `studyTime` on a course, `note`
+  on a reading or task (max 280 characters), and `freeStudy` on the semester.
 
 The directory is read each time the list loads, so a new file shows up in the
 selector the next time the app launches (or when you reselect from the dropdown).
