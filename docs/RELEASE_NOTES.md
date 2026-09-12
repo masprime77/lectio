@@ -1,5 +1,134 @@
 ## Unreleased
 
+## 1.2.0 — 2026-09-12
+
+- Added (desktop + mobile): the study timer now has **three tabs**. **Pomodoro**
+  is the cycle timer exactly as before, with its Course / Free study choice
+  inside it. **Stopwatch** counts up with no phases and no breaks — you assign
+  the elapsed time to a course (or to Free study) when you stop it, credited to
+  the day the stretch began. **Log** has no clock at all: an amount, a target
+  and the day you studied, for time spent away from the app. Only one clock can
+  be live at a time, and whichever one is running gets the corner pill.
+
+- Added (desktop + mobile): the Study time panel now answers **Today**, **This
+  week**, **Last week** and **All time**. The two week views show the seven days
+  as bars; tapping one narrows the ring and legend to that day. All time is
+  unchanged — the running totals, which keep every hour ever tracked.
+
+- Added (`@lectio/core`): per-session study logs are kept for four weeks and
+  pruned as new time is credited, so a semester file stops growing while its
+  all-time totals stay complete. Existing semesters keep every hour in All time;
+  the day and week views fill in from this version onward.
+
+- Fixed (`@lectio/core`): study-session dates are now stamped in the user's
+  **local** timezone rather than sliced off a UTC timestamp. An evening session
+  east of Greenwich was being dated to the next day, which the new day and week
+  views would have made visible. Existing entries keep the date they were given.
+
+- Added (tests): behavioural coverage for the `export-course`,
+  `export-semester` and `import-file` IPC handlers, which were previously only
+  asserted to be *registered* — happy paths, both guards, the not-found branch
+  and the malformed-JSON branch. `ipc-handlers.js` goes from 60% to 100% line
+  and function coverage.
+
+- Added (tests): negative-path coverage for `assertStorage` — the storage
+  contract's validator was only ever called with valid adapters, so neither of
+  its rejection branches was exercised.
+
+- Fixed (`@lectio/core`): `prepareImportedCourse` threw
+  `ReferenceError: global is not defined` when called in a browser without an
+  explicit id-maker. Its dual-mode wrapper never passed the global into its
+  factory, so the browser fallback referenced a Node-only binding. Mobile
+  always passed `uid` explicitly, so nothing hit it in production — but it
+  would have broken the desktop renderer the moment it used the module.
+
+- Added (desktop): `@lectio/core`'s `.lectio.json` interchange module is now
+  vendored into the renderer as `window.LectioFile`, so the desktop can share
+  core's envelope and import logic instead of its own copies.
+
+- Removed: dead code with no remaining callers — the `externalLinks` IPC bridge
+  and its `open-external` handler (left behind when feedback moved in-app), the
+  superseded tick-based Pomodoro helpers in `@lectio/core`
+  (`createIdleState`/`startWork`/`tick`/`advancePhase`; the deadline-based
+  session API has encoded the same cadence for a while), the unreferenced
+  `docs/brand_images/old_icon.png`, and `packages/desktop/start.command`, whose
+  double-click path ran `npm install` in the wrong directory for this
+  workspace layout. No user-facing behaviour changes.
+
+- Changed (security): the export and import IPC handlers now only read or write
+  paths ending in `.lectio.json`. They previously accepted any non-empty string
+  from the renderer and called `fs.writeFileSync` / `fs.readFileSync` on it with
+  no confinement. Both file dialogs already default to and filter on that
+  extension, so nothing reachable through the UI changes.
+
+- Changed (security): all five app windows now deny `window.open` by default,
+  and both renderer pages ship a Content-Security-Policy.
+
+- Changed (security): the Moodle SSO and OAuth sign-in windows now refuse to
+  navigate anywhere that isn't `https:`. `buildLaunchUrl` validated only that
+  the Moodle base URL parsed, and the OAuth authorize URL wasn't parsed at all
+  before being loaded — so a non-https target (`file://`, say) would have been
+  loaded in a real window. Well-formed https sign-in flows are unaffected.
+
+- Fixed (desktop): **drag-and-drop import was broken.** Dropping a
+  `.lectio.json` file onto the window always failed with "Only .lectio.json
+  files can be dropped here", because the code read the `File.path` property
+  that Electron removed. It now uses `webUtils.getPathForFile()` — Electron's
+  documented replacement — through a new `window.fileUtils` preload bridge, so
+  dropped files import again. The extension check and its message are
+  unchanged, as is the dialog-based import path.
+
+- Fixed (docs): **the docs said desktop had no cloud sync.** CLAUDE.md,
+  README.md, `PENDING_FEATURES.md` and `ROADMAP_TO_LAUNCH.md` all claimed the
+  desktop app was not wired to Supabase and that sync was mobile-only. Desktop
+  sync shipped some time ago — all four now describe the real behaviour: local
+  JSON files when signed out, Supabase when signed in, chosen per session by
+  `getActiveStorage()`, with `local-import.js` migrating existing local
+  semesters into a cloud account.
+
+- Fixed (docs): the mobile auth description said email/password only; it now
+  covers Google OAuth and Sign in with Apple, including provider linking.
+
+- Fixed (docs): CLAUDE.md's component inventories were several phases stale.
+  Preload bridges went from 3 listed to the 11 that exist, the core module list
+  gained `pomodoro-core.js`, the `integrations/` directory and
+  `storage/conflict.js`, the adapter list gained the desktop Supabase adapter,
+  and the mobile screen list went from 4 routes to all 18. The contract-suite
+  note claimed the mobile adapters weren't wired up — all four adapters run it.
+
+- Fixed (docs): the data-model example in CLAUDE.md and README.md still showed
+  the pre-migration `"status": "pending"` shape. Both now show the tag-id
+  schema with `readingTags`/`taskTags`, and document `examDate`, `note`,
+  `studyTime` and `freeStudy`.
+
+- Fixed (docs): `npm test` runs core *and* mobile (only `test:watch` /
+  `test:coverage` are core-only); the vendoring and packaging scripts live in
+  `packages/desktop/scripts/`, not the root `scripts/`; `sync-supabase.js` is
+  now documented alongside `sync-core.js`; and the CI description includes the
+  `Mobile (typecheck)` job it previously omitted.
+
+- Fixed (docs): README's project-structure tree and IPC table were badly out of
+  date — the tree now matches the tracked file set, and the IPC section lists
+  all 25 channels across 11 bridges instead of 4. Its "no HTTP" heading now
+  says plainly that persistence goes over IPC while the renderer does call
+  Supabase and the feedback endpoint over HTTPS.
+
+- Fixed: a stale `lib/ipc-handlers.js` path in a `semester-store.js` comment,
+  left over from the monorepo migration.
+
+- Added (docs): a read-only repository audit
+  (`docs/AUDIT_2026-09.md`) covering architecture conformance, dead-code
+  candidates, test-coverage gaps, the security/IPC surface, documentation
+  drift, and whether the `@lectio/core` split has earned its keep. No source
+  file was changed — every finding is a proposal.
+
+- Noted (docs): the audit records three drift items worth acting on. All three
+  planning documents still say the desktop is not wired to Supabase, though
+  cross-device sync shipped there; the `externalLinks` IPC bridge and its
+  `open-external` handler no longer have a renderer caller; and the desktop's
+  drag-and-drop import reads the `File.path` property that Electron removed in
+  favour of `webUtils.getPathForFile`.
+
 - Fixed (desktop, macOS): after the study-timer's phase-complete popup
   appeared, Lectio lost its dock indicator and menu bar and its window stopped
   behaving normally in Stage Manager (couldn't be moved between stages, stuck

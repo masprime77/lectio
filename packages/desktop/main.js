@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, dialog, shell, safeStorage, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, dialog, safeStorage, screen } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log/main');
 const fs = require('fs');
@@ -57,6 +57,10 @@ function createWindow() {
       backgroundThrottling: false,
     },
   });
+
+  // Nothing here ever opens a child window; deny by default so a
+  // window.open() or target=_blank from loaded content can't spawn one.
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
   mainWindow.loadFile('index.html');
   mainWindow.on('closed', () => {
@@ -117,6 +121,9 @@ function openLegalDocWindow(docKey) {
     title: doc.title,
     webPreferences: { contextIsolation: true, nodeIntegration: false },
   });
+  // Nothing here ever opens a child window; deny by default so a
+  // window.open() or target=_blank from loaded content can't spawn one.
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
 }
 
@@ -371,6 +378,10 @@ function showPomodoroPopup(payload) {
     },
   });
 
+  // Nothing here ever opens a child window; deny by default so a
+  // window.open() or target=_blank from loaded content can't spawn one.
+  popupWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+
   // Floats above other apps' windows too, not just Lectio's own — this is
   // meant to read as a system alert, not a regular document window.
   // macOS/Linux-only knobs; no-ops on Windows.
@@ -565,21 +576,6 @@ ipcMain.handle('show-open-dialog', async (event, { title }) => {
   return { canceled: false, filePath: filePaths[0] };
 });
 
-// Open an external link in the user's default browser. Restricted to https
-// github.com URLs (used for the pre-filled feedback/bug-report issue links) so
-// the renderer can't ask the OS to open arbitrary URLs.
-ipcMain.handle('open-external', (event, url) => {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol === 'https:' && parsed.hostname === 'github.com') {
-      return shell.openExternal(parsed.href);
-    }
-  } catch (e) {
-    /* malformed URL → ignore */
-  }
-  return Promise.resolve();
-});
-
 // ---------------------------------------------------------------------------
 // Moodle: secure token storage + SSO capture window
 //
@@ -682,6 +678,10 @@ function captureMoodleToken(baseUrl) {
       },
     });
 
+    // This window loads a remote institution's login pages; deny by default
+    // so none of it can spawn an uncontrolled popup.
+    authWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+
     function handleRedirect(event, url) {
       if (settled || !/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/token=/.test(url)) return;
       event.preventDefault();
@@ -716,6 +716,21 @@ function captureOAuthRedirect(oauthUrl) {
   return new Promise((resolve, reject) => {
     let settled = false;
 
+    // The renderer supplies this URL and we navigate a real window to it, so
+    // parse it and require https first. Without this a malformed string
+    // reaches loadURL, and a valid but wrong scheme (file://) would load.
+    let authorizeUrl;
+    try {
+      authorizeUrl = new URL(oauthUrl);
+    } catch (e) {
+      reject(new Error('Sign-in failed: malformed authorize URL.'));
+      return;
+    }
+    if (authorizeUrl.protocol !== 'https:') {
+      reject(new Error('Sign-in failed: the authorize URL must use https.'));
+      return;
+    }
+
     const authWindow = new BrowserWindow({
       width: 480,
       height: 720,
@@ -725,6 +740,9 @@ function captureOAuthRedirect(oauthUrl) {
         nodeIntegration: false,
       },
     });
+
+    // Loads the provider's remote consent pages; deny by default.
+    authWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
     function handleRedirect(event, url) {
       const parsed = parseOAuthRedirect(url);
@@ -746,7 +764,7 @@ function captureOAuthRedirect(oauthUrl) {
       if (!settled) reject(new Error('Sign-in was cancelled.'));
     });
 
-    authWindow.loadURL(oauthUrl);
+    authWindow.loadURL(authorizeUrl.href);
   });
 }
 

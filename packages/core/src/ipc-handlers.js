@@ -6,6 +6,19 @@
 const fs = require('fs');
 const path = require('path');
 const store = require('./semester-store');
+const lectioFile = require('./integrations/lectio-file');
+
+// The export/import handlers below take a filesystem path straight from the
+// renderer. It is meant to come from show-save-dialog / show-open-dialog, but
+// the main process can't verify that, so confine what it will touch to the
+// app's own interchange extension. Both dialogs already filter on / default to
+// `.lectio.json`, so this rejects nothing a user can reach through the UI.
+function assertLectioFilePath(filePath) {
+  if (!filePath || typeof filePath !== 'string') throw new Error('filePath required');
+  if (!filePath.endsWith('.lectio.json')) {
+    throw new Error('filePath must end with .lectio.json');
+  }
+}
 
 function registerIpcHandlers(ipcMain, getDir) {
   const dir = () => (typeof getDir === 'function' ? getDir() : getDir);
@@ -15,27 +28,20 @@ function registerIpcHandlers(ipcMain, getDir) {
   ipcMain.handle('save-semester', (event, id, data) => store.saveSemester(dir(), id, data));
   ipcMain.handle('delete-semester', (event, id) => store.deleteSemester(dir(), id));
 
-  // Export a single course to a file path chosen by the renderer (via show-save-dialog).
+  // Export a single course to a file path chosen by the renderer (via
+  // show-save-dialog). The envelope (and the course projection inside it) comes
+  // from core's lectio-file module, so desktop and mobile emit the same bytes
+  // and the format version lives in exactly one place.
   ipcMain.handle('export-course', (event, { filePath, course }) => {
-    if (!filePath || typeof filePath !== 'string') throw new Error('filePath required');
-    const payload = {
-      _lectioType: 'course',
-      _version: 1,
-      course,
-    };
-    fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf8');
+    assertLectioFilePath(filePath);
+    fs.writeFileSync(filePath, JSON.stringify(lectioFile.buildCourseFile(course), null, 2), 'utf8');
     return { ok: true };
   });
 
   // Export a full semester (with tags) to a file path chosen by the renderer.
   ipcMain.handle('export-semester', (event, { filePath, semester }) => {
-    if (!filePath || typeof filePath !== 'string') throw new Error('filePath required');
-    const payload = {
-      _lectioType: 'semester',
-      _version: 1,
-      semester,
-    };
-    fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf8');
+    assertLectioFilePath(filePath);
+    fs.writeFileSync(filePath, JSON.stringify(lectioFile.buildSemesterFile(semester), null, 2), 'utf8');
     return { ok: true };
   });
 
@@ -43,7 +49,7 @@ function registerIpcHandlers(ipcMain, getDir) {
   // Validation of _lectioType / _version is done in the renderer. Used for both
   // dialog-picked and drag-and-drop file paths.
   ipcMain.handle('import-file', (event, { filePath }) => {
-    if (!filePath || typeof filePath !== 'string') throw new Error('filePath required');
+    assertLectioFilePath(filePath);
     if (!fs.existsSync(filePath)) throw new Error(`File not found: ${filePath}`);
     const raw = fs.readFileSync(filePath, 'utf8');
     return JSON.parse(raw);

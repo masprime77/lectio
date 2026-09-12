@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 // Expose a minimal, safe API to the renderer. ipcRenderer itself is never
 // exposed — only these four wrapped methods cross the bridge.
@@ -46,12 +46,14 @@ contextBridge.exposeInMainWorld('appInfo', {
   platform: process.platform,
 });
 
-// External links: open a URL in the default browser. Main restricts this to
-// https github.com URLs (used for the pre-filled feedback issue links).
-// NB: named `externalLinks`, not `external` — `window.external` is a built-in
-// browser property and exposeInMainWorld can't bind on top of it.
-contextBridge.exposeInMainWorld('externalLinks', {
-  openExternal: (url) => ipcRenderer.invoke('open-external', url),
+// Dropped-file paths. Electron used to augment renderer `File` objects with a
+// `.path` property; that was removed in favour of webUtils.getPathForFile(),
+// which only exists in the preload context — the sandboxed renderer has no
+// `webUtils`. The `File` itself crosses the contextBridge by structured clone,
+// which is exactly what this call is for. Used by app.js's drag-and-drop
+// import to turn a dropped file into a path for the `import-file` handler.
+contextBridge.exposeInMainWorld('fileUtils', {
+  getPathForFile: (file) => webUtils.getPathForFile(file),
 });
 
 // Settings bridge: file-based settings (settings.json) read/write, plus the

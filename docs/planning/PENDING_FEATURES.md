@@ -1,13 +1,17 @@
 # Pending Features
 
 Lectio is an npm-workspaces monorepo with three packages. The **desktop** app
-(`@lectio/desktop`, Electron) is the feature-complete reference and persists
-each semester as a JSON file via the `fs-storage` adapter. The **mobile** app
-(`@lectio/mobile`, Expo / React Native) is an early preview: it signs in with
-email/password and reads/writes semesters through Supabase (`supabase-storage`,
+(`@lectio/desktop`, Electron) is the feature-complete reference. Signed out it
+persists each semester as a local JSON file via the `fs-storage` adapter;
+signed in it reads and writes the same semesters through Supabase
+(`supabase-client.js` + `auth.js` + `supabase-storage.js`), with
+`getActiveStorage()` in `app.js` choosing between the two per session and
+`local-import.js` offering a one-time, non-destructive upload of existing local
+semesters into a cloud account. The **mobile** app (`@lectio/mobile`, Expo /
+React Native) reads/writes the same Supabase tables (`supabase-storage`,
 Postgres + Row Level Security), with an on-device `device-storage` adapter kept
-for a future offline mode. Cross-device **sync is mobile-only so far** — desktop
-is not yet wired to Supabase, so it does not sync with mobile or across machines.
+for a future offline mode. Cross-device **sync works on both platforms** —
+desktop↔mobile and across machines — for a signed-in account.
 
 This file is the single authoritative tracker for what's missing; it supersedes
 any scattered roadmap notes. Checkboxes mark open items.
@@ -15,7 +19,11 @@ any scattered roadmap notes. Checkboxes mark open items.
 ## Mobile (`@lectio/mobile`)
 
 What the mobile app can do today: sign in / create an account / sign out via
-the profile screen (`app/sign-in.tsx`, `app/profile.tsx`), browse semesters and
+the profile screen (`app/sign-in.tsx`, `app/profile.tsx`) — with
+email/password, **Google** (`signInWithOAuth`, browser round-trip) or **Sign in
+with Apple** (`signInWithIdToken`, Apple's on-device Authentication Services,
+no browser), and either provider also linkable to an existing account
+(`linkGoogle` / `linkAppleNative` in `src/auth/oauth.ts`) — browse semesters and
 courses, see per-course progress bars, tap a reading/task to advance its tag
 (which recomputes progress and persists to Supabase), create/edit/delete
 semesters, create/rename/recolor/reorder/delete courses, and

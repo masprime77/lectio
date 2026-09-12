@@ -17,7 +17,11 @@
 // conflict → window.PlannerConflict (used by supabase-storage.js's save() to
 // detect cloud write conflicts, the same logic the mobile adapter uses),
 // moodle → window.LectioMoodle (the type-agnostic Moodle mapper), moodle-client
-// → window.LectioMoodleClient (the Moodle Web Services REST client).
+// → window.LectioMoodleClient (the Moodle Web Services REST client),
+// lectio-file → window.LectioFile (the .lectio.json interchange envelope).
+//
+// ORDER MATTERS for lectio-file: its defaultMakeId() reads window.PlannerCore
+// in the browser, so its <script> tag must come after planner-core.js's.
 //
 // The copies are git-ignored; they're regenerated on prestart/predev/prebuild.
 const fs = require('fs');
@@ -30,6 +34,7 @@ const files = [
   ['@lectio/core/storage/conflict', 'conflict.js'],
   ['@lectio/core/integrations/moodle', 'moodle.js'],
   ['@lectio/core/integrations/moodle-client', 'moodle-client.js'],
+  ['@lectio/core/integrations/lectio-file', 'lectio-file.js'],
 ];
 // A copy that isn't in the electron-builder `files` allowlist is missing from
 // the packaged app, and the failure only shows up at runtime as an undefined

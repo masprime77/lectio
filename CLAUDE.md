@@ -9,26 +9,39 @@ Guidance for AI assistants (and humans) working in this repo.
 ships as two apps sharing one core:
 
 - **`@lectio/desktop`** — a native **desktop app for macOS and Windows**
-  (Electron, framework-free **vanilla JS** renderer). **No server and no
-  database** — each semester is a plain JSON file the Electron main process
-  reads/writes directly via Node's `fs` (the `fs-storage` adapter).
+  (Electron, framework-free **vanilla JS** renderer). Signed out, it is
+  entirely local: each semester is a plain JSON file the Electron main process
+  reads/writes via Node's `fs` (the `fs-storage` adapter). Signed in, the same
+  renderer talks to **Supabase** instead (the desktop `supabase-storage`
+  adapter).
 - **`@lectio/mobile`** — an **Expo / React Native app for iOS and Android**
   (Expo Router + TypeScript, runs in Expo Go). Semesters sync across devices
-  through **Supabase** (Postgres + RLS) behind email/password auth (the
-  `supabase-storage` adapter); a `device-storage` adapter (on-device
-  AsyncStorage) is kept for a future offline mode.
+  through **Supabase** (Postgres + RLS) behind email/password, Google OAuth or
+  Sign in with Apple (the `supabase-storage` adapter); a `device-storage`
+  adapter (on-device AsyncStorage) is kept for a future offline mode.
 - **`@lectio/core`** — pure, DOM/Electron-free planner logic plus the async
   **storage contract** and adapters, shared by all of the above.
 
-Sync is currently **mobile-only**: desktop still uses `fs-storage` and is not
-wired to Supabase, so cross-device sync works mobile↔mobile. Remaining gaps are
-tracked in [`docs/planning/PENDING_FEATURES.md`](docs/planning/PENDING_FEATURES.md).
+**Sync works on both platforms.** The desktop is wired to Supabase through
+`supabase-client.js` (builds `window.lectioSupabase`), `auth.js` (the
+renderer's sign-in surface) and `supabase-storage.js` (a contract-compliant
+cloud adapter). The renderer picks its adapter at runtime — see
+`getActiveStorage()` in `app.js`, which returns `window.lectioSupabaseStorage`
+when a session exists and falls back to the `fsStorage` IPC wrapper otherwise —
+so the local store remains the offline path rather than being replaced. `local-import.js`
+is the one-time, non-destructive upload that migrates a user's existing local
+semesters into their cloud account. Because the renderer can't read
+`process.env`, `packages/desktop/scripts/sync-supabase.js` generates its config
+on prestart/predev/prebuild and **fails the build in CI** when the Supabase
+secrets are absent. Remaining gaps are tracked in
+[`docs/planning/PENDING_FEATURES.md`](docs/planning/PENDING_FEATURES.md).
 
 ## Commands
 
 npm-workspaces monorepo. Run these from the **repo root**; `start`/`dev`/`build:*`
-delegate to `@lectio/desktop`, `mobile*` to `@lectio/mobile`, and `test*` to
-`@lectio/core`:
+delegate to `@lectio/desktop` and `mobile*` to `@lectio/mobile`. `npm test` runs
+**both** `@lectio/core` and `@lectio/mobile`; `test:watch` and `test:coverage`
+are core-only:
 
 ```bash
 npm install            # install deps + link workspaces
@@ -37,8 +50,9 @@ npm run dev            # run with DevTools open
 npm run mobile         # run mobile in Expo Go (→ @lectio/mobile: expo start)
 npm run mobile:ios     # mobile in the iOS simulator
 npm run mobile:android # mobile on the Android emulator
-npm test               # Vitest suite (run once, @lectio/core)
-npm run test:coverage  # coverage report (coverage/), thresholds enforced
+npm test               # Vitest suites, run once: @lectio/core then @lectio/mobile
+npm run test:watch     # Vitest watch mode (@lectio/core only)
+npm run test:coverage  # coverage report (packages/core/coverage/), thresholds enforced
 npm run build:mac      # build .dmg + .zip into packages/desktop/dist/ (electron-builder)
 npm run build:win      # build NSIS .exe + .zip into packages/desktop/dist/ (electron-builder)
 # Mobile typecheck lives in the mobile workspace (no root alias):
@@ -66,7 +80,11 @@ holds the shared, Electron-free logic; `@lectio/desktop` (`packages/desktop/`)
 is the Electron app; `@lectio/mobile` (`packages/mobile/`) is the Expo app. Both
 apps depend on core. The root `package.json` is a thin workspace manager that
 delegates scripts. Repo-level concerns (`api/`, `homebrew/`, `macos-signing/`,
-`scripts/`) stay at the root.
+`scripts/`) stay at the root — note the root `scripts/` holds only
+`gen-macos-signing-cert.sh`; the build/vendoring scripts (`sync-core.js`,
+`sync-supabase.js`, `bundle-deps.js`, `clean-deps.js`) live in
+`packages/desktop/scripts/` and are referenced relative to that workspace in
+its `package.json`.
 
 Desktop has three layers + the shared core:
 
@@ -75,33 +93,82 @@ Desktop has three layers + the shared core:
   `require('@lectio/core/ipc-handlers')`), runs auto-update, and owns the
   unsaved-changes close prompt (`before-quit`).
 - **`packages/desktop/preload.js`**: exposes the `contextBridge` APIs to the
-  renderer and never leaks `ipcRenderer`:
-  - `window.planner` — `listSemesters / getSemester / saveSemester / deleteSemester`
-  - `window.updater` — auto-update events + `restartAndUpdate`
+  renderer and never leaks `ipcRenderer`. Eleven bridges:
+  - `window.planner` — semester CRUD (`listSemesters / getSemester /
+    saveSemester / deleteSemester`) plus the file dialogs and export/import
+    (`showSaveDialog`, `showOpenDialog`, `exportCourse`, `exportSemester`,
+    `importFile`, `loadExampleSemester`)
+  - `window.updater` — auto-update events + `startDownload` / `restartAndUpdate`
   - `window.saver` — File→Save trigger, `setDirty`, save-before-quit handshake
-- **`index.html` + `app.js` + `style.css`** (renderer, in `packages/desktop/`):
-  all UI, rendering, views, the save system, theme, and session restore. `app.js`
-  is global-scoped (not a module); it auto-runs `init()` at the bottom. The
-  renderer loads core's `planner-core.js` via `<script src="planner-core.js">`;
-  that file is vendored next to `index.html` by `scripts/sync-core.js`
-  (prestart/predev/prebuild, git-ignored) so the same relative path resolves
-  under `npm start` and in the flattened packaged bundle — the sandboxed renderer
-  (`contextIsolation:true`, `nodeIntegration:false`) can't `require()` it.
-- **`@lectio/core`** (`packages/core/src/`) — pure, DOM/Electron-free logic,
-  imported by the desktop main process (CommonJS), the renderer (browser global),
-  and the tests (CommonJS):
-  - `planner-core.js` — status cycles, `courseProgress`, course CRUD, `uid`
-    (dual-mode: attaches `window.PlannerCore` in the browser, `module.exports`
-    in Node)
+  - `window.appInfo` — `getVersion()`, plus a synchronous `platform`
+  - `window.fileUtils` — `getPathForFile(file)` for drag-and-drop import
+    (`webUtils` is preload-only; `File.path` no longer exists)
+  - `window.settings` — `settings.json` get/save + the menu's "open settings"
+    signal
+  - `window.legalDocs` — opens the Impressum / Privacy Policy windows
+  - `window.moodleAuth` — multi-account Moodle token storage + SSO capture
+  - `window.providerAuth` — `captureRedirect(oauthUrl)` for the Google/Apple
+    OAuth window
+  - `window.pomodoroTray` — one-way tray state report + the clicked action id
+  - `window.pomodoroPopup` — show/hide the always-on-top completion alert
+  
+  `packages/desktop/preload-pomodoro-popup.js` is a separate, smaller preload
+  for the popup's **own** renderer; it exposes a different `window.pomodoroPopup`
+  (`onData` / `action` / `dismiss`) in a context that never shares JS with the
+  main window.
+- **The renderer** (in `packages/desktop/`) — `index.html` + `app.js` +
+  `style.css` carry all UI, rendering, views, the save system, theme and
+  session restore; `app.js` is global-scoped (not a module) and auto-runs
+  `init()` at the bottom. Alongside them, loaded as plain `<script>`s in this
+  order: `supabase.js` + `supabase-config.js` (both generated, git-ignored),
+  `supabase-client.js` (builds `window.lectioSupabase`), `auth.js`
+  (`window.lectioAuth` — the sign-in gate's surface), the vendored core files,
+  `supabase-storage.js` (the cloud adapter) and `local-import.js`
+  (local→cloud upload). `pomodoro-popup.html` is a second, separate renderer
+  with its own preload.
+  
+  The renderer loads core via `<script src="planner-core.js">` and friends;
+  those files are vendored next to `index.html` by
+  `packages/desktop/scripts/sync-core.js` (prestart/predev/prebuild,
+  git-ignored) so the same relative path resolves under `npm start` and in the
+  flattened packaged bundle — the sandboxed renderer (`contextIsolation:true`,
+  `nodeIntegration:false`) can't `require()` it. `scripts/sync-supabase.js`
+  does the same for the supabase-js UMD bundle and writes the renderer's
+  `supabase-config.js` from the environment.
+- **`@lectio/core`** (`packages/core/src/`) — DOM/Electron-free logic,
+  imported by the desktop main process (CommonJS), the renderer (browser
+  global), the mobile app (ESM/TS) and the tests:
+  - `planner-core.js` — tag sets, `courseProgress`, `courseBreakdown`, course
+    and item CRUD, sorting, `uid` (dual-mode: attaches `window.PlannerCore` in
+    the browser, `module.exports` in Node)
+  - `pomodoro-core.js` — the deadline-based pomodoro timer, the count-up
+    stopwatch, and study-time accounting: local `YYYY-MM-DD` date keys, the
+    day/week ranges behind the Today / This week / Last week / All time views
+    (`studyTimeInRange`, `studyTimeByDay`), and the four-week log retention
+    (`pruneStudySessions`, which never touches a bucket's `totalSeconds`)
+    (`window.PomodoroCore`); the largest core module
   - `semester-store.js` — filesystem read/write/delete (parameterized by dir)
-  - `ipc-handlers.js` — `registerIpcHandlers(ipcMain, getDir)`, used by `main.js`
+  - `ipc-handlers.js` — `registerIpcHandlers(ipcMain, getDir)`, used by
+    `main.js`; also owns the export/import file handlers
+  - `integrations/` — `lectio-file.js` (the `.lectio.json` interchange
+    envelope), `moodle.js` (the type-agnostic Moodle mapper), `moodle-client.js`
+    (Moodle Web Services REST client), `moodle-sso.js` (launch-URL builder +
+    redirect parser) and `oauth-redirect.js` (`lectio://auth-callback` parser)
   - `storage/` — the async storage layer shared across platforms:
     `contract.js` (the canonical `list`/`get`/`save`/`delete` interface +
     `assertStorage` validator), `migrate.js` (`migrateStatusToTagId`, the
-    platform-agnostic legacy→tag-id migration), and `fs-storage.js`
-    (`createFsStorage(dirOrResolver)`, used by desktop)
+    platform-agnostic legacy→tag-id migration), `conflict.js`
+    (`detectConflict` + `ConflictError`, shared by both Supabase adapters) and
+    `fs-storage.js` (`createFsStorage(dirOrResolver)`, used by desktop)
 
-The renderer's `api` object calls `window.planner.*` (IPC) — there is no HTTP.
+Note that `semester-store.js`, `ipc-handlers.js`, `contract.js` and
+`fs-storage.js` are Node-only CommonJS (they sit on `fs`); the other nine core
+modules carry the dual-mode wrapper. Mobile's `types/lectio-core.d.ts`
+deliberately omits the Node-only surface.
+
+Persistence reaches the main process over IPC (`window.planner.*`) — there is
+no HTTP in that path. The renderer does make HTTPS calls of its own, though:
+Supabase (PostgREST + auth) when signed in, and the feedback endpoint.
 
 ## Storage contract & adapters
 
@@ -112,32 +179,60 @@ enforced at construction by `assertStorage`. Every adapter migrates on load
 "invalid"/"not found" error messages, so they're drop-in interchangeable:
 
 - **`fs-storage`** (`@lectio/core/storage/fs`) — filesystem, used by desktop via
-  `ipc-handlers`.
-- **`device-storage`** (`packages/mobile/src/storage/device-storage.ts`) —
-  on-device AsyncStorage; the future offline fallback (kept but not the active
-  adapter).
+  `ipc-handlers`; the local/offline path when signed out.
+- **`supabase-storage`** (`packages/desktop/supabase-storage.js`) — the
+  desktop's cloud adapter, a vanilla-JS dual-mode mirror of the mobile one.
+  Takes its Supabase client by injection, so the same file runs in the renderer
+  and under Vitest against an in-memory fake.
 - **`supabase-storage`** (`packages/mobile/src/storage/supabase-storage.ts`) —
   the mobile app's **active** adapter; a `public.semesters` JSON-blob table
   keyed by `(user_id, id)` with Row Level Security for per-user isolation.
+- **`device-storage`** (`packages/mobile/src/storage/device-storage.ts`) —
+  on-device AsyncStorage; the future offline fallback (kept but not the active
+  adapter).
+
+Both Supabase adapters detect concurrent cross-device writes through the same
+`@lectio/core/storage/conflict` helpers (`detectConflict` / `ConflictError`).
 
 A reusable contract suite (`packages/core/tests/contract/storage-contract.js`)
-exercises the full surface; it runs against `fs-storage` today. The mobile
-adapters are not yet wired to it (see `docs/planning/PENDING_FEATURES.md`).
+exercises the full surface, and **all four adapters now run against it**:
+`fs-storage` and the desktop Supabase adapter from core's own suite
+(`tests/unit/fs-storage.test.js`, `tests/contract/desktop-supabase-storage.test.js`),
+and both mobile adapters from the mobile workspace
+(`packages/mobile/test/{device,supabase}-storage.test.ts`, which import the
+suite by relative path since it is not in core's package `exports`).
 
 ## Mobile (`@lectio/mobile`)
 
 Expo (SDK 56) / React Native + Expo Router (file-based routing) + TypeScript,
 runnable in Expo Go (no native/dev-client build). Key pieces:
 
-- **Screens** (`app/`): `sign-in.tsx` (email/password), `index.tsx` (semesters
-  list + sign-out), `semester/[id].tsx` (courses with progress bars),
-  `semester/[id]/course/[courseId].tsx` (readings/tasks; tap an item to cycle
-  its tag and persist). `_layout.tsx` redirects to `/sign-in` until authed.
-- **Auth** (`src/auth/AuthProvider.tsx`): Supabase email/password session,
-  restored from AsyncStorage, exposing `signIn`/`signUp`/`signOut`.
+- **Screens** (`app/`), 18 routes. `_layout.tsx` redirects to `/sign-in` until
+  authed. Auth: `sign-in.tsx`, `forgot-password.tsx`, `profile.tsx` (the
+  account hub — change email/password, delete account, sign out). Planner:
+  `index.tsx` (semesters list), `semester/[id].tsx` (courses with progress
+  bars), `semester/[id]/course/[courseId].tsx` (readings/tasks; tap an item to
+  cycle its tag and persist), plus the `add.tsx` / `semester-form.tsx` /
+  `semester/course-form.tsx` / `semester/item-form.tsx` editors. Moodle:
+  `moodle.tsx`, `moodle-import.tsx`, `moodle-triage.tsx`, `moodle-raw.tsx`.
+  Other: `settings.tsx`, `settings/legal/[doc].tsx`, `feedback.tsx`.
+- **Auth** (`src/auth/AuthProvider.tsx`): Supabase session restored from
+  AsyncStorage, exposing `signIn`/`signUp`/`signOut`. Beyond email/password,
+  `src/auth/oauth.ts` adds **Google** (`signInWithOAuth`, browser round-trip)
+  and **Sign in with Apple** (`signInWithIdToken` over Apple's on-device
+  Authentication Services), plus `linkGoogle` / `linkAppleNative` /
+  `listIdentities` / `unlinkProvider` for linking providers to an existing
+  account.
 - **Storage** (`src/storage/index.ts`): returns `supabase-storage` as the
   singleton `storage`; `ensureSeed` exists but is intentionally **not**
   auto-called (so new cloud accounts aren't seeded with sample data).
+- **Other subsystems** under `src/`: `pomodoro/` (`PomodoroProvider` owns both
+  clocks — the pomodoro session and the stopwatch — plus `logStudyTime`;
+  `StudyTimerSheet` is the three-tab Pomodoro / Stopwatch / Log sheet and
+  `StudyTimeDashboard` the ranged study-time panel, all on
+  `@lectio/core/pomodoro-core`), `moodle/` (import session, raw
+  rows, week suggestion), `sync/` (conflict dialog + `saveWithConflict`),
+  `tutorial/` (the first-run overlay), `components/` and `add/` (shared UI).
 - All planner math comes from `@lectio/core` (typed via the hand-written
   `types/lectio-core.d.ts` ambient declarations + `tsconfig` `paths`); none is
   reimplemented. `metro.config.js` is monorepo-aware so Metro bundles the
@@ -153,16 +248,64 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
   "id": "ss2025", "name": "Summer Semester 2025",
   "startDate": "2025-04-07",          // ISO date of Monday of week 1
   "weeks": 15,
+
+  // Tag sets live on the semester. Each item's `status` is a tag ID into the
+  // matching array. `section` ('pending' | 'done') is what decides whether an
+  // item wearing the tag counts toward course progress.
+  "readingTags": [
+    { "id": "r-pending",    "name": "pending",    "color": "#ef4444", "section": "pending" },
+    { "id": "r-seen",       "name": "seen",       "color": "#f97316", "section": "pending" },
+    { "id": "r-summarized", "name": "summarized", "color": "#3b82f6", "section": "done" },
+    { "id": "r-studied",    "name": "studied",    "color": "#22c55e", "section": "done" }
+  ],
+  "taskTags": [
+    { "id": "t-pending", "name": "pending", "color": "#ef4444", "section": "pending" },
+    { "id": "t-done",    "name": "done",    "color": "#3b82f6", "section": "done" },
+    { "id": "t-studied", "name": "studied", "color": "#22c55e", "section": "done" }
+  ],
+
+  // Time studied with no course attached — its own category in the breakdown.
+  "freeStudy": {
+    "totalSeconds": 1500,
+    "sessions": [
+      // `date` is a LOCAL date key, not a UTC slice — that is what makes the
+      // day and week views right for anyone not on GMT. Entries are pruned to
+      // the last four weeks (see pruneStudySessions); `totalSeconds` is never
+      // trimmed, so All time keeps every hour. 'adjustment' entries (a
+      // hand-edited total) are excluded from the day/week views.
+      { "id": "st-abc", "seconds": 1500, "source": "pomodoro",
+        "date": "2025-04-09", "createdAt": "2025-04-09T14:05:00.000Z" }
+    ]
+  },
+
   "courses": [{
     "id": "course-1", "name": "Algorithms", "color": "#4A90D9",
-    "readings": [{ "id": "r-1", "week": 1, "title": "...", "status": "pending" }],
-    "tasks":    [{ "id": "t-1", "week": 1, "title": "...", "dueDate": "2025-04-14", "status": "not done" }]
+    "examDate": "2025-07-21",         // optional; '' when unset
+    // Same bucket shape as freeStudy. Capped at 200 sessions, oldest dropped.
+    "studyTime": { "totalSeconds": 3000, "sessions": [/* … */] },
+    "readings": [
+      { "id": "r-1", "week": 1, "title": "...", "status": "r-pending",
+        "note": "optional, max 280 chars" }
+    ],
+    "tasks": [
+      { "id": "t-1", "week": 1, "title": "...", "dueDate": "2025-04-14",
+        "status": "t-pending" }
+    ]
   }]
 }
 ```
 
-- Reading status: `pending → seen → summarized → studied` (cycles).
-- Task status: `not done → done → reviewed` (cycles).
+- **Statuses are tag IDs, not names.** An item's `status` references an entry in
+  the semester's `readingTags` / `taskTags`; clicking an item cycles to the next
+  tag in that array. The defaults above ship with every new semester, but tags
+  are user-editable (add / rename / recolor / reorder / delete) — only
+  `r-pending` and `t-pending` are protected, since the migration falls back to
+  them.
+- **Legacy files migrate on load.** `migrateStatusToTagId`
+  (`@lectio/core/storage/migrate`) rewrites the old name-string shape
+  (`"pending"`, `"not done"`, `"reviewed"`, …) to tag IDs and adds the default
+  tag arrays. It runs in every storage adapter's `get()`, is idempotent, and
+  maps anything unrecognised to the protected pending tag.
 - **Where files live:** dev → `packages/desktop/semesters/`; packaged → per-OS
   `app.getPath('userData')`: macOS
   `~/Library/Application Support/Lectio/semesters/`, Windows
@@ -183,6 +326,14 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
   script in `index.html`. All colors are CSS variables (`style.css` top block).
 - **Add course:** "+ Add course" reuses the semester editor modal (no separate
   flow). Course columns/empty states have low-weight +Reading/+Task buttons.
+- **Study timer:** one modal, three tabs (`setupTimerTabs` / `setTimerTab`) —
+  Pomodoro (the cycle timer, with the Course / Free study switch inside it),
+  Stopwatch (counts up; the target picker is the assign step shown only once it
+  is paused) and Log (an amount + target + date, no clock). Only one clock runs
+  at a time (`otherTimerBusy`); the stopwatch persists to `settings.json` beside
+  the pomodoro session. The Study time panel's ranges (`STUDY_RANGES`,
+  `setStudyRange`) are Today / This week / Last week / All time, with a
+  tappable day bar per day in the week views.
 
 ## Testing
 
@@ -204,9 +355,15 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
   with its base before opening a PR (`git merge origin/<base>`).
 - **Commits:** Conventional-Commits style — `feat:`, `fix:`, `chore:`, `ci:`,
   `docs:`, `test:`, `refactor:`. Small, focused commits.
-- **CI/CD:** `.github/workflows/ci.yml` runs on `main` + `dev` (tests on
-  macOS + Ubuntu, plus a macOS packaging build with no publish) and gates
-  `release.yml`. Release flow: bump `version` in `package.json` → PR → merge →
+- **CI/CD:** `.github/workflows/ci.yml` runs on `main` + `dev` and gates
+  `release.yml`. Three jobs — four check runs, since `Test` is a two-OS matrix:
+  `Test` (`macos-latest` + `ubuntu-latest`, running the root `npm test` and
+  `npm run test:coverage`), `Build (macOS, no publish)` (proves the desktop app
+  still packages end-to-end; needs the Supabase secrets, since
+  `sync-supabase.js` exits non-zero without them), and `Mobile (typecheck)`
+  (`tsc --noEmit` on `@lectio/mobile`, Ubuntu-only).
+
+  Release flow: bump `version` in `package.json` → PR → merge →
   `git tag vX.Y.Z && git push origin vX.Y.Z`. The release workflow runs CI, then
   builds and publishes in two parallel, independent jobs — macOS
   (`.dmg`/`.zip`/`latest-mac.yml`) and Windows (NSIS `.exe`/`.zip`/`latest.yml`) —
@@ -251,11 +408,13 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
   `node_modules`, so `packages/desktop` has no local `node_modules`.
   electron-builder bundles only `<appDir>/node_modules` and otherwise runs a
   destructive `npm install --omit=dev` that prunes the hoisted root mid-build.
-  `prebuild:mac`/`prebuild:win` therefore run `scripts/bundle-deps.js`, which
+  `prebuild:mac`/`prebuild:win` therefore run
+  `packages/desktop/scripts/bundle-deps.js`, which
   seeds `packages/desktop/node_modules` with the production-dependency closure
   (computed by `npm ls`, copied from the hoisted modules) so electron-builder
   skips its install and bundles the right modules; `predev`/`prestart` run
-  `scripts/clean-deps.js` to drop that seed so dev uses the live workspace.
+  `packages/desktop/scripts/clean-deps.js` to drop that seed so dev uses the
+  live workspace.
   `electron` is **pinned to an exact version** in the desktop `package.json`
   because electron-builder can't derive it from a range when electron is hoisted.
 - Don't touch the user's `../homebrew-tap` repo unless asked; `sync-tap.sh`
