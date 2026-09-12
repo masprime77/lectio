@@ -108,6 +108,7 @@
       "conflict.js",
       "moodle.js",
       "moodle-client.js",
+      "lectio-file.js",
       "semesters/",
       "assets/icon.png",
       "assets/lockup.png",

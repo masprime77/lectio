@@ -1,5 +1,16 @@
 ## Unreleased
 
+- Fixed (`@lectio/core`): `prepareImportedCourse` threw
+  `ReferenceError: global is not defined` when called in a browser without an
+  explicit id-maker. Its dual-mode wrapper never passed the global into its
+  factory, so the browser fallback referenced a Node-only binding. Mobile
+  always passed `uid` explicitly, so nothing hit it in production — but it
+  would have broken the desktop renderer the moment it used the module.
+
+- Added (desktop): `@lectio/core`'s `.lectio.json` interchange module is now
+  vendored into the renderer as `window.LectioFile`, so the desktop can share
+  core's envelope and import logic instead of its own copies.
+
 - Removed: dead code with no remaining callers — the `externalLinks` IPC bridge
   and its `open-external` handler (left behind when feedback moved in-app), the
   superseded tick-based Pomodoro helpers in `@lectio/core`

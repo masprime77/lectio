@@ -969,6 +969,9 @@
   <script src="pomodoro-core.js"></script>
   <script src="moodle.js"></script>
   <script src="moodle-client.js"></script>
+  <!-- lectio-file.js reads window.PlannerCore for uid(), so it must follow
+       planner-core.js above. Exposes window.LectioFile. -->
+  <script src="lectio-file.js"></script>
   <script src="migrate.js"></script>
   <script src="conflict.js"></script>
   <script src="supabase-storage.js"></script>
