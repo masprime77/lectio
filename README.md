@@ -444,7 +444,7 @@ The other ten bridges follow the same pattern:
 | `window.saver`         | `menu-save`, `set-dirty`, `flush-save-and-quit`, `save-and-quit-done`                       | File → Save, unsaved-changes reporting, save-before-quit    |
 | `window.appInfo`       | `get-version` (+ a synchronous `platform`)                                                  | App version and host platform                               |
 | `window.settings`      | `get-settings`, `save-settings`, `open-settings`                                            | `settings.json` read/write + the ⌘, menu signal             |
-| `window.externalLinks` | `open-external`                                                                             | Open a link in the browser — restricted to `https://github.com` |
+| `window.fileUtils`     | *(no channel — calls `webUtils` in preload)*                                                | Resolves a dropped `File` to a real path for drag-and-drop import |
 | `window.legalDocs`     | `open-legal-doc`                                                                            | Open the Impressum / Privacy Policy windows                 |
 | `window.moodleAuth`    | `moodle-list-accounts`, `moodle-get-account-token`, `moodle-add-account`, `moodle-remove-account`, `moodle-capture-token` | Multi-account Moodle tokens (encrypted via `safeStorage`) + SSO capture |
 | `window.providerAuth`  | `oauth-capture-redirect`                                                                    | Drives the Google / Apple OAuth window and parses the redirect |

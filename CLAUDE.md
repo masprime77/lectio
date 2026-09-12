@@ -101,8 +101,8 @@ Desktop has three layers + the shared core:
   - `window.updater` — auto-update events + `startDownload` / `restartAndUpdate`
   - `window.saver` — File→Save trigger, `setDirty`, save-before-quit handshake
   - `window.appInfo` — `getVersion()`, plus a synchronous `platform`
-  - `window.externalLinks` — `openExternal(url)` (main restricts it to
-    `https://github.com`)
+  - `window.fileUtils` — `getPathForFile(file)` for drag-and-drop import
+    (`webUtils` is preload-only; `File.path` no longer exists)
   - `window.settings` — `settings.json` get/save + the menu's "open settings"
     signal
   - `window.legalDocs` — opens the Impressum / Privacy Policy windows
