@@ -58,58 +58,11 @@
     };
   }
 
-  // Timer state shape: { phase, secondsRemaining, completedPomodoros, running }
-  // phase is one of 'idle' | 'work' | 'shortBreak' | 'longBreak'.
-  function createIdleState() {
-    return { phase: 'idle', secondsRemaining: 0, completedPomodoros: 0, running: false };
-  }
-
-  function startWork(settings) {
-    const s = clampPomodoroSettings(settings);
-    return { phase: 'work', secondsRemaining: s.workMinutes * 60, completedPomodoros: 0, running: true };
-  }
-
-  // Advance the clock by one second. No-op when idle or not running.
-  function tick(state) {
-    if (!state || !state.running || state.secondsRemaining <= 0) return state;
-    return { ...state, secondsRemaining: state.secondsRemaining - 1 };
-  }
-
-  // Call once secondsRemaining has reached 0. Returns the next state:
-  //   work        -> shortBreak, or longBreak every `pomodorosUntilLongBreak`th
-  //   shortBreak  -> work
-  //   longBreak   -> idle (the configured cycle is complete)
-  function advancePhase(state, settings) {
-    const s = clampPomodoroSettings(settings);
-    if (!state || state.phase === 'idle') return createIdleState();
-    if (state.phase === 'work') {
-      const completed = state.completedPomodoros + 1;
-      const isLongBreak = completed % s.pomodorosUntilLongBreak === 0;
-      return {
-        phase: isLongBreak ? 'longBreak' : 'shortBreak',
-        secondsRemaining: (isLongBreak ? s.longBreakMinutes : s.shortBreakMinutes) * 60,
-        completedPomodoros: completed,
-        running: true,
-      };
-    }
-    if (state.phase === 'shortBreak') {
-      return {
-        phase: 'work',
-        secondsRemaining: s.workMinutes * 60,
-        completedPomodoros: state.completedPomodoros,
-        running: true,
-      };
-    }
-    // longBreak just finished: the configured cycle is done.
-    return createIdleState();
-  }
-
   // ---- Deadline-based timer state -----------------------------------------
-  // The tick-based helpers above decrement a counter and assume a reliable
-  // 1 Hz caller. These derive everything from wall-clock instead, which is
-  // what both UIs actually use: an interval only triggers a repaint, so a
-  // throttled or suspended timer (backgrounded app, sleeping laptop) resumes
-  // showing the correct remaining time with no catch-up logic.
+  // Everything is derived from wall-clock rather than a decremented counter,
+  // which is what both UIs actually use: an interval only triggers a repaint,
+  // so a throttled or suspended timer (backgrounded app, sleeping laptop)
+  // resumes showing the correct remaining time with no catch-up logic.
   //
   // Session shape:
   //   { phase, endsAt, pausedAt, completedPomodoros, awaitingAdvance,
@@ -322,8 +275,8 @@
     return elapsedWorkSeconds(session, settings, nowMs);
   }
 
-  // Advance to the next phase, keeping the same course/semester. Mirrors
-  // advancePhase(): work -> shortBreak, or longBreak every nth pomodoro;
+  // Advance to the next phase, keeping the same course/semester:
+  // work -> shortBreak, or longBreak every nth pomodoro;
   // shortBreak -> work; longBreak -> idle (one full cycle done). The new phase
   // is measured from `nowMs`, not from the old deadline, so a session parked
   // awaiting advance starts its next phase when the user confirms; the
@@ -653,11 +606,6 @@
     FREE_STUDY_NAME,
     FREE_STUDY_COLOR,
     clampPomodoroSettings,
-    // tick-based state machine (retained)
-    createIdleState,
-    startWork,
-    tick,
-    advancePhase,
     // deadline-based session state
     createIdleSession,
     phaseDurationSeconds,
