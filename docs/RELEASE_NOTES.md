@@ -1,5 +1,11 @@
 ## Unreleased
 
+- Added (tests): behavioural coverage for the `export-course`,
+  `export-semester` and `import-file` IPC handlers, which were previously only
+  asserted to be *registered* — happy paths, both guards, the not-found branch
+  and the malformed-JSON branch. `ipc-handlers.js` goes from 60% to 100% line
+  and function coverage.
+
 - Added (tests): negative-path coverage for `assertStorage` — the storage
   contract's validator was only ever called with valid adapters, so neither of
   its rejection branches was exercised.
