@@ -1,5 +1,9 @@
 ## Unreleased
 
+- Added (tests): negative-path coverage for `assertStorage` — the storage
+  contract's validator was only ever called with valid adapters, so neither of
+  its rejection branches was exercised.
+
 - Fixed (`@lectio/core`): `prepareImportedCourse` threw
   `ReferenceError: global is not defined` when called in a browser without an
   explicit id-maker. Its dual-mode wrapper never passed the global into its
