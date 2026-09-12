@@ -3850,11 +3850,10 @@ async function importSemester(parsedPayload) {
       // Resolve id conflict
       let targetId = toSave.id;
       if (hasConflict && conflictChoice === 'new') {
-        const ids = new Set(existingList.map((s) => s.id));
-        let base = slugify(toSave.name);
-        let n = 2;
-        targetId = base;
-        while (ids.has(targetId)) targetId = `${base}-${n++}`;
+        targetId = window.LectioFile.uniqueSemesterId(
+          toSave.name,
+          new Set(existingList.map((s) => s.id))
+        );
         toSave.id = targetId;
       }
 
@@ -4314,9 +4313,9 @@ function addCourseField(course) {
   container.appendChild(row);
 }
 
-function slugify(s) {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'semester';
-}
+// slugify + uniqueSemesterId come from core (LectioFile) so desktop, mobile and
+// the import paths all mint identical ids for the same semester name.
+const slugify = (s) => window.LectioFile.slugify(s);
 
 // Add the reading/task described by the items panel to the currently open
 // semester, mirroring the inline add-rows (same shape, via core's addItem).
@@ -4440,10 +4439,7 @@ async function submitSemesterFromModal() {
   });
 
   const existing = await api.list();
-  const ids = new Set(existing.map((s) => s.id));
-  let id = slugify(name);
-  let n = 2;
-  while (ids.has(id)) id = `${slugify(name)}-${n++}`;
+  const id = window.LectioFile.uniqueSemesterId(name, new Set(existing.map((s) => s.id)));
 
   const draft = state.editingSemester || {};
   const semester = {
