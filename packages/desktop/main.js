@@ -58,6 +58,10 @@ function createWindow() {
     },
   });
 
+  // Nothing here ever opens a child window; deny by default so a
+  // window.open() or target=_blank from loaded content can't spawn one.
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+
   mainWindow.loadFile('index.html');
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -117,6 +121,9 @@ function openLegalDocWindow(docKey) {
     title: doc.title,
     webPreferences: { contextIsolation: true, nodeIntegration: false },
   });
+  // Nothing here ever opens a child window; deny by default so a
+  // window.open() or target=_blank from loaded content can't spawn one.
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
 }
 
@@ -370,6 +377,10 @@ function showPomodoroPopup(payload) {
       backgroundThrottling: false,
     },
   });
+
+  // Nothing here ever opens a child window; deny by default so a
+  // window.open() or target=_blank from loaded content can't spawn one.
+  popupWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
   // Floats above other apps' windows too, not just Lectio's own — this is
   // meant to read as a system alert, not a regular document window.
@@ -682,6 +693,10 @@ function captureMoodleToken(baseUrl) {
       },
     });
 
+    // This window loads a remote institution's login pages; deny by default
+    // so none of it can spawn an uncontrolled popup.
+    authWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+
     function handleRedirect(event, url) {
       if (settled || !/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/token=/.test(url)) return;
       event.preventDefault();
@@ -741,6 +756,9 @@ function captureOAuthRedirect(oauthUrl) {
         nodeIntegration: false,
       },
     });
+
+    // Loads the provider's remote consent pages; deny by default.
+    authWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
     function handleRedirect(event, url) {
       const parsed = parseOAuthRedirect(url);
