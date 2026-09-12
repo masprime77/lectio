@@ -31,16 +31,17 @@ when a session exists and falls back to the `fsStorage` IPC wrapper otherwise �
 so the local store remains the offline path rather than being replaced. `local-import.js`
 is the one-time, non-destructive upload that migrates a user's existing local
 semesters into their cloud account. Because the renderer can't read
-`process.env`, `scripts/sync-supabase.js` generates its config on
-prestart/predev/prebuild and **fails the build in CI** when the Supabase
+`process.env`, `packages/desktop/scripts/sync-supabase.js` generates its config
+on prestart/predev/prebuild and **fails the build in CI** when the Supabase
 secrets are absent. Remaining gaps are tracked in
 [`docs/planning/PENDING_FEATURES.md`](docs/planning/PENDING_FEATURES.md).
 
 ## Commands
 
 npm-workspaces monorepo. Run these from the **repo root**; `start`/`dev`/`build:*`
-delegate to `@lectio/desktop`, `mobile*` to `@lectio/mobile`, and `test*` to
-`@lectio/core`:
+delegate to `@lectio/desktop` and `mobile*` to `@lectio/mobile`. `npm test` runs
+**both** `@lectio/core` and `@lectio/mobile`; `test:watch` and `test:coverage`
+are core-only:
 
 ```bash
 npm install            # install deps + link workspaces
@@ -49,8 +50,9 @@ npm run dev            # run with DevTools open
 npm run mobile         # run mobile in Expo Go (→ @lectio/mobile: expo start)
 npm run mobile:ios     # mobile in the iOS simulator
 npm run mobile:android # mobile on the Android emulator
-npm test               # Vitest suite (run once, @lectio/core)
-npm run test:coverage  # coverage report (coverage/), thresholds enforced
+npm test               # Vitest suites, run once: @lectio/core then @lectio/mobile
+npm run test:watch     # Vitest watch mode (@lectio/core only)
+npm run test:coverage  # coverage report (packages/core/coverage/), thresholds enforced
 npm run build:mac      # build .dmg + .zip into packages/desktop/dist/ (electron-builder)
 npm run build:win      # build NSIS .exe + .zip into packages/desktop/dist/ (electron-builder)
 # Mobile typecheck lives in the mobile workspace (no root alias):
@@ -78,7 +80,11 @@ holds the shared, Electron-free logic; `@lectio/desktop` (`packages/desktop/`)
 is the Electron app; `@lectio/mobile` (`packages/mobile/`) is the Expo app. Both
 apps depend on core. The root `package.json` is a thin workspace manager that
 delegates scripts. Repo-level concerns (`api/`, `homebrew/`, `macos-signing/`,
-`scripts/`) stay at the root.
+`scripts/`) stay at the root — note the root `scripts/` holds only
+`gen-macos-signing-cert.sh`; the build/vendoring scripts (`sync-core.js`,
+`sync-supabase.js`, `bundle-deps.js`, `clean-deps.js`) live in
+`packages/desktop/scripts/` and are referenced relative to that workspace in
+its `package.json`.
 
 Desktop has three layers + the shared core:
 
@@ -329,9 +335,15 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
   with its base before opening a PR (`git merge origin/<base>`).
 - **Commits:** Conventional-Commits style — `feat:`, `fix:`, `chore:`, `ci:`,
   `docs:`, `test:`, `refactor:`. Small, focused commits.
-- **CI/CD:** `.github/workflows/ci.yml` runs on `main` + `dev` (tests on
-  macOS + Ubuntu, plus a macOS packaging build with no publish) and gates
-  `release.yml`. Release flow: bump `version` in `package.json` → PR → merge →
+- **CI/CD:** `.github/workflows/ci.yml` runs on `main` + `dev` and gates
+  `release.yml`. Three jobs — four check runs, since `Test` is a two-OS matrix:
+  `Test` (`macos-latest` + `ubuntu-latest`, running the root `npm test` and
+  `npm run test:coverage`), `Build (macOS, no publish)` (proves the desktop app
+  still packages end-to-end; needs the Supabase secrets, since
+  `sync-supabase.js` exits non-zero without them), and `Mobile (typecheck)`
+  (`tsc --noEmit` on `@lectio/mobile`, Ubuntu-only).
+
+  Release flow: bump `version` in `package.json` → PR → merge →
   `git tag vX.Y.Z && git push origin vX.Y.Z`. The release workflow runs CI, then
   builds and publishes in two parallel, independent jobs — macOS
   (`.dmg`/`.zip`/`latest-mac.yml`) and Windows (NSIS `.exe`/`.zip`/`latest.yml`) —
@@ -376,11 +388,13 @@ A semester JSON file (`<id>.json`), where `id` is the filename and must match
   `node_modules`, so `packages/desktop` has no local `node_modules`.
   electron-builder bundles only `<appDir>/node_modules` and otherwise runs a
   destructive `npm install --omit=dev` that prunes the hoisted root mid-build.
-  `prebuild:mac`/`prebuild:win` therefore run `scripts/bundle-deps.js`, which
+  `prebuild:mac`/`prebuild:win` therefore run
+  `packages/desktop/scripts/bundle-deps.js`, which
   seeds `packages/desktop/node_modules` with the production-dependency closure
   (computed by `npm ls`, copied from the hoisted modules) so electron-builder
   skips its install and bundles the right modules; `predev`/`prestart` run
-  `scripts/clean-deps.js` to drop that seed so dev uses the live workspace.
+  `packages/desktop/scripts/clean-deps.js` to drop that seed so dev uses the
+  live workspace.
   `electron` is **pinned to an exact version** in the desktop `package.json`
   because electron-builder can't derive it from a range when electron is hoisted.
 - Don't touch the user's `../homebrew-tap` repo unless asked; `sync-tap.sh`
