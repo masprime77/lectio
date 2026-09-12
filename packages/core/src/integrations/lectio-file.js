@@ -17,13 +17,18 @@
 // in Node (`require`) and the browser (`window.LectioFile`), mirroring
 // planner-core.
 (function (global, factory) {
-  const api = factory();
+  const api = factory(global);
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (global) global.LectioFile = api;
-})(typeof window !== 'undefined' ? window : null, function () {
+})(typeof window !== 'undefined' ? window : null, function (global) {
   // Node loads uid from planner-core's CommonJS surface; the browser global is
   // attached as `window.PlannerCore`. Resolved lazily so requiring this module
   // never throws in the browser (where there is no `require`).
+  //
+  // `global` is the wrapper's parameter, not Node's global object — it has to
+  // be, because a browser has no `global` binding and a bare reference to one
+  // is a ReferenceError, not undefined. (This is the same way migrate.js hands
+  // its dependency to its factory.)
   function defaultMakeId(prefix) {
     if (typeof require === 'function') {
       return require('../planner-core.js').uid(prefix);
