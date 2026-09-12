@@ -1,5 +1,5 @@
 // Device-local UI preferences (last-opened semester, sort order, course
-// grouping, tutorial-seen, pomodoro durations + live session) backed by
+// grouping, tutorial-seen, pomodoro durations + live session + stopwatch) backed by
 // AsyncStorage. Mirrors the desktop renderer's
 // readPref/writePref semantics: reads never throw (fallback on error) and
 // writes fail silently. This is UI state only — it must never be written into
@@ -12,6 +12,7 @@ const K = {
   tutorialSeen: 'lectio:pref:tutorialSeen',
   pomodoroSettings: 'lectio:pref:pomodoroSettings',
   pomodoroSession: 'lectio:pref:pomodoroSession',
+  stopwatch: 'lectio:pref:stopwatch',
   openCourseWeeks: 'lectio:pref:openCourseWeeks',
   courseGrouping: 'lectio:pref:courseGrouping',
 } as const;
@@ -61,6 +62,11 @@ export const prefs = {
   getPomodoroSession: () => getString(K.pomodoroSession),
   setPomodoroSession: (json: string) => setString(K.pomodoroSession, json),
   clearPomodoroSession: () => remove(K.pomodoroSession),
+
+  // The stopwatch — the second, independent timer. Same treatment as the
+  // pomodoro session: a JSON blob, rehydrated defensively by core.
+  getStopwatch: () => getString(K.stopwatch),
+  setStopwatch: (json: string) => setString(K.stopwatch, json),
 
   // Which week sections are expanded on the course detail screen, as a JSON
   // map keyed by "<courseId>:<kind>:<week>". Only the sections the user has

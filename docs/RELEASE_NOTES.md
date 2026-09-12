@@ -1,5 +1,28 @@
 ## Unreleased
 
+- Added (desktop + mobile): the study timer now has **three tabs**. **Pomodoro**
+  is the cycle timer exactly as before, with its Course / Free study choice
+  inside it. **Stopwatch** counts up with no phases and no breaks — you assign
+  the elapsed time to a course (or to Free study) when you stop it, credited to
+  the day the stretch began. **Log** has no clock at all: an amount, a target
+  and the day you studied, for time spent away from the app. Only one clock can
+  be live at a time, and whichever one is running gets the corner pill.
+
+- Added (desktop + mobile): the Study time panel now answers **Today**, **This
+  week**, **Last week** and **All time**. The two week views show the seven days
+  as bars; tapping one narrows the ring and legend to that day. All time is
+  unchanged — the running totals, which keep every hour ever tracked.
+
+- Added (`@lectio/core`): per-session study logs are kept for four weeks and
+  pruned as new time is credited, so a semester file stops growing while its
+  all-time totals stay complete. Existing semesters keep every hour in All time;
+  the day and week views fill in from this version onward.
+
+- Fixed (`@lectio/core`): study-session dates are now stamped in the user's
+  **local** timezone rather than sliced off a UTC timestamp. An evening session
+  east of Greenwich was being dated to the next day, which the new day and week
+  views would have made visible. Existing entries keep the date they were given.
+
 - Added (tests): behavioural coverage for the `export-course`,
   `export-semester` and `import-file` IPC handlers, which were previously only
   asserted to be *registered* — happy paths, both guards, the not-found branch

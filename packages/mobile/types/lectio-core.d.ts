@@ -507,3 +507,85 @@ export function setFreeStudyTime(semester: Semester, newTotalSeconds: number): S
 export function formatClock(totalSeconds: number): string;
 export function formatHoursMinutes(totalSeconds: number): string;
 export function parseHoursMinutesInput(text: string): number | null;
+
+// --- Stopwatch -------------------------------------------------------------
+// The count-up timer. Unlike a pomodoro session it does not know what it
+// credits until it is stopped, so it carries no courseId.
+
+export interface Stopwatch {
+  /** Epoch ms the current run began, or null while paused. */
+  runningSince: number | null;
+  /** Seconds accumulated by earlier runs of this stopwatch. */
+  bankedSeconds: number;
+  /** Local date key of the first start — the day the time is credited to. */
+  startedDate: string | null;
+  semesterId: string | null;
+}
+
+export const MAX_STOPWATCH_SECONDS: number;
+export function createIdleStopwatch(): Stopwatch;
+export function isStopwatchRunning(sw: Stopwatch | null | undefined): boolean;
+export function isStopwatchPaused(sw: Stopwatch | null | undefined): boolean;
+export function isStopwatchIdle(sw: Stopwatch | null | undefined): boolean;
+export function stopwatchSeconds(sw: Stopwatch | null | undefined, nowMs?: number): number;
+export function startStopwatch(
+  opts: { semesterId?: string | null },
+  nowMs?: number
+): Stopwatch;
+export function pauseStopwatch(sw: Stopwatch, nowMs?: number): Stopwatch;
+export function resumeStopwatch(sw: Stopwatch, nowMs?: number): Stopwatch;
+export function resetStopwatch(): Stopwatch;
+export function rehydrateStopwatch(raw: unknown): Stopwatch;
+
+// --- Local calendar keys, ranges and the session log ------------------------
+// Dates are 'YYYY-MM-DD' in the *user's own* timezone, never a UTC slice.
+
+/** Monday — study weeks match the planner's, which start on a Monday. */
+export const WEEK_START_DAY: number;
+/** How many calendar weeks of per-session detail are kept (current + 3 back). */
+export const STUDY_LOG_WEEKS: number;
+
+export interface StudyDateRange {
+  from: string;
+  to: string;
+}
+
+export function localDateKey(value?: Date | number): string;
+export function isValidDateKey(key: unknown): boolean;
+export function dateKeyToDate(key: string): Date | null;
+export function addDaysToKey(key: string, days: number): string | null;
+export function weekStartKey(key: string): string | null;
+export function dateKeysBetween(fromKey: string, toKey: string): string[];
+/** 0 is today, -1 yesterday. */
+export function studyDayRange(dayOffset: number, nowMs?: number): StudyDateRange;
+/** 0 is the current week, -1 the previous one. */
+export function studyWeekRange(weekOffset: number, nowMs?: number): StudyDateRange;
+export function studyLogCutoffKey(nowMs?: number, weeksKept?: number): string;
+
+/**
+ * Where the time studied between two dates (inclusive) went — the ranged
+ * counterpart of studyTimeByCourse, in the same shape. Built from the session
+ * log rather than the running totals, and excludes 'adjustment' entries, which
+ * correct the all-time total rather than record time studied at a moment.
+ */
+export function studyTimeInRange(
+  semester: Semester | null | undefined,
+  fromKey: string,
+  toKey: string
+): StudyTimeBreakdown;
+/** One gap-filled entry per day in the range. */
+export function studyTimeByDay(
+  semester: Semester | null | undefined,
+  fromKey: string,
+  toKey: string
+): { date: string; totalSeconds: number }[];
+/**
+ * Drops session entries older than the kept window, in place. `totalSeconds` is
+ * never touched, so the all-time view keeps every hour. Returns how many
+ * entries were removed.
+ */
+export function pruneStudySessions(
+  semester: Semester | null | undefined,
+  nowMs?: number,
+  weeksKept?: number
+): number;
