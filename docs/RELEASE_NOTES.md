@@ -1,5 +1,7 @@
 ## Unreleased
 
+## 1.2.0 — 2026-09-12
+
 - Added (desktop + mobile): the study timer now has **three tabs**. **Pomodoro**
   is the cycle timer exactly as before, with its Course / Free study choice
   inside it. **Stopwatch** counts up with no phases and no breaks — you assign
