@@ -1,5 +1,43 @@
 ## Unreleased
 
+- Fixed (docs): **the docs said desktop had no cloud sync.** CLAUDE.md,
+  README.md, `PENDING_FEATURES.md` and `ROADMAP_TO_LAUNCH.md` all claimed the
+  desktop app was not wired to Supabase and that sync was mobile-only. Desktop
+  sync shipped some time ago — all four now describe the real behaviour: local
+  JSON files when signed out, Supabase when signed in, chosen per session by
+  `getActiveStorage()`, with `local-import.js` migrating existing local
+  semesters into a cloud account.
+
+- Fixed (docs): the mobile auth description said email/password only; it now
+  covers Google OAuth and Sign in with Apple, including provider linking.
+
+- Fixed (docs): CLAUDE.md's component inventories were several phases stale.
+  Preload bridges went from 3 listed to the 11 that exist, the core module list
+  gained `pomodoro-core.js`, the `integrations/` directory and
+  `storage/conflict.js`, the adapter list gained the desktop Supabase adapter,
+  and the mobile screen list went from 4 routes to all 18. The contract-suite
+  note claimed the mobile adapters weren't wired up — all four adapters run it.
+
+- Fixed (docs): the data-model example in CLAUDE.md and README.md still showed
+  the pre-migration `"status": "pending"` shape. Both now show the tag-id
+  schema with `readingTags`/`taskTags`, and document `examDate`, `note`,
+  `studyTime` and `freeStudy`.
+
+- Fixed (docs): `npm test` runs core *and* mobile (only `test:watch` /
+  `test:coverage` are core-only); the vendoring and packaging scripts live in
+  `packages/desktop/scripts/`, not the root `scripts/`; `sync-supabase.js` is
+  now documented alongside `sync-core.js`; and the CI description includes the
+  `Mobile (typecheck)` job it previously omitted.
+
+- Fixed (docs): README's project-structure tree and IPC table were badly out of
+  date — the tree now matches the tracked file set, and the IPC section lists
+  all 25 channels across 11 bridges instead of 4. Its "no HTTP" heading now
+  says plainly that persistence goes over IPC while the renderer does call
+  Supabase and the feedback endpoint over HTTPS.
+
+- Fixed: a stale `lib/ipc-handlers.js` path in a `semester-store.js` comment,
+  left over from the monorepo migration.
+
 - Added (docs): a read-only repository audit
   (`docs/AUDIT_2026-09.md`) covering architecture conformance, dead-code
   candidates, test-coverage gaps, the security/IPC surface, documentation
