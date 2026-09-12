@@ -89,3 +89,111 @@ describe('IPC handlers', () => {
     await expect(ipc.invoke('get-semester', 'x')).rejects.toThrow(/not found/i);
   });
 });
+
+// The three file handlers write and read real paths, so they get their own
+// block: the suite above only ever asserted that they were registered.
+describe('export/import IPC handlers', () => {
+  const course = {
+    id: 'c1',
+    name: 'Algorithms',
+    color: '#4A90D9',
+    examDate: '2025-07-21',
+    readings: [{ id: 'r1', week: 1, title: 'Chapter 1', status: 'r-pending', note: 'keep me' }],
+    tasks: [{ id: 't1', week: 1, title: 'Set 1', dueDate: '2025-01-13', status: 't-pending' }],
+  };
+  const out = (name) => path.join(dir, name);
+
+  describe('export-semester', () => {
+    it('writes a semester envelope the file system can read back', async () => {
+      const file = out('sem.lectio.json');
+      await expect(ipc.invoke('export-semester', { filePath: file, semester: sample })).resolves.toEqual({
+        ok: true,
+      });
+      const written = JSON.parse(fs.readFileSync(file, 'utf8'));
+      expect(written._lectioType).toBe('semester');
+      expect(written._version).toBe(1);
+      expect(written.semester).toEqual(sample);
+    });
+
+    it('rejects a missing or empty filePath', async () => {
+      await expect(ipc.invoke('export-semester', { semester: sample })).rejects.toThrow(
+        /filePath required/
+      );
+      await expect(
+        ipc.invoke('export-semester', { filePath: '', semester: sample })
+      ).rejects.toThrow(/filePath required/);
+    });
+
+    it('rejects a filePath that is not .lectio.json, writing nothing', async () => {
+      const file = out('sem.json');
+      await expect(
+        ipc.invoke('export-semester', { filePath: file, semester: sample })
+      ).rejects.toThrow(/must end with \.lectio\.json/);
+      expect(fs.existsSync(file)).toBe(false);
+    });
+  });
+
+  describe('export-course', () => {
+    it('writes a course envelope, keeping item notes', async () => {
+      const file = out('course.lectio.json');
+      await expect(ipc.invoke('export-course', { filePath: file, course })).resolves.toEqual({
+        ok: true,
+      });
+      const written = JSON.parse(fs.readFileSync(file, 'utf8'));
+      expect(written._lectioType).toBe('course');
+      expect(written._version).toBe(1);
+      expect(written.course.name).toBe('Algorithms');
+      expect(written.course.readings[0].note).toBe('keep me');
+      // The envelope carries no semester-level tag sets.
+      expect(written.course.readingTags).toBeUndefined();
+    });
+
+    it('rejects a missing filePath', async () => {
+      await expect(ipc.invoke('export-course', { course })).rejects.toThrow(/filePath required/);
+    });
+
+    it('rejects a filePath that is not .lectio.json, writing nothing', async () => {
+      const file = out('course.txt');
+      await expect(ipc.invoke('export-course', { filePath: file, course })).rejects.toThrow(
+        /must end with \.lectio\.json/
+      );
+      expect(fs.existsSync(file)).toBe(false);
+    });
+  });
+
+  describe('import-file', () => {
+    it('round-trips an exported semester', async () => {
+      const file = out('round.lectio.json');
+      await ipc.invoke('export-semester', { filePath: file, semester: sample });
+      const payload = await ipc.invoke('import-file', { filePath: file });
+      expect(payload._lectioType).toBe('semester');
+      expect(payload.semester).toEqual(sample);
+    });
+
+    it('rejects a missing filePath', async () => {
+      await expect(ipc.invoke('import-file', {})).rejects.toThrow(/filePath required/);
+    });
+
+    it('rejects a filePath that is not .lectio.json even when the file exists', async () => {
+      const file = out('real.json');
+      fs.writeFileSync(file, JSON.stringify({ _lectioType: 'semester', semester: sample }));
+      await expect(ipc.invoke('import-file', { filePath: file })).rejects.toThrow(
+        /must end with \.lectio\.json/
+      );
+    });
+
+    it('rejects a path that does not exist', async () => {
+      await expect(ipc.invoke('import-file', { filePath: out('nope.lectio.json') })).rejects.toThrow(
+        /File not found/
+      );
+    });
+
+    it('propagates a JSON parse failure for a malformed file', async () => {
+      const file = out('bad.lectio.json');
+      fs.writeFileSync(file, '{ not json at all');
+      // The handler does not catch this; the renderer surfaces it as
+      // "Could not read file: ...".
+      await expect(ipc.invoke('import-file', { filePath: file })).rejects.toThrow(SyntaxError);
+    });
+  });
+});
