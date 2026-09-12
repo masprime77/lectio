@@ -6,6 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const store = require('./semester-store');
+const lectioFile = require('./integrations/lectio-file');
 
 // The export/import handlers below take a filesystem path straight from the
 // renderer. It is meant to come from show-save-dialog / show-open-dialog, but
@@ -27,27 +28,20 @@ function registerIpcHandlers(ipcMain, getDir) {
   ipcMain.handle('save-semester', (event, id, data) => store.saveSemester(dir(), id, data));
   ipcMain.handle('delete-semester', (event, id) => store.deleteSemester(dir(), id));
 
-  // Export a single course to a file path chosen by the renderer (via show-save-dialog).
+  // Export a single course to a file path chosen by the renderer (via
+  // show-save-dialog). The envelope (and the course projection inside it) comes
+  // from core's lectio-file module, so desktop and mobile emit the same bytes
+  // and the format version lives in exactly one place.
   ipcMain.handle('export-course', (event, { filePath, course }) => {
     assertLectioFilePath(filePath);
-    const payload = {
-      _lectioType: 'course',
-      _version: 1,
-      course,
-    };
-    fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf8');
+    fs.writeFileSync(filePath, JSON.stringify(lectioFile.buildCourseFile(course), null, 2), 'utf8');
     return { ok: true };
   });
 
   // Export a full semester (with tags) to a file path chosen by the renderer.
   ipcMain.handle('export-semester', (event, { filePath, semester }) => {
     assertLectioFilePath(filePath);
-    const payload = {
-      _lectioType: 'semester',
-      _version: 1,
-      semester,
-    };
-    fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf8');
+    fs.writeFileSync(filePath, JSON.stringify(lectioFile.buildSemesterFile(semester), null, 2), 'utf8');
     return { ok: true };
   });
 
