@@ -41,6 +41,12 @@
     // explicitly for deterministic tests.
     const passport = opts.passport !== undefined ? opts.passport : Math.floor(Math.random() * 1e9);
     const url = new URL(`${String(baseUrl).replace(/\/+$/, '')}/admin/tool/mobile/launch.php`);
+    // The platform layer loads this URL in a real window, so a non-https base
+    // (e.g. `file:///etc`) would have it navigate somewhere it must never go.
+    // `new URL` above only rejects malformed input, not a valid wrong scheme.
+    if (url.protocol !== 'https:') {
+      throw new Error('buildLaunchUrl requires an https baseUrl.');
+    }
     url.searchParams.set('service', service);
     url.searchParams.set('passport', String(passport));
     url.searchParams.set('urlscheme', urlscheme);

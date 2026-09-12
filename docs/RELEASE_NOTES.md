@@ -1,5 +1,11 @@
 ## Unreleased
 
+- Changed (security): the Moodle SSO and OAuth sign-in windows now refuse to
+  navigate anywhere that isn't `https:`. `buildLaunchUrl` validated only that
+  the Moodle base URL parsed, and the OAuth authorize URL wasn't parsed at all
+  before being loaded — so a non-https target (`file://`, say) would have been
+  loaded in a real window. Well-formed https sign-in flows are unaffected.
+
 - Fixed (desktop): **drag-and-drop import was broken.** Dropping a
   `.lectio.json` file onto the window always failed with "Only .lectio.json
   files can be dropped here", because the code read the `File.path` property

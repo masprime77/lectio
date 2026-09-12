@@ -716,6 +716,22 @@ function captureOAuthRedirect(oauthUrl) {
   return new Promise((resolve, reject) => {
     let settled = false;
 
+    // The renderer supplies this URL and we navigate a real window to it, so
+    // check it the same way the open-external handler does: parse, then require
+    // https. Without this a malformed string reaches loadURL, and a valid but
+    // wrong scheme (file://, for one) would actually load.
+    let authorizeUrl;
+    try {
+      authorizeUrl = new URL(oauthUrl);
+    } catch (e) {
+      reject(new Error('Sign-in failed: malformed authorize URL.'));
+      return;
+    }
+    if (authorizeUrl.protocol !== 'https:') {
+      reject(new Error('Sign-in failed: the authorize URL must use https.'));
+      return;
+    }
+
     const authWindow = new BrowserWindow({
       width: 480,
       height: 720,
@@ -746,7 +762,7 @@ function captureOAuthRedirect(oauthUrl) {
       if (!settled) reject(new Error('Sign-in was cancelled.'));
     });
 
-    authWindow.loadURL(oauthUrl);
+    authWindow.loadURL(authorizeUrl.href);
   });
 }
 
