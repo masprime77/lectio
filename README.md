@@ -296,32 +296,55 @@ lives in [`CLAUDE.md`](CLAUDE.md).
 lectio/
 ├── package.json        # Workspace root: delegates start/dev/build/test/mobile to the packages
 ├── packages/
-│   ├── core/           # @lectio/core — pure, testable logic (DOM/Electron-free)
+│   ├── core/           # @lectio/core — shared, testable logic (DOM/Electron-free)
 │   │   ├── src/
-│   │   │   ├── planner-core.js   # status cycles, progress, course CRUD
+│   │   │   ├── planner-core.js   # tags, progress, breakdown, course/item CRUD, sorting, uid
+│   │   │   ├── pomodoro-core.js  # study timer state machine + study-time accounting
 │   │   │   ├── semester-store.js # filesystem read/write/delete
-│   │   │   ├── ipc-handlers.js   # registers the semester IPC handlers
+│   │   │   ├── ipc-handlers.js   # registers the semester + export/import IPC handlers
+│   │   │   ├── integrations/     # platform-free integrations
+│   │   │   │   ├── lectio-file.js    # .lectio.json interchange envelope (build/parse)
+│   │   │   │   ├── moodle.js         # Moodle course-contents → import candidates
+│   │   │   │   ├── moodle-client.js  # Moodle Web Services REST client
+│   │   │   │   ├── moodle-sso.js     # SSO launch URL + token-redirect parser
+│   │   │   │   └── oauth-redirect.js # lectio://auth-callback parser
 │   │   │   └── storage/          # async storage contract + adapters
 │   │   │       ├── contract.js   # the canonical list/get/save/delete interface + validator
 │   │   │       ├── migrate.js    # platform-agnostic legacy→tag-id migration
+│   │   │       ├── conflict.js   # cross-device write-conflict detection + ConflictError
 │   │   │       └── fs-storage.js # filesystem adapter (used by desktop)
 │   │   └── tests/                # Vitest unit + integration + reusable storage-contract suite
 │   ├── desktop/        # @lectio/desktop — the Electron app + electron-builder config
-│   │   ├── main.js               # Main process: window, IPC handlers, auto-update
-│   │   ├── preload.js            # contextBridge bridges: window.planner + window.updater
-│   │   ├── index.html            # Markup: update banner, header, dashboard, planner, modal
+│   │   ├── main.js               # Main process: windows, IPC, menu, tray, auto-update
+│   │   ├── preload.js            # contextBridge bridges (11 — see "How it works" below)
+│   │   ├── preload-pomodoro-popup.js  # separate preload for the popup's own renderer
+│   │   ├── index.html            # Markup: update banner, header, dashboard, planner, modals
+│   │   ├── pomodoro-popup.html   # The always-on-top phase-complete alert window
 │   │   ├── app.js                # Renderer logic: views, save system, session restore
+│   │   ├── auth.js               # Renderer auth surface (window.lectioAuth)
+│   │   ├── supabase-client.js    # Builds window.lectioSupabase from the generated config
+│   │   ├── supabase-storage.js   # Desktop cloud storage adapter (contract-compliant)
+│   │   ├── supabase-config.example.js  # Template for the generated renderer config
+│   │   ├── local-import.js       # One-time, non-destructive local → cloud upload
 │   │   ├── style.css             # Styles (theme variables, banners, indicators)
 │   │   ├── start.command         # Double-click launcher for running from source
-│   │   ├── package.json          # Desktop scripts + electron-builder config (dmg, publish)
-│   │   ├── scripts/sync-core.js  # Vendors planner-core next to index.html for the renderer
-│   │   ├── assets/               # Icon + DMG background, and their generators
+│   │   ├── package.json          # Desktop scripts + electron-builder config (dmg, nsis, publish)
+│   │   ├── scripts/
+│   │   │   ├── sync-core.js      # Vendors core modules next to index.html for the renderer
+│   │   │   ├── sync-supabase.js  # Vendors supabase-js UMD + generates supabase-config.js
+│   │   │   ├── bundle-deps.js    # Seeds packages/desktop/node_modules before packaging
+│   │   │   └── clean-deps.js     # Drops that seed so dev uses the live workspace
+│   │   ├── assets/               # Icons, DMG background, tray glyph, and their generators
 │   │   │   ├── icon.png              # 1024×1024 source icon
-│   │   │   ├── icon.icns             # built app/volume icon (see docs/guides/UPDATING_THE_ICON.md)
+│   │   │   ├── icon.icns / icon.ico  # built app icons (see docs/guides/UPDATING_THE_ICON.md)
 │   │   │   ├── build-icns.sh         # icon.png → icon.icns  (npm run icon)
+│   │   │   ├── build-ico.js          # icon.png → icon.ico   (npm run icon:win)
 │   │   │   ├── generate-icon.js      # generate a placeholder icon.png
-│   │   │   ├── dmg-background.png / @2x   # DMG window background
-│   │   │   └── generate-dmg-background.js
+│   │   │   ├── generate-dmg-background.js  # DMG window background
+│   │   │   ├── generate-tray-icon.js       # monochrome menu-bar clock glyph
+│   │   │   ├── dmg-background.png / @2x    # DMG window background
+│   │   │   ├── pomodoro-tray-icon.png / @2x  # menu-bar tray icon
+│   │   │   └── google-logo.svg / apple-logo.svg  # OAuth provider buttons
 │   │   ├── build/
 │   │   │   ├── afterPack.js          # ad-hoc/self-signed sign the .app (free distribution path)
 │   │   │   ├── afterSign.js          # Notarization hook (runs only if APPLE_TEAM_ID set)
@@ -329,52 +352,109 @@ lectio/
 │   │   └── semesters/
 │   │       └── example.json      # Bundled example semester (starter data)
 │   └── mobile/         # @lectio/mobile — the Expo / React Native app (iOS + Android)
-│       ├── app/                  # Expo Router screens (sign-in, semesters, course detail)
+│       ├── app/                  # Expo Router screens (18 routes: auth, planner, Moodle, settings)
 │       ├── src/
-│       │   ├── auth/             # AuthProvider (Supabase email/password session)
+│       │   ├── auth/             # AuthProvider + OAuth (Google / Sign in with Apple)
 │       │   ├── storage/          # device-storage + supabase-storage adapters
-│       │   └── supabase/client.ts   # Supabase client (reads EXPO_PUBLIC_* env vars)
+│       │   ├── supabase/client.ts   # Supabase client (reads EXPO_PUBLIC_* env vars)
+│       │   ├── pomodoro/         # Study timer UI + study-time dashboard
+│       │   ├── moodle/           # Import session, raw rows, week suggestion
+│       │   ├── sync/             # Conflict dialog + saveWithConflict
+│       │   ├── tutorial/         # First-run onboarding overlay
+│       │   ├── components/       # Shared UI (progress bars, sheets, menus, swipe rows)
+│       │   ├── add/              # Semester / course / item / tag form fields
+│       │   └── lib/              # Feedback client, prefs, transfer, hooks
+│       ├── test/                 # Vitest suite (storage adapters against the shared contract)
+│       ├── types/                # Hand-written @lectio/core ambient declarations
 │       ├── .env.example          # Supabase URL + publishable key placeholders
-│       └── package.json          # Expo scripts (start/ios/android)
+│       ├── eas.json              # EAS Build profiles
+│       └── package.json          # Expo scripts (start/ios/android/typecheck/test)
 ├── api/                # Vercel feedback function (repo-level)
+├── supabase/           # Supabase Edge Functions (delete-account)
+├── spikes/             # Throwaway validation scripts (Moodle Web Services PoC)
+├── scripts/            # gen-macos-signing-cert.sh (self-signed cert for release signing)
 ├── homebrew/
 │   ├── Casks/lectio.rb            # Homebrew cask
 │   ├── update-cask.sh             # refresh cask version + sha256 from a release
 │   └── sync-tap.sh                # publish the cask to ../homebrew-tap
 ├── docs/
+│   ├── index.html                # GitHub Pages landing page
 │   ├── RELEASE_NOTES.md          # Full changelog (append under
 │   │                             #   ## Unreleased each task)
+│   ├── AUDIT_2026-09.md          # Repository audit (architecture, dead code, security, drift)
 │   ├── planning/
 │   │   ├── PENDING_FEATURES.md   # Mobile/desktop/infra gaps tracker
-│   │   └── USER_STORIES.md       # Stories + test traceability
+│   │   ├── ROADMAP_TO_LAUNCH.md  # Phased plan to launch
+│   │   ├── USER_STORIES.md       # Stories + test traceability
+│   │   ├── TESTING_CHECKLIST.md  # Manual release-testing checklist
+│   │   ├── TUTORIAL_STEPS.md     # Onboarding tour copy
+│   │   └── MOODLE_INTEGRATION_SPIKE.md  # Moodle integration design notes
 │   ├── guides/
 │   │   ├── UPDATING_THE_ICON.md  # How to rebuild icon files from icon.png
 │   │   └── MACOS_SIGNING.md      # Self-signed signing + auto-update notes
+│   ├── legal/                    # Impressum + privacy policy (DE/EN), shipped in the app
+│   ├── brand_images/             # Logo + icon renders for docs and the landing page
 │   └── archive/
-│       └── GITHUB_RELEASE.md     # Release-description template
-├── .github/workflows/  # ci.yml (tests + macOS build) + release.yml (build & publish)
+│       ├── GITHUB_RELEASE.md         # Release-description template
+│       └── CHANGELOG_PRE_LAUNCH.md   # Pre-1.0 changelog
+├── .github/
+│   ├── workflows/      # ci.yml (tests + macOS build + mobile typecheck) + release.yml
+│   └── ISSUE_TEMPLATE/ # bug_report.md + feature_request.md
 └── README.md
 ```
 
-## How it works (IPC, no HTTP)
+## How it works (IPC first, HTTPS where it has to be)
 
 The renderer never touches the filesystem directly. `preload.js` uses
-`contextBridge` to expose a small, safe `window.planner` API; each method calls
-`ipcRenderer.invoke`, and the main process handles it with `ipcMain.handle`:
+`contextBridge` to expose small, purpose-built APIs on `window`; each method
+calls `ipcRenderer.invoke`/`send`, and the main process handles it with
+`ipcMain.handle`/`ipcMain.on`. `ipcRenderer` itself is never exposed, and the
+renderer runs with `contextIsolation: true` / `nodeIntegration: false`.
 
-| Renderer call (`window.planner.*`) | IPC channel       | Main process action            |
-| ---------------------------------- | ----------------- | ------------------------------ |
-| `listSemesters()`                  | `list-semesters`  | List all semester files        |
-| `getSemester(id)`                  | `get-semester`    | Read a semester JSON           |
-| `saveSemester(id, data)`           | `save-semester`   | Write a semester JSON          |
-| `deleteSemester(id)`               | `delete-semester` | Delete a semester file         |
+That covers all persistence in the local (signed-out) path — no HTTP involved.
+The renderer does make HTTPS calls of its own in two places: **Supabase**
+(PostgREST + auth) when signed in, and the **feedback** endpoint at
+`https://lectio-opal.vercel.app/api/feedback`, which files a GitHub issue on
+your behalf so you don't need an account.
+
+**`window.planner`** — semesters, dialogs, and file export/import:
+
+| Renderer call                          | IPC channel            | Main process action                          |
+| -------------------------------------- | ---------------------- | -------------------------------------------- |
+| `listSemesters()`                      | `list-semesters`       | List all semester files                      |
+| `getSemester(id)`                      | `get-semester`         | Read a semester JSON (migrating on load)     |
+| `saveSemester(id, data)`               | `save-semester`        | Write a semester JSON                        |
+| `deleteSemester(id)`                   | `delete-semester`      | Delete a semester file                       |
+| `showSaveDialog(opts)`                 | `show-save-dialog`     | Native save dialog; returns the chosen path  |
+| `showOpenDialog(opts)`                 | `show-open-dialog`     | Native open dialog; returns the chosen path  |
+| `exportCourse({ filePath, course })`   | `export-course`        | Write a `.lectio.json` course export         |
+| `exportSemester({ filePath, semester })` | `export-semester`    | Write a `.lectio.json` semester export       |
+| `importFile({ filePath })`             | `import-file`          | Read + parse a `.lectio.json` file           |
+| `loadExampleSemester()`                | `load-example-semester` | Copy the bundled example into the data dir  |
 
 `id` is the filename without `.json` and must match `[A-Za-z0-9_-]+` (this
-guards against path traversal). `ipcRenderer` is never exposed to the renderer.
+guards against path traversal), and every export/import path must end in
+`.lectio.json`.
 
-Two more `contextBridge` bridges follow the same pattern: **`window.updater`**
-(auto-update events + restart) and **`window.saver`** (the File → Save trigger,
-unsaved-changes reporting, and the save-before-quit handshake).
+The other ten bridges follow the same pattern:
+
+| Bridge                 | Channels                                                                                   | What it does                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| `window.updater`       | `update-available`, `update-download-progress`, `update-downloaded`, `update-error`, `start-update-download`, `restart-and-update` | Auto-update events + download/restart triggers             |
+| `window.saver`         | `menu-save`, `set-dirty`, `flush-save-and-quit`, `save-and-quit-done`                       | File → Save, unsaved-changes reporting, save-before-quit    |
+| `window.appInfo`       | `get-version` (+ a synchronous `platform`)                                                  | App version and host platform                               |
+| `window.settings`      | `get-settings`, `save-settings`, `open-settings`                                            | `settings.json` read/write + the ⌘, menu signal             |
+| `window.externalLinks` | `open-external`                                                                             | Open a link in the browser — restricted to `https://github.com` |
+| `window.legalDocs`     | `open-legal-doc`                                                                            | Open the Impressum / Privacy Policy windows                 |
+| `window.moodleAuth`    | `moodle-list-accounts`, `moodle-get-account-token`, `moodle-add-account`, `moodle-remove-account`, `moodle-capture-token` | Multi-account Moodle tokens (encrypted via `safeStorage`) + SSO capture |
+| `window.providerAuth`  | `oauth-capture-redirect`                                                                    | Drives the Google / Apple OAuth window and parses the redirect |
+| `window.pomodoroTray`  | `pomodoro-tray-report`, `tray-pomodoro-action`, `tray-open-pomodoro-modal`                  | Menu-bar timer state + the clicked action id                |
+| `window.pomodoroPopup` | `pomodoro-popup-show`, `pomodoro-popup-hide`, `popup-pomodoro-action`                       | The always-on-top phase-complete alert                      |
+
+The popup window has its own smaller preload
+(`preload-pomodoro-popup.js`, channels `pomodoro-popup-data`,
+`pomodoro-popup-action`, `pomodoro-popup-dismiss`) running in a context that
+never shares JavaScript with the main window.
 
 ### Where your data lives
 
