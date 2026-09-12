@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 import { DEFAULT_READING_TAGS, DEFAULT_TASK_TAGS } from '@lectio/core/planner-core';
 import { storage } from '../storage';
 import { saveWithConflict } from '../sync/saveWithConflict';
-import { uniqueSemesterId } from '../lib/semester-id';
+import { uniqueSemesterId } from '@lectio/core/integrations/lectio-file';
 import { useTheme } from '../theme';
 import { DateField } from '../components/DateField';
 import { NumericKeyboardDoneBar, NUMERIC_KEYBOARD_ACCESSORY_ID } from '../components/NumericKeyboardDoneBar';
