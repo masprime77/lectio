@@ -3799,13 +3799,13 @@ async function exportSemester() {
 
 // parsedPayload is the already-parsed object returned by window.planner.importFile().
 async function importSemester(parsedPayload) {
-  if (!parsedPayload || parsedPayload._lectioType !== 'semester') {
-    alert('This file is not a Lectio semester export.');
-    return;
-  }
-  const sem = parsedPayload.semester;
-  if (!sem || !sem.id || !Array.isArray(sem.courses)) {
-    alert('The semester file appears corrupt or invalid.');
+  // Validation lives in core (LectioFile) so desktop and mobile accept and
+  // reject exactly the same files, with the same messages.
+  let sem;
+  try {
+    sem = window.LectioFile.parseSemesterFile(parsedPayload);
+  } catch (err) {
+    alert(err.message || String(err));
     return;
   }
 
@@ -3909,8 +3909,11 @@ async function exportCourse(course) {
 
 // parsedPayload is the already-parsed object returned by window.planner.importFile().
 async function importCourse(parsedPayload) {
-  if (!parsedPayload || parsedPayload._lectioType !== 'course') {
-    alert('This file is not a Lectio course export.');
+  let incoming;
+  try {
+    incoming = window.LectioFile.parseCourseFile(parsedPayload);
+  } catch (err) {
+    alert(err.message || String(err));
     return;
   }
   if (!state.semester) {
@@ -3918,11 +3921,6 @@ async function importCourse(parsedPayload) {
     return;
   }
 
-  const incoming = parsedPayload.course;
-  if (!incoming || !incoming.name) {
-    alert('The course file appears corrupt or invalid.');
-    return;
-  }
 
   // Always assign a fresh id to avoid collisions within the current semester.
   const newCourse = {
@@ -3957,12 +3955,14 @@ async function importCourseFromModal() {
     return;
   }
 
-  if (!payload || payload._lectioType !== 'course' || !payload.course || !payload.course.name) {
-    alert('This file is not a valid Lectio course export.');
+  let incoming;
+  try {
+    incoming = window.LectioFile.parseCourseFile(payload);
+  } catch (err) {
+    alert(err.message || String(err));
     return;
   }
 
-  const incoming = payload.course;
   // Fresh ids so the course never collides with existing ones.
   const newCourse = {
     id: uid('course'),
