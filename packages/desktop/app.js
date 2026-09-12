@@ -3889,15 +3889,10 @@ async function exportCourse(course) {
   });
   if (canceled) return;
 
-  // Export only the fields that belong to the course schema (no tags).
-  const clean = {
-    id: course.id,
-    name: course.name,
-    color: course.color,
-    examDate: course.examDate || '',
-    readings: course.readings.map(({ id, week, title, status }) => ({ id, week, title, status })),
-    tasks: course.tasks.map(({ id, week, title, dueDate, status }) => ({ id, week, title, dueDate, status })),
-  };
+  // Export only the fields that belong to the course schema (no tags), using
+  // core's canonical projection so the file matches the mobile app's byte for
+  // byte. Unlike the old local copy, this keeps item notes.
+  const clean = window.LectioFile.cleanCourse(course);
 
   try {
     await window.planner.exportCourse({ filePath, course: clean });
