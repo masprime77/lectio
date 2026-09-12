@@ -173,26 +173,34 @@ Setup details and current limitations are in
 
 ## Testing
 
-The core logic lives in `@lectio/core` (`packages/core/`, pure DOM-free modules)
-and is tested with [Vitest](https://vitest.dev/):
+The core logic lives in `@lectio/core` (`packages/core/`, DOM-free modules) and
+is tested with [Vitest](https://vitest.dev/); the mobile workspace has its own
+Vitest suite too:
 
 ```bash
-npm test            # run the suite once
-npm run test:watch  # watch mode
-npm run test:coverage   # run with a V8 coverage report (written to coverage/)
+npm test            # run both suites once (@lectio/core, then @lectio/mobile)
+npm run test:watch  # watch mode (@lectio/core only)
+npm run test:coverage   # V8 coverage report for core (packages/core/coverage/)
 ```
 
-- **Unit tests** (`packages/core/tests/unit/`) cover status cycling, progress
-  calculation, course CRUD, and the filesystem store.
+- **Unit tests** (`packages/core/tests/unit/`) cover tag cycling, progress and
+  breakdown, course/item CRUD, sorting, the Pomodoro timer and study-time
+  accounting, the `.lectio.json` interchange format, the Moodle mapper/client/
+  SSO helpers, the OAuth redirect parser, conflict detection, and the
+  filesystem store.
 - **Integration tests** (`packages/core/tests/integration/`) drive the IPC
   handlers through a mock `ipcMain` against a temp directory.
+- **Contract tests** (`packages/core/tests/contract/`) hold a reusable suite
+  every storage adapter runs against — `fs-storage` and the desktop Supabase
+  adapter here, and both mobile adapters from `packages/mobile/test/`.
 - Coverage thresholds are enforced at **70% lines** and **70% functions**
   (see `packages/core/vitest.config.mjs`); the run fails if they aren't met.
 
-CI runs the suite on **macOS** and **Ubuntu** (Node 22) on pushes and pull
+CI runs the suites on **macOS** and **Ubuntu** (Node 22) on pushes and pull
 requests to `main` and `dev`, and uploads the coverage report as an
 artifact. It also runs a macOS packaging build (no publish) so desktop build
-breakage is caught on PRs. A release is only built once CI passes — see
+breakage is caught on PRs, and a `tsc --noEmit` typecheck of the mobile
+workspace. A release is only built once CI passes — see
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) and
 [`release.yml`](.github/workflows/release.yml). Feature-to-test traceability
 lives in [`docs/planning/USER_STORIES.md`](docs/planning/USER_STORIES.md).
