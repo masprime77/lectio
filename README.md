@@ -137,8 +137,7 @@ npm start
 `npm start` (from the repo root) delegates to the `@lectio/desktop` workspace,
 which runs `electron .` and opens the desktop window directly — no terminal
 interaction, no browser, no `localhost`. Use `npm run dev` to launch with
-DevTools open. You can also double-click **`packages/desktop/start.command`** in
-Finder to run the app from source without a terminal.
+DevTools open.
 
 In development the app reads and writes the desktop package's own
 `packages/desktop/semesters/` folder.
@@ -327,7 +326,6 @@ lectio/
 │   │   ├── supabase-config.example.js  # Template for the generated renderer config
 │   │   ├── local-import.js       # One-time, non-destructive local → cloud upload
 │   │   ├── style.css             # Styles (theme variables, banners, indicators)
-│   │   ├── start.command         # Double-click launcher for running from source
 │   │   ├── package.json          # Desktop scripts + electron-builder config (dmg, nsis, publish)
 │   │   ├── scripts/
 │   │   │   ├── sync-core.js      # Vendors core modules next to index.html for the renderer
