@@ -1,5 +1,14 @@
 ## Unreleased
 
+- Changed (security): the export and import IPC handlers now only read or write
+  paths ending in `.lectio.json`. They previously accepted any non-empty string
+  from the renderer and called `fs.writeFileSync` / `fs.readFileSync` on it with
+  no confinement. Both file dialogs already default to and filter on that
+  extension, so nothing reachable through the UI changes.
+
+- Changed (security): all five app windows now deny `window.open` by default,
+  and both renderer pages ship a Content-Security-Policy.
+
 - Changed (security): the Moodle SSO and OAuth sign-in windows now refuse to
   navigate anywhere that isn't `https:`. `buildLaunchUrl` validated only that
   the Moodle base URL parsed, and the OAuth authorize URL wasn't parsed at all
