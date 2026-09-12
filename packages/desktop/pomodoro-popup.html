@@ -3,6 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!--
+    Content-Security-Policy. This window is self-contained: one inline <style>
+    block and one inline <script>, no network access of any kind, no images.
+    So everything is denied by default and only those two are allowed — the
+    script by its SHA-256 hash.
+    *** If you edit the inline script at the bottom, recompute that hash or
+    the popup renders with no buttons and cannot be dismissed. ***
+  -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'none';
+    script-src 'sha256-dnJM6V4vaNVatMJNXy+ypoMin91e206BjXIudyq22xU=';
+    style-src 'unsafe-inline';
+    base-uri 'none';
+  " />
   <title>Lectio</title>
   <style>
     :root {

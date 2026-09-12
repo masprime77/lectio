@@ -23,17 +23,16 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (global) global.LocalImport = api;
 })(typeof window !== 'undefined' ? window : null, function () {
-  // slugify + uniqueSemesterId: copied from app.js (and mirrored by the mobile
-  // semester-id.ts) so this file is self-contained regardless of script order.
-  function slugify(s) {
-    return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'semester';
-  }
-  function uniqueSemesterId(name, existingIds) {
-    let id = slugify(name);
-    let n = 2;
-    while (existingIds.has(id)) id = `${slugify(name)}-${n++}`;
-    return id;
-  }
+  // slugify + uniqueSemesterId come from core's lectio-file module — one
+  // implementation across desktop, mobile and the import paths, so the same
+  // semester name always yields the same id. Resolved at call time (not at
+  // load time) because this file's <script> order relative to the vendored
+  // lectio-file.js shouldn't matter.
+  const lectioFile = () =>
+    (typeof module !== 'undefined' && module.exports)
+      ? require('@lectio/core/integrations/lectio-file')
+      : global.LectioFile;
+  const uniqueSemesterId = (name, existingIds) => lectioFile().uniqueSemesterId(name, existingIds);
 
   // Read every local semester (full object) from fs-storage. Read-only.
   async function getLocalSemesters() {
@@ -82,5 +81,5 @@
     return results;
   }
 
-  return { slugify, uniqueSemesterId, getLocalSemesters, planUpload, runUpload };
+  return { uniqueSemesterId, getLocalSemesters, planUpload, runUpload };
 });

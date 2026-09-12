@@ -1,6 +1,6 @@
 {
   "name": "@lectio/desktop",
-  "version": "1.1.5",
+  "version": "1.2.0",
   "description": "Lectio desktop app (Electron) for planning a university semester",
   "main": "main.js",
   "license": "MIT",
@@ -108,6 +108,7 @@
       "conflict.js",
       "moodle.js",
       "moodle-client.js",
+      "lectio-file.js",
       "semesters/",
       "assets/icon.png",
       "assets/lockup.png",

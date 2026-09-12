@@ -3,6 +3,36 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!--
+    Content-Security-Policy. Notes on why each directive is what it is — this
+    page has real constraints, so do not "tighten" it without checking them:
+
+    - script-src: every script is a local sibling ('self'), except the
+      anti-flash theme block below, which is allowed by its SHA-256 hash.
+      *** If you edit that inline script, recompute the hash or it stops
+      running and the app flashes the wrong theme on launch. ***
+    - style-src: 57-odd inline style="..." attributes plus the Google Fonts
+      stylesheet, hence 'unsafe-inline' and the fonts.googleapis.com origin.
+    - font-src: the font files Google Fonts' stylesheet then pulls.
+    - connect-src is `https:` rather than an origin list on purpose. The
+      renderer talks to Supabase and the feedback endpoint, but it also calls
+      whatever Moodle host the user connects (see createMoodleClient), which
+      cannot be enumerated ahead of time. Restricting the *scheme* still rules
+      out http/ws/file exfiltration.
+    - frame-src/object-src 'none' and base-uri 'self': nothing here embeds or
+      rebases, so deny outright.
+  -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' 'sha256-GLpKuSwKYtPlXGkKDpCPiEoLnU1pneF20kN0s44qRGs=';
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    font-src https://fonts.gstatic.com;
+    img-src 'self' data:;
+    connect-src https:;
+    frame-src 'none';
+    object-src 'none';
+    base-uri 'self';
+  " />
   <!-- Apply the saved theme before any rendering to avoid a flash of wrong theme. -->
   <script>
     (function () {
@@ -395,7 +425,10 @@
     </div>
   </div>
 
-  <!-- Pomodoro setup: choose a course and the session/break lengths. -->
+  <!-- Study timer: three ways to put time on a course (or on Free study) —
+       a Pomodoro cycle, a count-up Stopwatch assigned when it stops, and a
+       Log entry for time already spent away from the app. One tab each; the
+       tab bar and the panels are wired by setupTimerTabs() in app.js. -->
   <div id="pomodoro-overlay" class="modal-overlay hidden">
     <div class="modal pomodoro-modal" role="dialog" aria-modal="true"
          aria-labelledby="pomodoro-title">
@@ -404,46 +437,115 @@
         <button id="pomodoro-close" class="icon-btn" aria-label="Close"></button>
       </div>
 
-      <!-- Free study is its own category, not a course: picking it hides the
-           course list entirely and banks the time on the semester. -->
-      <div class="pomodoro-mode" role="radiogroup" aria-label="What this session tracks">
-        <button type="button" class="pomodoro-mode-btn" id="pomodoro-mode-course"
-                role="radio" aria-checked="true">Course</button>
-        <button type="button" class="pomodoro-mode-btn" id="pomodoro-mode-free"
-                role="radio" aria-checked="false">Free study</button>
+      <div class="timer-tabs" role="tablist" aria-label="How to track this time">
+        <button type="button" class="timer-tab" id="timer-tab-pomodoro" role="tab"
+                aria-selected="true" aria-controls="timer-panel-pomodoro">Pomodoro</button>
+        <button type="button" class="timer-tab" id="timer-tab-stopwatch" role="tab"
+                aria-selected="false" aria-controls="timer-panel-stopwatch">Stopwatch</button>
+        <button type="button" class="timer-tab" id="timer-tab-log" role="tab"
+                aria-selected="false" aria-controls="timer-panel-log">Log</button>
       </div>
 
-      <label class="pomodoro-field" id="pomodoro-course-field">
-        <span>Course</span>
-        <select id="pomodoro-course-select"></select>
-      </label>
+      <!-- Tab 1: the pomodoro cycle. -->
+      <div class="timer-panel" id="timer-panel-pomodoro" role="tabpanel"
+           aria-labelledby="timer-tab-pomodoro">
+        <!-- Free study is its own category, not a course: picking it hides the
+             course list entirely and banks the time on the semester. -->
+        <div class="pomodoro-mode" role="radiogroup" aria-label="What this session tracks">
+          <button type="button" class="pomodoro-mode-btn" id="pomodoro-mode-course"
+                  role="radio" aria-checked="true">Course</button>
+          <button type="button" class="pomodoro-mode-btn" id="pomodoro-mode-free"
+                  role="radio" aria-checked="false">Free study</button>
+        </div>
 
-      <div class="pomodoro-grid">
-        <label class="pomodoro-field">
-          <span>Focus (min)</span>
-          <input type="number" id="pomodoro-work-min" min="1" max="180" step="1" />
+        <label class="pomodoro-field" id="pomodoro-course-field">
+          <span>Course</span>
+          <select id="pomodoro-course-select"></select>
         </label>
-        <label class="pomodoro-field">
-          <span>Short break (min)</span>
-          <input type="number" id="pomodoro-short-min" min="1" max="60" step="1" />
-        </label>
-        <label class="pomodoro-field">
-          <span>Long break (min)</span>
-          <input type="number" id="pomodoro-long-min" min="1" max="90" step="1" />
-        </label>
-        <label class="pomodoro-field">
-          <span>Focus blocks before long break</span>
-          <input type="number" id="pomodoro-count" min="1" max="12" step="1" />
-        </label>
+
+        <div class="pomodoro-grid">
+          <label class="pomodoro-field">
+            <span>Focus (min)</span>
+            <input type="number" id="pomodoro-work-min" min="1" max="180" step="1" />
+          </label>
+          <label class="pomodoro-field">
+            <span>Short break (min)</span>
+            <input type="number" id="pomodoro-short-min" min="1" max="60" step="1" />
+          </label>
+          <label class="pomodoro-field">
+            <span>Long break (min)</span>
+            <input type="number" id="pomodoro-long-min" min="1" max="90" step="1" />
+          </label>
+          <label class="pomodoro-field">
+            <span>Focus blocks before long break</span>
+            <input type="number" id="pomodoro-count" min="1" max="12" step="1" />
+          </label>
+        </div>
+
+        <p class="pomodoro-hint" id="pomodoro-hint"></p>
+
+        <div class="modal-actions">
+          <div class="modal-actions-left"></div>
+          <div class="modal-actions-right">
+            <button type="button" id="pomodoro-cancel" class="btn">Cancel</button>
+            <button type="button" id="pomodoro-start" class="btn btn-primary">Start</button>
+          </div>
+        </div>
       </div>
 
-      <p class="pomodoro-hint" id="pomodoro-hint"></p>
+      <!-- Tab 2: the stopwatch. It counts up with no phases and no breaks, and
+           unlike the pomodoro it does not know what it credits until it is
+           stopped — the target picker below only appears then. -->
+      <div class="timer-panel hidden" id="timer-panel-stopwatch" role="tabpanel"
+           aria-labelledby="timer-tab-stopwatch">
+        <p class="stopwatch-face"><span id="stopwatch-clock">00:00</span></p>
 
-      <div class="modal-actions">
-        <div class="modal-actions-left"></div>
-        <div class="modal-actions-right">
-          <button type="button" id="pomodoro-cancel" class="btn">Cancel</button>
-          <button type="button" id="pomodoro-start" class="btn btn-primary">Start</button>
+        <label class="pomodoro-field hidden" id="stopwatch-assign">
+          <span>Add this time to</span>
+          <select id="stopwatch-target"></select>
+        </label>
+
+        <p class="pomodoro-hint" id="stopwatch-hint"></p>
+
+        <div class="modal-actions">
+          <div class="modal-actions-left">
+            <button type="button" id="stopwatch-discard" class="btn btn-danger hidden">Discard</button>
+          </div>
+          <div class="modal-actions-right">
+            <button type="button" id="stopwatch-toggle" class="btn">Start</button>
+            <button type="button" id="stopwatch-save" class="btn btn-primary hidden">Save time</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 3: log time already spent. No clock at all — an amount, a target
+           and the day it was studied, which is what puts it in the right day
+           and week on the Study time panel. -->
+      <div class="timer-panel hidden" id="timer-panel-log" role="tabpanel"
+           aria-labelledby="timer-tab-log">
+        <label class="pomodoro-field">
+          <span>Time studied</span>
+          <input type="text" id="log-amount" placeholder='e.g. "1h 30m", "45m", or 90' />
+        </label>
+
+        <label class="pomodoro-field">
+          <span>Add it to</span>
+          <select id="log-target"></select>
+        </label>
+
+        <label class="pomodoro-field">
+          <span>Day studied</span>
+          <input type="date" id="log-date" />
+        </label>
+
+        <p class="pomodoro-hint" id="log-hint"></p>
+
+        <div class="modal-actions">
+          <div class="modal-actions-left"></div>
+          <div class="modal-actions-right">
+            <button type="button" id="log-cancel" class="btn">Cancel</button>
+            <button type="button" id="log-save" class="btn btn-primary">Add time</button>
+          </div>
         </div>
       </div>
     </div>
@@ -939,6 +1041,9 @@
   <script src="pomodoro-core.js"></script>
   <script src="moodle.js"></script>
   <script src="moodle-client.js"></script>
+  <!-- lectio-file.js reads window.PlannerCore for uid(), so it must follow
+       planner-core.js above. Exposes window.LectioFile. -->
+  <script src="lectio-file.js"></script>
   <script src="migrate.js"></script>
   <script src="conflict.js"></script>
   <script src="supabase-storage.js"></script>

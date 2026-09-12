@@ -34,7 +34,17 @@ const state = {
     settings: null,
     session: window.PomodoroCore.createIdleSession(),
     intervalId: null,
+    // The stopwatch is a second, independent timer with its own repaint loop.
+    // Only one of the two may be live at a time — see guardTimerConflict().
+    stopwatch: window.PomodoroCore.createIdleStopwatch(),
+    stopwatchIntervalId: null,
   },
+  // Which of the study timer's three tabs is showing: 'pomodoro' | 'stopwatch'
+  // | 'log'. And, on the Study time panel, which window is being totalled and
+  // which day of a week view is singled out (null = the whole week).
+  timerTab: 'pomodoro',
+  studyRange: 'today',
+  studyDay: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -448,6 +458,25 @@ const {
   formatClock,
   formatHoursMinutes,
   parseHoursMinutesInput,
+  // Stopwatch — the count-up timer, assigned to a course when it stops.
+  createIdleStopwatch,
+  startStopwatch,
+  pauseStopwatch,
+  resumeStopwatch,
+  stopwatchSeconds,
+  isStopwatchRunning,
+  isStopwatchPaused,
+  isStopwatchIdle,
+  rehydrateStopwatch,
+  // Local calendar keys + the day/week windows the Study time panel offers.
+  localDateKey,
+  isValidDateKey,
+  addDaysToKey,
+  studyDayRange,
+  studyWeekRange,
+  studyTimeInRange,
+  studyTimeByDay,
+  pruneStudySessions,
 } = window.PomodoroCore;
 
 // ---------------------------------------------------------------------------
@@ -2214,7 +2243,7 @@ const TUTORIAL_STEPS = [
     id: 'pomodoro',
     title: 'Study timer',
     description:
-      'Start a Pomodoro timer from the bottom-left corner, for a course or as Free study — its own category. When a focus block ends you can take the break or keep studying; when a break ends you can go back to work, take five more minutes, or rest on. The button becomes a live countdown, and the chart button opens your study time.',
+      'The bottom-left corner opens the study timer, which tracks time three ways: a Pomodoro cycle, a Stopwatch you assign to a course when you stop it, and a Log for time you spent away from the app. Every one of them credits a course or Free study — its own category. The button becomes a live clock, and the chart button opens your study time by day, week or all time.',
     targetSelector: '#pomodoro-control',
     setup: null,
   },
@@ -2817,11 +2846,19 @@ async function setupPomodoro() {
   const saved = await readSettingsFile();
   state.pomodoro.settings = clampPomodoroSettings(saved.pomodoro);
   state.pomodoro.session = rehydrateSession(saved.pomodoroSession);
+  state.pomodoro.stopwatch = rehydrateStopwatch(saved.stopwatch);
 
   document.getElementById('pomodoro-btn')
     .addEventListener('click', onPomodoroPrimaryClick);
-  document.getElementById('pomodoro-stop-btn')
-    .addEventListener('click', () => runPomodoroAction('stop'));
+  document.getElementById('pomodoro-stop-btn').addEventListener('click', () => {
+    // The same corner button ends whichever timer is live.
+    if (state.pomodoro.session.phase === 'idle' && !isStopwatchIdle(state.pomodoro.stopwatch)) {
+      if (isStopwatchRunning(state.pomodoro.stopwatch)) onStopwatchToggle();
+      openPomodoroModal();
+      return;
+    }
+    runPomodoroAction('stop');
+  });
   document.getElementById('pomodoro-skip-btn')
     .addEventListener('click', () => runPomodoroAction('advance'));
 
@@ -2864,6 +2901,9 @@ async function setupPomodoro() {
 
   setupPomodoroAdvanceModal();
   setupStudyTimePanel();
+  setupTimerTabs();
+  setupStopwatch();
+  setupLogPanel();
 
   // A session restored from a previous launch keeps running.
   const restored = state.pomodoro.session;
@@ -2887,6 +2927,13 @@ function persistPomodoroSession() {
 function onPomodoroPrimaryClick() {
   const s = state.pomodoro.session;
   if (s.phase === 'idle') {
+    // With the stopwatch as the live timer the button is its pause/resume;
+    // once it is paused there is nothing to toggle, only time to assign.
+    const sw = state.pomodoro.stopwatch;
+    if (isStopwatchRunning(sw)) {
+      onStopwatchToggle();
+      return;
+    }
     openPomodoroModal();
     return;
   }
@@ -3049,7 +3096,14 @@ function openPomodoroModal() {
   document.getElementById('pomodoro-count').value = s.pomodorosUntilLongBreak;
 
   document.getElementById('pomodoro-overlay').classList.remove('hidden');
-  document.getElementById('pomodoro-start').focus();
+  // A live stopwatch is what the user most likely came back for, so the modal
+  // opens on its tab rather than on a Pomodoro they cannot start anyway.
+  setTimerTab(isStopwatchIdle(state.pomodoro.stopwatch) ? state.timerTab : 'stopwatch');
+  renderStopwatchPanel();
+  renderLogPanel();
+  document.getElementById(
+    state.timerTab === 'pomodoro' ? 'pomodoro-start' : 'pomodoro-close'
+  ).focus();
 }
 
 function closePomodoroModal() {
@@ -3057,6 +3111,13 @@ function closePomodoroModal() {
 }
 
 async function startPomodoroFromModal() {
+  // Both clocks measure the same wall time — running them together would
+  // double-count it.
+  if (otherTimerBusy('pomodoro')) {
+    alert('The stopwatch still has time on it. Save or discard it before starting a pomodoro.');
+    setTimerTab('stopwatch');
+    return;
+  }
   const settings = clampPomodoroSettings({
     workMinutes: document.getElementById('pomodoro-work-min').value,
     shortBreakMinutes: document.getElementById('pomodoro-short-min').value,
@@ -3280,16 +3341,24 @@ function creditPendingWork(session) {
 // course — onto the semester's own Free study category. Refuses to write if the
 // loaded semester is no longer the one the session was started against,
 // otherwise switching semesters mid-session would credit the wrong place.
-function creditStudySeconds(session, seconds) {
-  if (!session.semesterId || !(seconds > 0)) return;
-  if (!state.semester || state.semesterId !== session.semesterId) return;
+// `opts` carries the log entry's source and date, so the stopwatch can bank on
+// the day it started and the Log tab on the day the user picked; it defaults to
+// a pomodoro entry dated today. Returns whether the time was actually written.
+function creditStudySeconds(session, seconds, opts) {
+  if (!session.semesterId || !(seconds > 0)) return false;
+  if (!state.semester || state.semesterId !== session.semesterId) return false;
+  const entry = { source: 'pomodoro', ...(opts || {}) };
   if (session.courseId) {
     const course = state.semester.courses.find((c) => c.id === session.courseId);
-    if (!course) return;
-    addStudyTime(course, seconds, { source: 'pomodoro' });
+    if (!course) return false;
+    addStudyTime(course, seconds, entry);
   } else {
-    addFreeStudyTime(state.semester, seconds, { source: 'pomodoro' });
+    addFreeStudyTime(state.semester, seconds, entry);
   }
+  // Day and week detail is only kept for four weeks; the running totals behind
+  // the all-time view are never trimmed. Pruning here means the log is tidied
+  // exactly when it grows, with no separate housekeeping pass.
+  pruneStudySessions(state.semester);
   persist();
   renderDashboard();
   renderStudyTimePanel();
@@ -3298,6 +3367,7 @@ function creditStudySeconds(session, seconds) {
   const snap = captureScroll();
   renderPlanner();
   restoreScroll(snap);
+  return true;
 }
 
 // Stop the session. `creditPartial` is true for the user-facing stop button so
@@ -3354,6 +3424,22 @@ function renderPomodoroControl() {
   );
 
   if (idle) {
+    // No pomodoro — but the stopwatch may be the live timer instead, and it
+    // deserves the same corner readout rather than hiding behind the modal.
+    const sw = state.pomodoro.stopwatch;
+    if (!isStopwatchIdle(sw)) {
+      const running = isStopwatchRunning(sw);
+      btn.classList.add(running ? 'pomodoro-btn--work' : 'pomodoro-btn--paused');
+      btn.innerHTML =
+        `${icon(running ? 'player-pause' : 'player-play')}` +
+        `<span class="pomodoro-clock">${formatClock(stopwatchSeconds(sw))}</span>` +
+        '<span class="pomodoro-label">Stopwatch</span>';
+      btn.title = running ? 'Pause the stopwatch' : 'Stopwatch paused — open to save this time';
+      stopBtn.classList.remove('hidden');
+      stopBtn.innerHTML = icon('player-stop');
+      reportPomodoroToTray();
+      return;
+    }
     btn.innerHTML = `${icon('clock')}<span>Study timer</span>`;
     btn.title = 'Start a study timer';
     reportPomodoroToTray();
@@ -3480,6 +3566,250 @@ function reportPomodoroToTray() {
 }
 
 // ---------------------------------------------------------------------------
+// Study-timer tabs: Pomodoro / Stopwatch / Log
+//
+// Three ways to put time on a course (or on Free study), sharing one modal:
+//   Pomodoro   the cycle timer — knows what it credits before it starts
+//   Stopwatch  counts up, no phases; assigned only when it is stopped
+//   Log        no clock at all — an amount and the day it was studied
+// Only one clock may be live at a time: two timers running at once would both
+// claim the same hour.
+// ---------------------------------------------------------------------------
+
+const TIMER_TABS = ['pomodoro', 'stopwatch', 'log'];
+
+function setupTimerTabs() {
+  TIMER_TABS.forEach((id) => {
+    const tab = document.getElementById(`timer-tab-${id}`);
+    if (tab) tab.addEventListener('click', () => setTimerTab(id));
+  });
+}
+
+function setTimerTab(id) {
+  state.timerTab = TIMER_TABS.includes(id) ? id : 'pomodoro';
+  TIMER_TABS.forEach((name) => {
+    const tab = document.getElementById(`timer-tab-${name}`);
+    const panel = document.getElementById(`timer-panel-${name}`);
+    const on = name === state.timerTab;
+    if (tab) tab.setAttribute('aria-selected', String(on));
+    if (panel) panel.classList.toggle('hidden', !on);
+  });
+  if (state.timerTab === 'stopwatch') renderStopwatchPanel();
+  if (state.timerTab === 'log') renderLogPanel();
+}
+
+// Options for "which course does this time belong to", with Free study as the
+// empty value — the same vocabulary the running session's switcher uses, so a
+// blank selection always means the semester's own category rather than "none".
+function studyTargetOptionsHtml(selectedId) {
+  const options = [
+    `<option value=""${selectedId ? '' : ' selected'}>${escapeHtml(FREE_STUDY_NAME)}</option>`,
+  ];
+  if (state.semester) {
+    sortedCourses(state.semester.courses).forEach((c) => {
+      options.push(
+        `<option value="${escapeHtml(c.id)}"${c.id === selectedId ? ' selected' : ''}>` +
+          `${escapeHtml(c.name)}</option>`
+      );
+    });
+  }
+  return options.join('');
+}
+
+// True (and explains itself) when the other timer is already live. Both clocks
+// measure the same wall time, so letting them overlap would double-count it.
+function otherTimerBusy(which) {
+  if (which === 'stopwatch') return state.pomodoro.session.phase !== 'idle';
+  return !isStopwatchIdle(state.pomodoro.stopwatch);
+}
+
+// ---- Stopwatch ------------------------------------------------------------
+
+function setupStopwatch() {
+  const toggle = document.getElementById('stopwatch-toggle');
+  if (!toggle) return;
+  toggle.addEventListener('click', onStopwatchToggle);
+  document.getElementById('stopwatch-save').addEventListener('click', saveStopwatchTime);
+  document.getElementById('stopwatch-discard').addEventListener('click', discardStopwatch);
+
+  state.pomodoro.stopwatch = rehydrateStopwatch(state.pomodoro.stopwatch);
+  if (isStopwatchRunning(state.pomodoro.stopwatch)) startStopwatchTicking();
+}
+
+function persistStopwatch() {
+  writeSettingsPatch({ stopwatch: state.pomodoro.stopwatch }).catch((err) =>
+    console.warn('stopwatch save failed', err)
+  );
+}
+
+function startStopwatchTicking() {
+  stopStopwatchTicking();
+  state.pomodoro.stopwatchIntervalId = setInterval(onStopwatchTick, POMODORO_TICK_MS);
+}
+
+function stopStopwatchTicking() {
+  if (state.pomodoro.stopwatchIntervalId) clearInterval(state.pomodoro.stopwatchIntervalId);
+  state.pomodoro.stopwatchIntervalId = null;
+}
+
+// Repaint only — `runningSince` is authoritative, so nothing here counts.
+function onStopwatchTick() {
+  renderStopwatchPanel();
+  renderPomodoroControl();
+}
+
+function onStopwatchToggle() {
+  const sw = state.pomodoro.stopwatch;
+  if (isStopwatchRunning(sw)) {
+    // Pausing is also "I'm done" — the assign step appears with the time on it,
+    // and resuming is still one click away if the pause was just a pause.
+    state.pomodoro.stopwatch = pauseStopwatch(sw);
+    stopStopwatchTicking();
+  } else if (isStopwatchPaused(sw)) {
+    state.pomodoro.stopwatch = resumeStopwatch(sw);
+    startStopwatchTicking();
+  } else {
+    if (otherTimerBusy('stopwatch')) {
+      alert('A pomodoro session is running. Stop it before starting the stopwatch.');
+      return;
+    }
+    state.pomodoro.stopwatch = startStopwatch({ semesterId: state.semesterId });
+    startStopwatchTicking();
+  }
+  persistStopwatch();
+  renderStopwatchPanel();
+  renderPomodoroControl();
+}
+
+// Bank the elapsed time on the chosen course (or on Free study) and reset.
+// Credited to the day the stopwatch *started*, so a stretch begun at 23:50
+// counts as that evening rather than as the small hours of the next day.
+function saveStopwatchTime() {
+  const sw = state.pomodoro.stopwatch;
+  const seconds = stopwatchSeconds(sw);
+  if (seconds <= 0) return;
+  const target = document.getElementById('stopwatch-target');
+  const courseId = target ? target.value || null : null;
+  const credited = creditStudySeconds(
+    { semesterId: sw.semesterId, courseId },
+    seconds,
+    { source: 'pomodoro', date: sw.startedDate || localDateKey() }
+  );
+  if (!credited) {
+    alert('That time belongs to another semester — reopen it to save this session.');
+    return;
+  }
+  discardStopwatch();
+}
+
+function discardStopwatch() {
+  stopStopwatchTicking();
+  state.pomodoro.stopwatch = createIdleStopwatch();
+  persistStopwatch();
+  renderStopwatchPanel();
+  renderPomodoroControl();
+}
+
+function renderStopwatchPanel() {
+  const clock = document.getElementById('stopwatch-clock');
+  if (!clock || state.timerTab !== 'stopwatch') return;
+  const sw = state.pomodoro.stopwatch;
+  const running = isStopwatchRunning(sw);
+  const paused = isStopwatchPaused(sw);
+  const seconds = stopwatchSeconds(sw);
+
+  clock.textContent = formatClock(seconds);
+  clock.parentElement.classList.toggle('stopwatch-face--running', running);
+
+  const toggle = document.getElementById('stopwatch-toggle');
+  toggle.textContent = running ? 'Pause' : paused ? 'Resume' : 'Start';
+
+  // The target picker is the assign step: it only exists once there is time to
+  // assign, and it is rebuilt then so a course added meanwhile is offered.
+  const assign = document.getElementById('stopwatch-assign');
+  assign.classList.toggle('hidden', !paused);
+  if (paused) {
+    const select = document.getElementById('stopwatch-target');
+    const keep = select.value;
+    select.innerHTML = studyTargetOptionsHtml(
+      keep || (state.focusedCourseId && state.semester ? state.focusedCourseId : null)
+    );
+  }
+  document.getElementById('stopwatch-save').classList.toggle('hidden', !paused);
+  document.getElementById('stopwatch-discard').classList.toggle('hidden', !paused);
+
+  const hint = document.getElementById('stopwatch-hint');
+  if (!state.semester) {
+    hint.textContent = 'Open a semester first — there is nowhere to save this time yet.';
+  } else if (running) {
+    hint.textContent = 'Counting up. Pause when you are done, then choose where the time goes.';
+  } else if (paused) {
+    hint.textContent = `Counted on ${formatDateKey(
+      sw.startedDate || localDateKey()
+    )} — the day this stretch began.`;
+  } else if (otherTimerBusy('stopwatch')) {
+    hint.textContent = 'A pomodoro session is running — stop it first.';
+  } else {
+    hint.textContent =
+      'No phases and no breaks: it just counts up until you stop it, and you pick the course afterwards.';
+  }
+}
+
+// ---- Log ------------------------------------------------------------------
+
+function setupLogPanel() {
+  const save = document.getElementById('log-save');
+  if (!save) return;
+  save.addEventListener('click', saveLoggedTime);
+  document.getElementById('log-cancel').addEventListener('click', closePomodoroModal);
+  document.getElementById('log-amount').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') saveLoggedTime();
+  });
+}
+
+function renderLogPanel() {
+  const date = document.getElementById('log-date');
+  if (!date) return;
+  const select = document.getElementById('log-target');
+  select.innerHTML = studyTargetOptionsHtml(
+    state.focusedCourseId && state.semester ? state.focusedCourseId : null
+  );
+  if (!date.value) date.value = localDateKey();
+  // Logging into the future is a typo, not an intention.
+  date.max = localDateKey();
+  document.getElementById('log-hint').textContent = state.semester
+    ? 'For time studied away from the app. It counts on the day you pick, in both the day and week views.'
+    : 'Open a semester first — there is nowhere to log this time yet.';
+}
+
+function saveLoggedTime() {
+  if (!state.semester) return;
+  const amountEl = document.getElementById('log-amount');
+  const seconds = parseHoursMinutesInput(amountEl.value);
+  const hint = document.getElementById('log-hint');
+  if (seconds === null || seconds <= 0) {
+    amountEl.classList.add('study-time-input--invalid');
+    amountEl.addEventListener(
+      'input',
+      () => amountEl.classList.remove('study-time-input--invalid'),
+      { once: true }
+    );
+    hint.textContent = 'Enter an amount like "1h 30m", "45m", or a plain number of minutes.';
+    amountEl.focus();
+    return;
+  }
+  const dateEl = document.getElementById('log-date');
+  const date = isValidDateKey(dateEl.value) ? dateEl.value : localDateKey();
+  const courseId = document.getElementById('log-target').value || null;
+  creditStudySeconds({ semesterId: state.semesterId, courseId }, seconds, {
+    source: 'manual',
+    date,
+  });
+  amountEl.value = '';
+  closePomodoroModal();
+}
+
+// ---------------------------------------------------------------------------
 // Study Time panel
 //
 // Where the semester's *tracked time* went: a ring of per-course slices, the
@@ -3561,11 +3891,13 @@ function studyTimeRingHtml(breakdown) {
 
 function studyTimeLegendHtml(breakdown) {
   if (breakdown.courses.length === 0) {
-    return (
-      '<p class="st-empty">No study time tracked yet. Finish a focus block — against a ' +
-      `course or as ${escapeHtml(FREE_STUDY_NAME)} — or set a course's studied time from the ` +
-      'dashboard.</p>'
-    );
+    // Nothing in an all-time view means nothing has ever been tracked; nothing
+    // in a dated one usually just means nothing was tracked *then*.
+    return state.studyRange === 'all'
+      ? '<p class="st-empty">No study time tracked yet. Finish a focus block — against a ' +
+          `course or as ${escapeHtml(FREE_STUDY_NAME)} — run the stopwatch, or log time you ` +
+          'already spent.</p>'
+      : '<p class="st-empty">Nothing tracked in this window.</p>';
   }
   const rows = breakdown.courses
     .map(
@@ -3615,6 +3947,97 @@ function studyTimeSwitchHtml() {
   );
 }
 
+// ---- Ranges ---------------------------------------------------------------
+// Today / This week / Last week / All time. The three dated windows are built
+// from the session log, which is kept for four weeks; All time comes from the
+// running totals, which are never trimmed. That is also the honest split for
+// existing semesters: their hours are all in the totals, but only time tracked
+// from this version onward has a day and a week attached to it.
+
+const STUDY_RANGES = [
+  { id: 'today', label: 'Today' },
+  { id: 'week', label: 'This week' },
+  { id: 'lastWeek', label: 'Last week' },
+  { id: 'all', label: 'All time' },
+];
+
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+// The dates a range covers, or null for the untimed all-time view.
+function studyRangeWindow(rangeId) {
+  if (rangeId === 'today') return studyDayRange(0);
+  if (rangeId === 'week') return studyWeekRange(0);
+  if (rangeId === 'lastWeek') return studyWeekRange(-1);
+  return null;
+}
+
+function isWeekRange(rangeId) {
+  return rangeId === 'week' || rangeId === 'lastWeek';
+}
+
+// 'Apr 7' — the same short form the planner's week headers use.
+function formatDateKey(key) {
+  const date = new Date(key + 'T00:00:00');
+  return Number.isNaN(date.getTime()) ? key : formatDate(date);
+}
+
+function studyRangeTabsHtml() {
+  const tabs = STUDY_RANGES.map(
+    (r) =>
+      `<button type="button" class="timer-tab st-range" data-range="${r.id}" role="tab"` +
+      ` aria-selected="${state.studyRange === r.id}">${r.label}</button>`
+  ).join('');
+  return `<div class="st-ranges" role="tablist" aria-label="Study time range">${tabs}</div>`;
+}
+
+// One clickable bar per day of the week, sized against the week's busiest day
+// so the shape of the week reads at a glance. Selecting a day narrows the ring
+// and legend below to it; selecting it again widens back out to the week.
+function studyDaysHtml(range) {
+  const days = studyTimeByDay(state.semester, range.from, range.to);
+  const peak = days.reduce((max, d) => Math.max(max, d.totalSeconds), 0);
+  const today = localDateKey();
+  const cells = days
+    .map((day, i) => {
+      const pct = peak > 0 ? Math.round((day.totalSeconds / peak) * 100) : 0;
+      const selected = state.studyDay === day.date;
+      const classes =
+        'st-day' +
+        (day.totalSeconds > 0 ? '' : ' st-day--empty') +
+        (day.date === today ? ' st-day--today' : '');
+      return (
+        `<button type="button" class="${classes}" data-day="${day.date}"` +
+        ` aria-pressed="${selected}"` +
+        ` title="${escapeHtml(formatDateKey(day.date))} — ${formatHoursMinutes(day.totalSeconds)}">` +
+        `<span class="st-day-bar" aria-hidden="true">` +
+        `<span class="st-day-fill" style="height:${pct}%"></span></span>` +
+        `<span class="st-day-name">${DAY_NAMES[i] || ''}</span>` +
+        `<span class="st-day-num">${day.date.slice(8)}</span>` +
+        '</button>'
+      );
+    })
+    .join('');
+  return `<div class="st-days">${cells}</div>`;
+}
+
+function studyRangeCaptionHtml(range) {
+  if (!range) {
+    return (
+      '<p class="st-range-caption"><span>Every hour ever tracked on this semester.</span></p>'
+    );
+  }
+  const day = state.studyDay;
+  const text = day
+    ? formatDateKey(day)
+    : range.from === range.to
+      ? formatDateKey(range.from)
+      : `${formatDateKey(range.from)} – ${formatDateKey(range.to)}`;
+  const clear = day
+    ? '<button type="button" class="st-range-clear" id="studytime-clear-day">Show whole week</button>'
+    : '';
+  return `<p class="st-range-caption"><span>${escapeHtml(text)}</span>${clear}</p>`;
+}
+
 // Cheap enough to rebuild wholesale; called on open and whenever the numbers
 // behind it move. A no-op while the panel is closed.
 function renderStudyTimePanel() {
@@ -3625,8 +4048,16 @@ function renderStudyTimePanel() {
       '<p class="st-empty">Open a semester to see where your study time went.</p>' +
       studyTimeSwitchHtml();
   } else {
-    const breakdown = studyTimeByCourse(state.semester);
+    const range = studyRangeWindow(state.studyRange);
+    // A day selected inside a week view narrows everything below it.
+    const scope = range && state.studyDay ? { from: state.studyDay, to: state.studyDay } : range;
+    const breakdown = scope
+      ? studyTimeInRange(state.semester, scope.from, scope.to)
+      : studyTimeByCourse(state.semester);
     body.innerHTML =
+      studyRangeTabsHtml() +
+      studyRangeCaptionHtml(range) +
+      (isWeekRange(state.studyRange) ? studyDaysHtml(range) : '') +
       '<div class="st-chart">' +
       studyTimeRingHtml(breakdown) +
       '<div class="st-ring-center">' +
@@ -3635,13 +4066,43 @@ function renderStudyTimePanel() {
       '</div>' +
       '</div>' +
       studyTimeLegendHtml(breakdown) +
+      (range
+        ? '<p class="st-note">Day and week totals cover the last four weeks and count only time ' +
+          'tracked since this view existed. All time keeps every hour, including anything ' +
+          'tracked before.</p>'
+        : '') +
       studyTimeSwitchHtml();
+  }
+
+  body.querySelectorAll('.st-range').forEach((tab) => {
+    tab.addEventListener('click', () => setStudyRange(tab.dataset.range));
+  });
+  body.querySelectorAll('.st-day').forEach((cell) => {
+    cell.addEventListener('click', () => {
+      state.studyDay = state.studyDay === cell.dataset.day ? null : cell.dataset.day;
+      renderStudyTimePanel();
+    });
+  });
+  const clearDay = document.getElementById('studytime-clear-day');
+  if (clearDay) {
+    clearDay.addEventListener('click', () => {
+      state.studyDay = null;
+      renderStudyTimePanel();
+    });
   }
 
   const select = document.getElementById('studytime-course');
   if (select) {
     select.addEventListener('change', () => switchPomodoroCourse(select.value || null));
   }
+}
+
+function setStudyRange(rangeId) {
+  state.studyRange = STUDY_RANGES.some((r) => r.id === rangeId) ? rangeId : 'today';
+  // "This week" opens on the whole week rather than on whichever day was
+  // singled out last time — the day filter belongs to the visit, not the range.
+  state.studyDay = null;
+  renderStudyTimePanel();
 }
 
 // Re-point the running session at another course (or at free study) without
@@ -3799,13 +4260,13 @@ async function exportSemester() {
 
 // parsedPayload is the already-parsed object returned by window.planner.importFile().
 async function importSemester(parsedPayload) {
-  if (!parsedPayload || parsedPayload._lectioType !== 'semester') {
-    alert('This file is not a Lectio semester export.');
-    return;
-  }
-  const sem = parsedPayload.semester;
-  if (!sem || !sem.id || !Array.isArray(sem.courses)) {
-    alert('The semester file appears corrupt or invalid.');
+  // Validation lives in core (LectioFile) so desktop and mobile accept and
+  // reject exactly the same files, with the same messages.
+  let sem;
+  try {
+    sem = window.LectioFile.parseSemesterFile(parsedPayload);
+  } catch (err) {
+    alert(err.message || String(err));
     return;
   }
 
@@ -3850,11 +4311,10 @@ async function importSemester(parsedPayload) {
       // Resolve id conflict
       let targetId = toSave.id;
       if (hasConflict && conflictChoice === 'new') {
-        const ids = new Set(existingList.map((s) => s.id));
-        let base = slugify(toSave.name);
-        let n = 2;
-        targetId = base;
-        while (ids.has(targetId)) targetId = `${base}-${n++}`;
+        targetId = window.LectioFile.uniqueSemesterId(
+          toSave.name,
+          new Set(existingList.map((s) => s.id))
+        );
         toSave.id = targetId;
       }
 
@@ -3889,15 +4349,10 @@ async function exportCourse(course) {
   });
   if (canceled) return;
 
-  // Export only the fields that belong to the course schema (no tags).
-  const clean = {
-    id: course.id,
-    name: course.name,
-    color: course.color,
-    examDate: course.examDate || '',
-    readings: course.readings.map(({ id, week, title, status }) => ({ id, week, title, status })),
-    tasks: course.tasks.map(({ id, week, title, dueDate, status }) => ({ id, week, title, dueDate, status })),
-  };
+  // Export only the fields that belong to the course schema (no tags), using
+  // core's canonical projection so the file matches the mobile app's byte for
+  // byte. Unlike the old local copy, this keeps item notes.
+  const clean = window.LectioFile.cleanCourse(course);
 
   try {
     await window.planner.exportCourse({ filePath, course: clean });
@@ -3909,8 +4364,11 @@ async function exportCourse(course) {
 
 // parsedPayload is the already-parsed object returned by window.planner.importFile().
 async function importCourse(parsedPayload) {
-  if (!parsedPayload || parsedPayload._lectioType !== 'course') {
-    alert('This file is not a Lectio course export.');
+  let incoming;
+  try {
+    incoming = window.LectioFile.parseCourseFile(parsedPayload);
+  } catch (err) {
+    alert(err.message || String(err));
     return;
   }
   if (!state.semester) {
@@ -3918,11 +4376,6 @@ async function importCourse(parsedPayload) {
     return;
   }
 
-  const incoming = parsedPayload.course;
-  if (!incoming || !incoming.name) {
-    alert('The course file appears corrupt or invalid.');
-    return;
-  }
 
   // Always assign a fresh id to avoid collisions within the current semester.
   const newCourse = {
@@ -3957,12 +4410,14 @@ async function importCourseFromModal() {
     return;
   }
 
-  if (!payload || payload._lectioType !== 'course' || !payload.course || !payload.course.name) {
-    alert('This file is not a valid Lectio course export.');
+  let incoming;
+  try {
+    incoming = window.LectioFile.parseCourseFile(payload);
+  } catch (err) {
+    alert(err.message || String(err));
     return;
   }
 
-  const incoming = payload.course;
   // Fresh ids so the course never collides with existing ones.
   const newCourse = {
     id: uid('course'),
@@ -4007,8 +4462,9 @@ function setupDragAndDrop() {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
     if (!file) return;
-    // Electron exposes the real fs path on File objects in the renderer.
-    const filePath = file.path;
+    // Electron removed the `File.path` augmentation; webUtils.getPathForFile()
+    // is its documented replacement and lives in preload (see window.fileUtils).
+    const filePath = window.fileUtils.getPathForFile(file);
     if (!filePath || !filePath.endsWith('.lectio.json')) {
       alert('Only .lectio.json files can be dropped here.');
       return;
@@ -4318,9 +4774,9 @@ function addCourseField(course) {
   container.appendChild(row);
 }
 
-function slugify(s) {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'semester';
-}
+// slugify + uniqueSemesterId come from core (LectioFile) so desktop, mobile and
+// the import paths all mint identical ids for the same semester name.
+const slugify = (s) => window.LectioFile.slugify(s);
 
 // Add the reading/task described by the items panel to the currently open
 // semester, mirroring the inline add-rows (same shape, via core's addItem).
@@ -4444,10 +4900,7 @@ async function submitSemesterFromModal() {
   });
 
   const existing = await api.list();
-  const ids = new Set(existing.map((s) => s.id));
-  let id = slugify(name);
-  let n = 2;
-  while (ids.has(id)) id = `${slugify(name)}-${n++}`;
+  const id = window.LectioFile.uniqueSemesterId(name, new Set(existing.map((s) => s.id)));
 
   const draft = state.editingSemester || {};
   const semester = {

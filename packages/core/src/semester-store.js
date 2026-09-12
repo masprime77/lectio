@@ -1,7 +1,7 @@
 'use strict';
 // Filesystem layer for semester JSON files. Pure Node — no Electron — so it can
 // be unit-tested directly against a temp directory. The main process wires
-// these into ipcMain handlers (see lib/ipc-handlers.js).
+// these into ipcMain handlers (see ./ipc-handlers.js).
 const fs = require('fs');
 const path = require('path');
 const { migrateStatusToTagId } = require('./storage/migrate');

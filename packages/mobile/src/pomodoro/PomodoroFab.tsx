@@ -35,7 +35,7 @@ import {
 } from '@lectio/core/pomodoro-core';
 import { useTheme } from '../theme';
 import { usePomodoro } from './PomodoroProvider';
-import { PomodoroSetupSheet } from './PomodoroSetupSheet';
+import { StudyTimerSheet } from './StudyTimerSheet';
 import { StudyTimeDashboard } from './StudyTimeDashboard';
 import type { Semester } from '../../types/lectio-core';
 
@@ -61,6 +61,10 @@ export function PomodoroFab({
     togglePause,
     skip,
     stop,
+    stopwatchElapsed,
+    stopwatchRunning,
+    stopwatchPaused,
+    pauseWatch,
   } = usePomodoro();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
@@ -150,7 +154,7 @@ export function PomodoroFab({
   );
 
   const sheet = (
-    <PomodoroSetupSheet
+    <StudyTimerSheet
       visible={sheetOpen}
       semester={semester}
       initialCourseId={defaultCourseId}
@@ -168,6 +172,65 @@ export function PomodoroFab({
   );
 
   if (idle) {
+    // No pomodoro — but the stopwatch may be the live timer instead, and it
+    // earns the same pill rather than hiding behind the sheet. It counts *up*
+    // with no phase to be a fraction of, so there is no meter and no dots:
+    // just the clock, tapped to pause, with the sheet one tap away for the
+    // assign step.
+    if (stopwatchRunning || stopwatchPaused) {
+      return (
+        <>
+          <Pressable
+            onPress={() => (stopwatchRunning ? pauseWatch() : setSheetOpen(true))}
+            accessibilityRole="button"
+            accessibilityLabel={`Stopwatch, ${formatClock(stopwatchElapsed)}, ${
+              stopwatchRunning ? 'running' : 'paused'
+            }`}
+            accessibilityHint={
+              stopwatchRunning
+                ? 'Tap to pause and choose where the time goes'
+                : 'Tap to save or discard this time'
+            }
+            style={({ pressed }) => [
+              styles.fab,
+              styles.pill,
+              {
+                bottom,
+                left,
+                backgroundColor: stopwatchRunning ? theme.accent : theme.surface,
+                borderColor: theme.border,
+                borderWidth: stopwatchRunning ? 0 : StyleSheet.hairlineWidth,
+              },
+              pressed && { opacity: 0.8 },
+            ]}
+          >
+            <ClockGlyph color={stopwatchRunning ? '#fff' : theme.accent} />
+            <View style={styles.meter}>
+              <Text
+                style={[
+                  styles.clock,
+                  { color: stopwatchRunning ? '#fff' : theme.text },
+                ]}
+              >
+                {formatClock(stopwatchElapsed)}
+              </Text>
+              <Text
+                style={[
+                  styles.label,
+                  { color: stopwatchRunning ? 'rgba(255,255,255,0.85)' : theme.muted },
+                ]}
+                numberOfLines={1}
+              >
+                Stopwatch
+              </Text>
+            </View>
+          </Pressable>
+          {studyButton}
+          {sheet}
+          {dashboard}
+        </>
+      );
+    }
     return (
       <>
         <Pressable
@@ -415,6 +478,10 @@ const styles = StyleSheet.create({
   pill: { flexDirection: 'row', gap: 10, borderRadius: 28, paddingHorizontal: 18 },
   // tabular-nums keeps the pill from jittering in width every second.
   clock: { fontSize: 17, fontWeight: '700', fontVariant: ['tabular-nums'], textAlign: 'center' },
+
+  // What the stopwatch pill shows under its clock, where a pomodoro would put
+  // its progress bar. Centred on the clock, which is the widest thing there.
+  label: { fontSize: 10, fontWeight: '600', textAlign: 'center' },
 
   // Dots + clock + progress bar, stacked in the clock's old slot. `stretch`
   // hands the bar the clock's width, so nothing here widens the pill.
