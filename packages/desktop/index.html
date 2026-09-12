@@ -3,6 +3,36 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!--
+    Content-Security-Policy. Notes on why each directive is what it is — this
+    page has real constraints, so do not "tighten" it without checking them:
+
+    - script-src: every script is a local sibling ('self'), except the
+      anti-flash theme block below, which is allowed by its SHA-256 hash.
+      *** If you edit that inline script, recompute the hash or it stops
+      running and the app flashes the wrong theme on launch. ***
+    - style-src: 57-odd inline style="..." attributes plus the Google Fonts
+      stylesheet, hence 'unsafe-inline' and the fonts.googleapis.com origin.
+    - font-src: the font files Google Fonts' stylesheet then pulls.
+    - connect-src is `https:` rather than an origin list on purpose. The
+      renderer talks to Supabase and the feedback endpoint, but it also calls
+      whatever Moodle host the user connects (see createMoodleClient), which
+      cannot be enumerated ahead of time. Restricting the *scheme* still rules
+      out http/ws/file exfiltration.
+    - frame-src/object-src 'none' and base-uri 'self': nothing here embeds or
+      rebases, so deny outright.
+  -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' 'sha256-GLpKuSwKYtPlXGkKDpCPiEoLnU1pneF20kN0s44qRGs=';
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    font-src https://fonts.gstatic.com;
+    img-src 'self' data:;
+    connect-src https:;
+    frame-src 'none';
+    object-src 'none';
+    base-uri 'self';
+  " />
   <!-- Apply the saved theme before any rendering to avoid a flash of wrong theme. -->
   <script>
     (function () {
