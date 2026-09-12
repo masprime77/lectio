@@ -1,5 +1,14 @@
 ## Unreleased
 
+- Removed: dead code with no remaining callers — the `externalLinks` IPC bridge
+  and its `open-external` handler (left behind when feedback moved in-app), the
+  superseded tick-based Pomodoro helpers in `@lectio/core`
+  (`createIdleState`/`startWork`/`tick`/`advancePhase`; the deadline-based
+  session API has encoded the same cadence for a while), the unreferenced
+  `docs/brand_images/old_icon.png`, and `packages/desktop/start.command`, whose
+  double-click path ran `npm install` in the wrong directory for this
+  workspace layout. No user-facing behaviour changes.
+
 - Changed (security): the export and import IPC handlers now only read or write
   paths ending in `.lectio.json`. They previously accepted any non-empty string
   from the renderer and called `fs.writeFileSync` / `fs.readFileSync` on it with
