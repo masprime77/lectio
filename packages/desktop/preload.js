@@ -56,14 +56,6 @@ contextBridge.exposeInMainWorld('fileUtils', {
   getPathForFile: (file) => webUtils.getPathForFile(file),
 });
 
-// External links: open a URL in the default browser. Main restricts this to
-// https github.com URLs (used for the pre-filled feedback issue links).
-// NB: named `externalLinks`, not `external` — `window.external` is a built-in
-// browser property and exposeInMainWorld can't bind on top of it.
-contextBridge.exposeInMainWorld('externalLinks', {
-  openExternal: (url) => ipcRenderer.invoke('open-external', url),
-});
-
 // Settings bridge: file-based settings (settings.json) read/write, plus the
 // "open settings" signal from the menu / Cmd+, accelerator.
 contextBridge.exposeInMainWorld('settings', {

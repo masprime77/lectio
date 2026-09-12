@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, dialog, shell, safeStorage, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, dialog, safeStorage, screen } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log/main');
 const fs = require('fs');
@@ -576,21 +576,6 @@ ipcMain.handle('show-open-dialog', async (event, { title }) => {
   return { canceled: false, filePath: filePaths[0] };
 });
 
-// Open an external link in the user's default browser. Restricted to https
-// github.com URLs (used for the pre-filled feedback/bug-report issue links) so
-// the renderer can't ask the OS to open arbitrary URLs.
-ipcMain.handle('open-external', (event, url) => {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol === 'https:' && parsed.hostname === 'github.com') {
-      return shell.openExternal(parsed.href);
-    }
-  } catch (e) {
-    /* malformed URL → ignore */
-  }
-  return Promise.resolve();
-});
-
 // ---------------------------------------------------------------------------
 // Moodle: secure token storage + SSO capture window
 //
@@ -732,9 +717,8 @@ function captureOAuthRedirect(oauthUrl) {
     let settled = false;
 
     // The renderer supplies this URL and we navigate a real window to it, so
-    // check it the same way the open-external handler does: parse, then require
-    // https. Without this a malformed string reaches loadURL, and a valid but
-    // wrong scheme (file://, for one) would actually load.
+    // parse it and require https first. Without this a malformed string
+    // reaches loadURL, and a valid but wrong scheme (file://) would load.
     let authorizeUrl;
     try {
       authorizeUrl = new URL(oauthUrl);
