@@ -5,15 +5,18 @@ course, per week, with click-to-cycle status badges and per-course progress
 bars. Lectio ships as two apps from one monorepo:
 
 - a framework-free **native desktop app** (macOS + Windows) built on
-  [Electron](https://www.electronjs.org/) — each semester is a plain JSON file
-  on disk, with no database and no server, and
+  [Electron](https://www.electronjs.org/) — signed out, each semester is a
+  plain JSON file on disk with no database and no server; signed in, the same
+  semesters sync through Supabase, and
 - a **mobile app** (iOS + Android) built with [Expo](https://expo.dev/) /
   React Native that syncs semesters across devices through
-  [Supabase](https://supabase.com/) with email/password sign-in.
+  [Supabase](https://supabase.com/), with email/password, Google or Apple
+  sign-in.
 
-Both apps share the same planner logic from the `@lectio/core` workspace. The
-mobile app is an early preview that mirrors a subset of the desktop features —
-see [`docs/planning/PENDING_FEATURES.md`](docs/planning/PENDING_FEATURES.md) for the gaps.
+Both apps share the same planner logic from the `@lectio/core` workspace, and a
+signed-in account sees the same semesters on desktop and mobile alike. The
+mobile app still mirrors a subset of the desktop features — see
+[`docs/planning/PENDING_FEATURES.md`](docs/planning/PENDING_FEATURES.md) for the gaps.
 
 ![CI](https://github.com/masprime77/lectio/actions/workflows/ci.yml/badge.svg)
 [![Latest release](https://img.shields.io/github/v/release/masprime77/lectio?label=download)](https://github.com/masprime77/lectio/releases/latest)
@@ -149,7 +152,9 @@ The mobile app lives in the `@lectio/mobile` workspace
 Android.
 
 Semesters sync through Supabase (Postgres + Row Level Security), gated behind
-email/password sign-in, so the same account sees the same data on every device.
+email/password, Google or Apple sign-in, so the same account sees the same data
+on every device — including the desktop app, which uses the same Supabase
+project once signed in.
 You need a Supabase project: copy
 [`packages/mobile/.env.example`](packages/mobile/.env.example) to
 `packages/mobile/.env` and fill in `EXPO_PUBLIC_SUPABASE_URL` and

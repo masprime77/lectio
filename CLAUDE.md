@@ -9,20 +9,32 @@ Guidance for AI assistants (and humans) working in this repo.
 ships as two apps sharing one core:
 
 - **`@lectio/desktop`** — a native **desktop app for macOS and Windows**
-  (Electron, framework-free **vanilla JS** renderer). **No server and no
-  database** — each semester is a plain JSON file the Electron main process
-  reads/writes directly via Node's `fs` (the `fs-storage` adapter).
+  (Electron, framework-free **vanilla JS** renderer). Signed out, it is
+  entirely local: each semester is a plain JSON file the Electron main process
+  reads/writes via Node's `fs` (the `fs-storage` adapter). Signed in, the same
+  renderer talks to **Supabase** instead (the desktop `supabase-storage`
+  adapter).
 - **`@lectio/mobile`** — an **Expo / React Native app for iOS and Android**
   (Expo Router + TypeScript, runs in Expo Go). Semesters sync across devices
-  through **Supabase** (Postgres + RLS) behind email/password auth (the
-  `supabase-storage` adapter); a `device-storage` adapter (on-device
-  AsyncStorage) is kept for a future offline mode.
+  through **Supabase** (Postgres + RLS) behind email/password, Google OAuth or
+  Sign in with Apple (the `supabase-storage` adapter); a `device-storage`
+  adapter (on-device AsyncStorage) is kept for a future offline mode.
 - **`@lectio/core`** — pure, DOM/Electron-free planner logic plus the async
   **storage contract** and adapters, shared by all of the above.
 
-Sync is currently **mobile-only**: desktop still uses `fs-storage` and is not
-wired to Supabase, so cross-device sync works mobile↔mobile. Remaining gaps are
-tracked in [`docs/planning/PENDING_FEATURES.md`](docs/planning/PENDING_FEATURES.md).
+**Sync works on both platforms.** The desktop is wired to Supabase through
+`supabase-client.js` (builds `window.lectioSupabase`), `auth.js` (the
+renderer's sign-in surface) and `supabase-storage.js` (a contract-compliant
+cloud adapter). The renderer picks its adapter at runtime — see
+`getActiveStorage()` in `app.js`, which returns `window.lectioSupabaseStorage`
+when a session exists and falls back to the `fsStorage` IPC wrapper otherwise —
+so the local store remains the offline path rather than being replaced. `local-import.js`
+is the one-time, non-destructive upload that migrates a user's existing local
+semesters into their cloud account. Because the renderer can't read
+`process.env`, `scripts/sync-supabase.js` generates its config on
+prestart/predev/prebuild and **fails the build in CI** when the Supabase
+secrets are absent. Remaining gaps are tracked in
+[`docs/planning/PENDING_FEATURES.md`](docs/planning/PENDING_FEATURES.md).
 
 ## Commands
 
