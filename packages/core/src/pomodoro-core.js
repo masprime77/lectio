@@ -500,7 +500,10 @@
       id: uidLocal('st'),
       seconds: secs,
       source: o.source || 'manual',
-      date: o.date || new Date().toISOString().slice(0, 10),
+      // Local, not UTC: an evening session must count as that evening (see
+      // localDateKey). An explicit `date` wins, which is how a manually logged
+      // entry lands on the day it was actually studied.
+      date: isValidDateKey(o.date) ? o.date : localDateKey(),
       createdAt: new Date().toISOString(),
     });
     if (bucket.sessions.length > MAX_SESSIONS) {
@@ -539,7 +542,7 @@
         id: uidLocal('adj'),
         seconds: delta,
         source: 'adjustment',
-        date: new Date().toISOString().slice(0, 10),
+        date: localDateKey(),
         createdAt: new Date().toISOString(),
       });
       if (bucket.sessions.length > MAX_SESSIONS) {
@@ -598,10 +601,325 @@
     return Math.round(hours * 3600 + minutes * 60);
   }
 
+  // ---- Local calendar keys -------------------------------------------------
+  // Every session entry is stamped with a 'YYYY-MM-DD' key in the *user's own*
+  // timezone. This is deliberately not an ISO/UTC slice: studying at 22:00 in
+  // Berlin must land on that evening's date, not on tomorrow's, or the "today"
+  // view is wrong for everyone east of Greenwich for part of each day.
+  // Entries written before this change keep whatever key they were given.
+
+  // Monday. The semester's own weeks start on a Monday (`startDate` is
+  // documented as "Monday of week 1"), so the study week matches the planner's.
+  const WEEK_START_DAY = 1;
+
+  // How many calendar weeks of per-session detail are kept — the current week
+  // plus the three before it. Older entries are pruned (see
+  // pruneStudySessions); their hours survive in the bucket's `totalSeconds`,
+  // which is never trimmed, so the all-time view stays complete while the file
+  // stops growing.
+  const STUDY_LOG_WEEKS = 4;
+
+  function pad2(n) {
+    return String(n).padStart(2, '0');
+  }
+
+  // 'YYYY-MM-DD' for a Date / epoch ms / nothing-at-all, in local time.
+  function localDateKey(value) {
+    const d =
+      value instanceof Date ? value : typeof value === 'number' ? new Date(value) : new Date();
+    if (Number.isNaN(d.getTime())) return localDateKey(Date.now());
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  }
+
+  function isValidDateKey(key) {
+    if (typeof key !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(key)) return false;
+    const [y, m, d] = key.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    return (
+      date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d
+    );
+  }
+
+  // Local midnight for a date key, or null when the key is malformed. Local
+  // rather than UTC so day arithmetic crosses DST boundaries correctly.
+  function dateKeyToDate(key) {
+    if (!isValidDateKey(key)) return null;
+    const [y, m, d] = key.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+
+  // `key` shifted by whole days. Returns null for a malformed key. Goes through
+  // a real Date so month lengths and DST transitions are handled by the
+  // platform rather than by arithmetic on milliseconds.
+  function addDaysToKey(key, days) {
+    const date = dateKeyToDate(key);
+    if (!date) return null;
+    date.setDate(date.getDate() + Math.round(Number(days) || 0));
+    return localDateKey(date);
+  }
+
+  // The Monday on or before `key`.
+  function weekStartKey(key) {
+    const date = dateKeyToDate(key);
+    if (!date) return null;
+    const delta = (date.getDay() - WEEK_START_DAY + 7) % 7;
+    date.setDate(date.getDate() - delta);
+    return localDateKey(date);
+  }
+
+  // Every date key from `fromKey` to `toKey`, inclusive. Empty for a malformed
+  // or inverted range; capped so a nonsense range can't spin forever.
+  function dateKeysBetween(fromKey, toKey) {
+    if (!isValidDateKey(fromKey) || !isValidDateKey(toKey)) return [];
+    const keys = [];
+    let cursor = fromKey;
+    for (let i = 0; i <= 400 && cursor <= toKey; i += 1) {
+      keys.push(cursor);
+      cursor = addDaysToKey(cursor, 1);
+      if (!cursor) break;
+    }
+    return keys;
+  }
+
+  // ---- Study-time ranges ---------------------------------------------------
+  // The dashboard asks for one of a few named windows; both apps derive them
+  // from here so their "this week" can never mean two different things.
+  // `weekOffset` 0 is the current week, -1 the previous one, and so on — four
+  // weeks back is as far as the log is kept (STUDY_LOG_WEEKS).
+
+  function studyDayRange(dayOffset, nowMs) {
+    const key = addDaysToKey(localDateKey(nowMs), dayOffset || 0);
+    return { from: key, to: key };
+  }
+
+  function studyWeekRange(weekOffset, nowMs) {
+    const thisWeek = weekStartKey(localDateKey(nowMs));
+    const from = addDaysToKey(thisWeek, (Math.round(Number(weekOffset) || 0)) * 7);
+    return { from, to: addDaysToKey(from, 6) };
+  }
+
+  // The oldest date whose per-session detail is still kept.
+  function studyLogCutoffKey(nowMs, weeksKept) {
+    const weeks = clampInt(weeksKept, 1, 52, STUDY_LOG_WEEKS);
+    return studyWeekRange(-(weeks - 1), nowMs).from;
+  }
+
+  // ---- Reading the session log --------------------------------------------
+
+  // 'adjustment' entries are the signed difference left behind when a total is
+  // corrected by hand. They are a correction to the all-time number, not time
+  // studied at a moment, so they never appear in a day or week view — those are
+  // built only from time that was actually clocked or explicitly logged.
+  function isTimedEntry(entry) {
+    return !!entry && entry.source !== 'adjustment' && Number(entry.seconds) > 0;
+  }
+
+  function bucketSecondsInRange(bucket, fromKey, toKey) {
+    if (!bucket || !Array.isArray(bucket.sessions)) return 0;
+    let total = 0;
+    bucket.sessions.forEach((entry) => {
+      if (!isTimedEntry(entry)) return;
+      if (!isValidDateKey(entry.date)) return;
+      if (entry.date < fromKey || entry.date > toKey) return;
+      total += Math.round(Number(entry.seconds));
+    });
+    return total;
+  }
+
+  // Shapes a list of { id, name, color, seconds, freeStudy } into the same
+  // { totalSeconds, courses } breakdown studyTimeByCourse returns, so a ranged
+  // view and the all-time view can share one renderer.
+  function shapeBreakdown(tracked) {
+    const totalSeconds = tracked.reduce((sum, c) => sum + c.seconds, 0);
+    const sorted = tracked.slice().sort((a, b) => b.seconds - a.seconds);
+    return {
+      totalSeconds,
+      courses: sorted.map((c) => ({
+        ...c,
+        share: totalSeconds > 0 ? c.seconds / totalSeconds : 0,
+        percent: totalSeconds > 0 ? Math.round((c.seconds / totalSeconds) * 100) : 0,
+      })),
+    };
+  }
+
+  // Where the time studied between two dates (inclusive) went — the ranged
+  // counterpart of studyTimeByCourse, in the same shape. Built from the session
+  // log rather than from the running totals, so it only knows about time
+  // clocked since the log started being kept; categories with nothing in the
+  // range are left out. Never mutates its argument.
+  function studyTimeInRange(semester, fromKey, toKey) {
+    if (!isValidDateKey(fromKey) || !isValidDateKey(toKey) || toKey < fromKey) {
+      return { totalSeconds: 0, courses: [] };
+    }
+    const list = semester && Array.isArray(semester.courses) ? semester.courses : [];
+    const tracked = [];
+    list.forEach((course) => {
+      const seconds = bucketSecondsInRange(course.studyTime, fromKey, toKey);
+      if (seconds <= 0) return;
+      tracked.push({
+        id: course.id,
+        name: course.name,
+        color: course.color || null,
+        seconds,
+        freeStudy: false,
+      });
+    });
+    const freeSeconds = semester ? bucketSecondsInRange(semester.freeStudy, fromKey, toKey) : 0;
+    if (freeSeconds > 0) {
+      tracked.push({
+        id: FREE_STUDY_ID,
+        name: FREE_STUDY_NAME,
+        color: FREE_STUDY_COLOR,
+        seconds: freeSeconds,
+        freeStudy: true,
+      });
+    }
+    return shapeBreakdown(tracked);
+  }
+
+  // One entry per day in the range, gap-filled with zeroes so a week always has
+  // seven bars: [{ date, totalSeconds }]. The per-course split for a single day
+  // comes from studyTimeInRange(semester, day, day).
+  function studyTimeByDay(semester, fromKey, toKey) {
+    return dateKeysBetween(fromKey, toKey).map((date) => ({
+      date,
+      totalSeconds: studyTimeInRange(semester, date, date).totalSeconds,
+    }));
+  }
+
+  // ---- Log retention -------------------------------------------------------
+
+  // Drops session entries older than the kept window from every bucket on the
+  // semester, in place. `totalSeconds` is deliberately untouched: the all-time
+  // view keeps every hour ever tracked, and only the day/week detail ages out.
+  // Entries without a usable date are dropped too — they can never appear in a
+  // ranged view, and their hours are already in the total. Returns the number
+  // of entries removed.
+  function pruneStudySessions(semester, nowMs, weeksKept) {
+    if (!semester) return 0;
+    const cutoff = studyLogCutoffKey(nowMs, weeksKept);
+    let removed = 0;
+    const pruneBucket = (bucket) => {
+      if (!bucket || !Array.isArray(bucket.sessions)) return;
+      const kept = bucket.sessions.filter(
+        (entry) => isValidDateKey(entry && entry.date) && entry.date >= cutoff
+      );
+      removed += bucket.sessions.length - kept.length;
+      bucket.sessions = kept;
+    };
+    if (Array.isArray(semester.courses)) semester.courses.forEach((c) => pruneBucket(c.studyTime));
+    pruneBucket(semester.freeStudy);
+    return removed;
+  }
+
+  // ---- Stopwatch -----------------------------------------------------------
+  // The count-*up* timer: no phases, no durations, no breaks. It runs until the
+  // user pauses it, and only then is the elapsed time assigned to a course or
+  // to Free study — unlike the pomodoro, which knows what it credits before it
+  // starts.
+  //
+  // Shape:
+  //   { runningSince, bankedSeconds, startedDate, semesterId }
+  //   runningSince   epoch ms the current run began, or null while paused
+  //   bankedSeconds  seconds accumulated by earlier runs of this stopwatch
+  //   startedDate    local date key of the first start — the day the time is
+  //                  credited to, so a stretch begun at 23:50 counts as that
+  //                  evening rather than as the small hours of the next day
+  //   semesterId     the semester it was started against, so it can't be
+  //                  banked onto a different one
+  // Derived, never stored: idle is "not running and nothing banked".
+  // Like the pomodoro session it is plain JSON and wall-clock based, so it
+  // survives a quit, a sleep or a reload with no catch-up logic.
+
+  // A stopwatch forgotten overnight would otherwise offer to bank a day of
+  // "study". The same reasoning (and the same number) as MAX_OVERTIME_SECONDS.
+  const MAX_STOPWATCH_SECONDS = 8 * 3600;
+
+  function createIdleStopwatch() {
+    return { runningSince: null, bankedSeconds: 0, startedDate: null, semesterId: null };
+  }
+
+  function isStopwatchRunning(sw) {
+    return !!sw && typeof sw.runningSince === 'number';
+  }
+
+  function isStopwatchIdle(sw) {
+    return !isStopwatchRunning(sw) && !(sw && sw.bankedSeconds > 0);
+  }
+
+  // Paused means "stopped with something on the clock" — which is also the
+  // state in which the elapsed time is waiting to be assigned.
+  function isStopwatchPaused(sw) {
+    return !isStopwatchRunning(sw) && !!sw && sw.bankedSeconds > 0;
+  }
+
+  // Whole seconds on the clock, capped. Frozen while paused.
+  function stopwatchSeconds(sw, nowMs) {
+    if (!sw) return 0;
+    const banked = Number.isFinite(sw.bankedSeconds) ? Math.max(0, sw.bankedSeconds) : 0;
+    if (!isStopwatchRunning(sw)) return Math.min(MAX_STOPWATCH_SECONDS, banked);
+    const now = typeof nowMs === 'number' ? nowMs : Date.now();
+    const live = Math.max(0, Math.floor((now - sw.runningSince) / 1000));
+    return Math.min(MAX_STOPWATCH_SECONDS, banked + live);
+  }
+
+  // Start a fresh stopwatch. `opts` = { semesterId }.
+  function startStopwatch(opts, nowMs) {
+    const now = typeof nowMs === 'number' ? nowMs : Date.now();
+    const o = opts || {};
+    return {
+      runningSince: now,
+      bankedSeconds: 0,
+      startedDate: localDateKey(now),
+      semesterId: o.semesterId || null,
+    };
+  }
+
+  function pauseStopwatch(sw, nowMs) {
+    if (!isStopwatchRunning(sw)) return sw;
+    return { ...sw, runningSince: null, bankedSeconds: stopwatchSeconds(sw, nowMs) };
+  }
+
+  function resumeStopwatch(sw, nowMs) {
+    if (!isStopwatchPaused(sw)) return sw;
+    const now = typeof nowMs === 'number' ? nowMs : Date.now();
+    return { ...sw, runningSince: now };
+  }
+
+  function resetStopwatch() {
+    return createIdleStopwatch();
+  }
+
+  // Restores a stopwatch read back from storage. Anything malformed collapses
+  // to idle. A stopwatch that was running when the app closed keeps running —
+  // its elapsed time is capped, so a laptop shut for a week comes back offering
+  // at most the cap rather than a week of focus.
+  function rehydrateStopwatch(raw) {
+    if (!raw || typeof raw !== 'object') return createIdleStopwatch();
+    const banked =
+      typeof raw.bankedSeconds === 'number' && Number.isFinite(raw.bankedSeconds)
+        ? Math.max(0, Math.floor(raw.bankedSeconds))
+        : 0;
+    const runningSince =
+      typeof raw.runningSince === 'number' && Number.isFinite(raw.runningSince)
+        ? raw.runningSince
+        : null;
+    if (runningSince == null && banked <= 0) return createIdleStopwatch();
+    return {
+      runningSince,
+      bankedSeconds: banked,
+      startedDate: isValidDateKey(raw.startedDate) ? raw.startedDate : null,
+      semesterId: typeof raw.semesterId === 'string' ? raw.semesterId : null,
+    };
+  }
+
   return {
     DEFAULT_POMODORO_SETTINGS,
     MAX_SESSIONS,
     MAX_OVERTIME_SECONDS,
+    MAX_STOPWATCH_SECONDS,
+    WEEK_START_DAY,
+    STUDY_LOG_WEEKS,
     FREE_STUDY_ID,
     FREE_STUDY_NAME,
     FREE_STUDY_COLOR,
@@ -643,5 +961,30 @@
     formatClock,
     formatHoursMinutes,
     parseHoursMinutesInput,
+    // local calendar keys + ranges
+    localDateKey,
+    isValidDateKey,
+    dateKeyToDate,
+    addDaysToKey,
+    weekStartKey,
+    dateKeysBetween,
+    studyDayRange,
+    studyWeekRange,
+    studyLogCutoffKey,
+    // ranged study time
+    studyTimeInRange,
+    studyTimeByDay,
+    pruneStudySessions,
+    // stopwatch
+    createIdleStopwatch,
+    isStopwatchRunning,
+    isStopwatchPaused,
+    isStopwatchIdle,
+    stopwatchSeconds,
+    startStopwatch,
+    pauseStopwatch,
+    resumeStopwatch,
+    resetStopwatch,
+    rehydrateStopwatch,
   };
 });
