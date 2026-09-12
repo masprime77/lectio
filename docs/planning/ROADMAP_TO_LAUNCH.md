@@ -21,11 +21,12 @@ branch is **`dev`**, with `main` reserved for releases.
   and keep `docs/planning/PENDING_FEATURES.md` updated (tick items as they land).
 
 Current baseline (verified): monorepo with `@lectio/core`, `@lectio/desktop`
-(Electron, fs-storage, feature-complete), `@lectio/mobile` (Expo SDK 56, Expo
-Router, TS; email/password auth + Supabase sync; read + tag-cycling only). CI
-runs core Vitest + a macOS desktop build. GitHub Actions already on current
-majors. `PENDING_FEATURES.md` is the authoritative gap tracker this roadmap
-sequences.
+(Electron, feature-complete; `fs-storage` locally and Supabase sync once signed
+in, chosen per session by `getActiveStorage()`), `@lectio/mobile` (Expo SDK 56,
+Expo Router, TS; email/password + Google/Apple auth, Supabase sync, full
+content CRUD). CI runs core + mobile Vitest, a mobile typecheck, and a macOS
+desktop packaging build. GitHub Actions already on current majors.
+`PENDING_FEATURES.md` is the authoritative gap tracker this roadmap sequences.
 
 ---
 
